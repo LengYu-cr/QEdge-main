@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # ============================================================
 # QEdge 项目 .gitignore
 # 保留：app/src/main（模块源码） + QEdge后台/QEdge/（网页源代码）
@@ -66,3 +67,39 @@ QEdge后台/QEdge/sessions/
 QEdge后台/QEdge/cache/
 QEdge后台/QEdge/upload/
 QEdge后台/QEdge/backup/
+=======
+# Gradle files
+.gradle/
+build/
+
+# Local configuration file (sdk path, etc)
+local.properties
+
+# Log/OS Files
+*.log
+
+# Android Studio generated files and folders
+captures/
+.externalNativeBuild/
+.cxx/
+*.aab
+*.apk
+output-metadata.json
+
+# IntelliJ
+*.iml
+.idea/
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+
+# Keystore files
+*.jks
+*.keystore
+
+# Google Services (e.g. APIs or Firebase)
+google-services.json
+
+# Android Profiling
+*.hprof
+>>>>>>> 346e928118da6f6235cfeb17a431c0ecf7cd0adb
