@@ -1,0 +1,354 @@
+package me.lengyu.qedge.ui.services
+
+import android.content.Context
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.*
+import java.net.HttpURLConnection
+import java.net.URL
+import java.net.URLEncoder
+import java.io.FileReader
+import java.io.BufferedReader
+import java.io.IOException
+import java.nio.charset.StandardCharsets
+import java.util.zip.ZipEntry
+import java.util.zip.ZipInputStream
+import java.util.zip.ZipOutputStream
+import me.lengyu.qedge.utils.QQCurrentEnv
+
+object OnlinePluginService {
+
+    private const val BASE_URL = "https://v.yuafeng.cn/QEdge"
+    private const val PLUGIN_LIST_URL = "$BASE_URL/online_plugin/list.php"
+    private const val PLUGIN_DOWNLOAD_URL = "$BASE_URL/online_plugin/download.php"
+    private const val PLUGIN_UPLOAD_URL = "$BASE_URL/online_plugin/index.php"
+
+    fun fetchOnlinePlugins(search: String = "", callback: (List<OnlinePlugin>?, String?) -> Unit) {
+        Thread {
+            try {
+                val urlString = if (search.isNotEmpty()) {
+                    "$PLUGIN_LIST_URL?api=json&search=${URLEncoder.encode(search, "UTF-8")}"
+                } else {
+                    "$PLUGIN_LIST_URL?api=json"
+                }
+
+                val url = URL(urlString)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                connection.requestMethod = "GET"
+
+                val reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
+                val response = StringBuilder()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    response.append(line)
+                }
+                reader.close()
+
+                val json = JSONObject(response.toString())
+                if (json.getInt("code") == 200) {
+                    val data = json.getJSONArray("data")
+                    val plugins = mutableListOf<OnlinePlugin>()
+                    for (i in 0 until data.length()) {
+                        val item = data.getJSONObject(i)
+                        plugins.add(
+                            OnlinePlugin(
+                                id = item.getInt("could_id"),
+                                pluginId = item.getString("plugin_id"),
+                                pluginName = item.getString("plugin_name"),
+                                versionCode = item.getString("version_code"),
+                                authorName = item.getString("author_name"),
+                                uploadQq = item.getString("upload_qq"),
+                                downloadCount = item.getInt("download_count"),
+                                uploadTime = item.getString("upload_time")
+                            )
+                        )
+                    }
+                    callback(plugins, null)
+                } else {
+                    callback(null, json.getString("message"))
+                }
+            } catch (e: Exception) {
+                callback(null, e.message)
+            }
+        }.start()
+    }
+
+    fun downloadPlugin(
+        pluginId: String,
+        pluginName: String,
+        callback: (filePath: String?, error: String?, zipPath: String?, targetPath: String?) -> Unit
+    ) {
+        Thread {
+            try {
+                val url = URL("$PLUGIN_DOWNLOAD_URL?id=$pluginId")
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 30000
+                connection.readTimeout = 30000
+                connection.requestMethod = "GET"
+
+                val inputStream = connection.inputStream
+                val tempDir = File(QQCurrentEnv.getCurrentDir(), "temp")
+                if (!tempDir.exists()) {
+                    tempDir.mkdirs()
+                }
+                val tempFile = File(tempDir, "plugin_download_${pluginId}.zip")
+                if (tempFile.exists()) {
+                    tempFile.delete()
+                }
+
+                tempFile.outputStream().use { outputStream ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (inputStream.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+                    }
+                }
+                inputStream.close()
+
+                val pluginBaseDir = File(QQCurrentEnv.getCurrentDir(), "plugin")
+                val targetDir = pluginBaseDir.resolve(pluginName)
+                val pluginDir = extractPluginZip(tempFile, targetDir)
+
+                if (pluginDir != null) {
+                    tempFile.delete()
+                    callback(pluginDir.absolutePath, null, null, null)
+                } else {
+                    callback(null, "解压插件失败", tempFile.absolutePath, targetDir.absolutePath)
+                }
+            } catch (e: Exception) {
+                callback(null, e.message, null, null)
+            }
+        }.start()
+    }
+
+    private fun extractPluginZip(zipFile: File, targetDir: File): File? {
+        return try {
+            if (targetDir.exists() && !deleteDir(targetDir)) {
+                return null
+            }
+            if (!targetDir.mkdirs()) {
+                return null
+            }
+
+            val rootFolder = findRootFolder(zipFile)
+
+            ZipInputStream(BufferedInputStream(FileInputStream(zipFile)), StandardCharsets.UTF_8).use { zis ->
+                var entry: ZipEntry? = zis.nextEntry
+                while (entry != null) {
+                    val entryName = entry.name
+                    val relativePath = if (rootFolder.isNotEmpty() && entryName.startsWith("$rootFolder/")) {
+                        entryName.substring(rootFolder.length + 1)
+                    } else {
+                        entryName
+                    }
+
+                    if (relativePath.isEmpty() || relativePath == "/") {
+                        zis.closeEntry()
+                        entry = zis.nextEntry
+                        continue
+                    }
+
+                    val targetFile = targetDir.resolve(relativePath)
+                    if (!targetFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
+                        throw SecurityException("Zip Slip: ${entry.name}")
+                    }
+
+                    if (entry.isDirectory) {
+                        targetFile.mkdirs()
+                    } else {
+                        targetFile.parentFile?.mkdirs()
+                        targetFile.outputStream().buffered().use { fos ->
+                            zis.copyTo(fos, 8192)
+                        }
+                    }
+                    zis.closeEntry()
+                    entry = zis.nextEntry
+                }
+            }
+
+            targetDir
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
+    }
+
+    private fun findRootFolder(zipFile: File): String {
+        val pathCounts = mutableMapOf<String, Int>()
+        ZipInputStream(BufferedInputStream(FileInputStream(zipFile)), StandardCharsets.UTF_8).use { zis ->
+            var entry: ZipEntry? = zis.nextEntry
+            while (entry != null) {
+                val name = entry.name
+                if (!name.endsWith("/")) {
+                    val firstSlash = name.indexOf('/')
+                    if (firstSlash > 0) {
+                        val root = name.substring(0, firstSlash)
+                        pathCounts[root] = pathCounts.getOrDefault(root, 0) + 1
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
+        }
+        return pathCounts.maxByOrNull { it.value }?.key ?: ""
+    }
+
+    private fun deleteDir(dir: File): Boolean {
+        if (dir.isDirectory) {
+            dir.listFiles()?.forEach { deleteDir(it) }
+        }
+        return dir.delete()
+    }
+
+    private fun readFileContent(file: File): String {
+        return try {
+            file.readText(StandardCharsets.UTF_8)
+        } catch (e: IOException) {
+            e.printStackTrace()
+            ""
+        }
+    }
+
+    private fun readPluginDescription(pluginDir: File): String {
+        val descriptionFile = pluginDir.resolve("desc.txt")
+        return if (descriptionFile.exists()) {
+            readFileContent(descriptionFile)
+        } else {
+            ""
+        }
+    }
+
+    fun uploadPlugin(
+        pluginId: String,
+        pluginName: String,
+        versionCode: String,
+        authorName: String,
+        pluginDir: File,
+        callback: (Map<String, Any>?, String?) -> Unit
+    ) {
+        Thread {
+            var zipFile: File? = null
+            try {
+                val tempDir = File(QQCurrentEnv.getCurrentDir(), "temp").apply {
+                    if (!exists()) mkdirs()
+                }
+                zipFile = File(tempDir, "plugin_upload_${System.currentTimeMillis()}.zip")
+                zipDirectory(pluginDir, zipFile)
+
+                val boundary = "----WebKitFormBoundary${System.currentTimeMillis()}"
+                val url = URL(PLUGIN_UPLOAD_URL)
+                val connection = url.openConnection() as HttpURLConnection
+                connection.connectTimeout = 30000
+                connection.readTimeout = 30000
+                connection.requestMethod = "POST"
+                connection.setRequestProperty("Content-Type", "multipart/form-data; boundary=$boundary; charset=UTF-8")
+                connection.doOutput = true
+
+                val outputStream = DataOutputStream(BufferedOutputStream(connection.outputStream))
+
+                writeFormField(outputStream, boundary, "qq", QQCurrentEnv.getCurrentUin() ?: "")
+
+                val safeFileName = URLEncoder.encode(zipFile.name, "UTF-8")
+                    .replace("+", "%20")
+                outputStream.writeUtf8("--$boundary\r\n")
+                outputStream.writeUtf8(
+                    "Content-Disposition: form-data; name=\"pluginFile\"; filename=\"${zipFile.name}\"; filename*=UTF-8''$safeFileName\r\n"
+                )
+                outputStream.writeUtf8("Content-Type: application/zip\r\n")
+                outputStream.writeUtf8("Content-Transfer-Encoding: binary\r\n")
+                outputStream.writeUtf8("\r\n")
+
+                FileInputStream(zipFile).use { fis ->
+                    val buffer = ByteArray(8192)
+                    var bytesRead: Int
+                    while (fis.read(buffer).also { bytesRead = it } != -1) {
+                        outputStream.write(buffer, 0, bytesRead)
+                    }
+                }
+
+                outputStream.writeUtf8("\r\n")
+                outputStream.writeUtf8("--$boundary--\r\n")
+                outputStream.flush()
+                outputStream.close()
+
+                val reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
+                val response = StringBuilder()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    response.append(line)
+                }
+                reader.close()
+
+                zipFile.delete()
+                zipFile = null
+
+                val json = JSONObject(response.toString())
+                if (json.getInt("code") == 200) {
+                    val data = mutableMapOf<String, Any>()
+                    data["message"] = json.getString("message")
+                    if (json.has("data")) {
+                        val dataObj = json.getJSONObject("data")
+                        val keys = dataObj.keys()
+                        while (keys.hasNext()) {
+                            val key = keys.next()
+                            data[key] = dataObj.get(key)
+                        }
+                    }
+                    callback(data, null)
+                } else {
+                    callback(null, json.getString("message"))
+                }
+            } catch (e: Exception) {
+                zipFile?.delete()
+                callback(null, e.message)
+            }
+        }.start()
+    }
+
+    private fun DataOutputStream.writeUtf8(str: String) {
+        write(str.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    private fun writeFormField(output: DataOutputStream, boundary: String, name: String, value: String) {
+        output.writeUtf8("--$boundary\r\n")
+        output.writeUtf8("Content-Disposition: form-data; name=\"$name\"\r\n")
+        output.writeUtf8("Content-Type: text/plain; charset=UTF-8\r\n")
+        output.writeUtf8("Content-Transfer-Encoding: 8bit\r\n")
+        output.writeUtf8("\r\n")
+        output.writeUtf8(value)
+        output.writeUtf8("\r\n")
+    }
+
+    private fun zipDirectory(sourceDir: File, outputFile: File) {
+        ZipOutputStream(BufferedOutputStream(FileOutputStream(outputFile)), StandardCharsets.UTF_8).use { zos ->
+            zos.setLevel(java.util.zip.Deflater.BEST_SPEED)
+            sourceDir.walk().forEach { file ->
+                val relativePath = sourceDir.toPath().relativize(file.toPath()).toString()
+                if (file.isDirectory) {
+                    if (relativePath.isNotEmpty()) {
+                        zos.putNextEntry(ZipEntry("$relativePath/"))
+                        zos.closeEntry()
+                    }
+                } else {
+                    zos.putNextEntry(ZipEntry(relativePath))
+                    file.inputStream().use { it.copyTo(zos, 8192) }
+                    zos.closeEntry()
+                }
+            }
+            zos.finish()
+        }
+    }
+
+    data class OnlinePlugin(
+        val pluginId: String,
+        val pluginName: String,
+        val versionCode: String,
+        val authorName: String,
+        val uploadQq: String,
+        val downloadCount: Int,
+        val uploadTime: String,
+        val id: Int
+    )
+}

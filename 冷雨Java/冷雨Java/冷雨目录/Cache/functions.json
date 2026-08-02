@@ -1,0 +1,363 @@
+{
+    "code": 0,
+    "msg": "success",
+    "functions": [
+        {
+            "name": "开/关机",
+            "key": "lengyu520",
+            "desc": "控制机器人总开关",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "视频菜单",
+            "key": "视频菜单",
+            "desc": "视频搜索和发送功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "音乐菜单",
+            "key": "音乐菜单",
+            "desc": "音乐搜索和发送功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "自助头衔",
+            "key": "自助头衔",
+            "desc": "成员自助设置头衔",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "图片功能",
+            "key": "图片功能",
+            "desc": "一系列作图功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "查询系统",
+            "key": "查询系统",
+            "desc": "信息查询功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "图片菜单",
+            "key": "图片菜单",
+            "desc": "图片搜索和发送菜单",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "艾特回复",
+            "key": "艾特回复",
+            "desc": "[全局功能] 被@时自动回复",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "艾特禁言",
+            "key": "艾特禁言",
+            "desc": "[全局功能] 被@时自动禁言",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "艾特提醒",
+            "key": "艾特提醒",
+            "desc": "[全局功能] 被@时提醒",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "文案菜单",
+            "key": "文案菜单",
+            "desc": "文案相关功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "视频解析",
+            "key": "视频解析",
+            "desc": "短视频分享链接解析功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "音乐解析",
+            "key": "音乐解析",
+            "desc": "音乐分享链接解析功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "全局精准问答",
+            "key": "问答功能",
+            "desc": "[全局功能] 全局精准问答功能",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "本群精准问答",
+            "key": "问答功能",
+            "desc": "本群精准问答功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "全局模糊问答",
+            "key": "模糊问答",
+            "desc": "[全局功能] 全局模糊问答",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "本群模糊问答",
+            "key": "模糊问答",
+            "desc": "本群模糊问答",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "天气系统",
+            "key": "天气系统",
+            "desc": "天气查询功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "违禁系统",
+            "key": "违禁系统",
+            "desc": "违禁词检测功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回图片",
+            "key": "撤回图片",
+            "desc": "自动撤回图片",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回卡片",
+            "key": "撤回卡片",
+            "desc": "自动撤回卡片消息",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回链接",
+            "key": "撤回链接",
+            "desc": "自动撤回链接",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回语音",
+            "key": "撤回语音",
+            "desc": "自动撤回语音",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回自身",
+            "key": "撤回自身",
+            "desc": "[全局功能] 延迟n秒撤回自己发送的消息",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "赞我点赞",
+            "key": "赞我点赞",
+            "desc": "[全局功能] 自动点赞功能",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "我的信息",
+            "key": "我的信息",
+            "desc": "个人信息查询",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "进群提示",
+            "key": "进群提示",
+            "desc": "新成员进群欢迎",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "退群提示",
+            "key": "退群提示",
+            "desc": "成员退群通知",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "入群验证",
+            "key": "入群验证",
+            "desc": "新成员入群验证",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "刷屏检测",
+            "key": "刷屏检测",
+            "desc": "检测刷屏行为",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "菜单限制",
+            "key": "菜单限制",
+            "desc": "开启后群员无法触发本脚本",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "退群拉黑",
+            "key": "退群拉黑",
+            "desc": "退群自动拉黑",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "艾特作图",
+            "key": "艾特作图",
+            "desc": "指令+@某人自动作图",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "自助上管",
+            "key": "自助上管",
+            "desc": "自助申请管理员，使用群收款，可以自定义金额",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "整点报时",
+            "key": "整点报时",
+            "desc": "整点时间提醒，有图片/文字/语音模式",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "消息尾巴",
+            "key": "消息尾巴",
+            "desc": "[全局功能] 消息尾部尾部，头部添加内容，如:一言，翻译，拼音等",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "撤回红包",
+            "key": "撤回红包",
+            "desc": "自动撤回红包",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回视频",
+            "key": "撤回视频",
+            "desc": "自动撤回视频",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回灰字提示",
+            "key": "撤回灰字",
+            "desc": "自动撤回灰字提示",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回数字",
+            "key": "撤回数字",
+            "desc": "自动撤回含有数字消息",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回Markdown",
+            "key": "撤回Markdown",
+            "desc": "自动撤回Markdown消息",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回禁言",
+            "key": "撤回禁言",
+            "desc": "撤回消息时执行禁言",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "撤回踢出",
+            "key": "撤回踢出",
+            "desc": "撤回消息时执行踢出该群",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "入群收款",
+            "key": "入群收款",
+            "desc": "入群需要付款，群收款收费，可以自定义金额",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "反弹作图",
+            "key": "反弹作图",
+            "desc": "反弹艾特作图，艾特机器人时自动切换成作图对方",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "空间秒赞",
+            "key": "空间秒赞",
+            "desc": "[全局功能] QQ空间自动点赞，延迟30s",
+            "scope": "global",
+            "default": "0"
+        },
+        {
+            "name": "签到系统",
+            "key": "签到系统",
+            "desc": "群内签到系统",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "炸弹系统",
+            "key": "炸弹系统",
+            "desc": "埋炸弹，扔炸弹，看看谁能中",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "银行系统",
+            "key": "银行系统",
+            "desc": "抢银行，抢劫他人，存款，贷款等娱乐功能",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "宠物系统",
+            "key": "宠物系统",
+            "desc": "养宠物什么的",
+            "scope": "group",
+            "default": "0"
+        },
+        {
+            "name": "修仙系统",
+            "key": "修仙系统",
+            "desc": "修仙什么的",
+            "scope": "group",
+            "default": "0"
+        }
+    ]
+}

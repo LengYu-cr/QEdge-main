@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">QEdge</string>
+    <string name="plugin_name">JavaPlugin</string>
+    <string name="xposed_description">基于Xposed的多功能模块</string>
+</resources>

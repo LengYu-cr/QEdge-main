@@ -1,0 +1,68 @@
+# ============================================================
+# QEdge 项目 .gitignore
+# 保留：app/src/main（模块源码） + QEdge后台/QEdge/（网页源代码）
+# 忽略：构建产物、临时文件、APK、签名、IDE配置、参考项目、备份文件
+# ============================================================
+
+# ---------- Android Gradle 构建系统 ----------
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+app/qedge.jks
+app/*.keystore
+app/src.zip
+
+# ---------- 二进制依赖（libs/*.jar/*.aar，从 Maven 拉取即可不入库）----------
+libs/**/*.jar
+libs/**/*.aar
+!libs/.gitkeep
+
+# ---------- Android APK / Dex / 反编译工作区 ----------
+*.apk
+*.aab
+*.ap_
+*.dex
+QQ/
+QEdge后台/QEdge/PluginMethod/
+
+# ---------- IDE / 编辑器工作区（不共享个人配置）----------
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 备份 / 临时 / 日志 ----------
+*.bak
+*.tmp
+*.log
+*.zip
+build_info.txt
+build_output.txt
+build.log
+check_unused_drawable.py
+doc.html
+OnMenuBuild.kt
+SplashActivity.java
+icon.png
+
+# ---------- 参考项目（不是 QRoutine 自身源码）----------
+QFun-main/
+QStory/
+
+# ---------- 后台：环境生成的锁文件 / 导出 zip ----------
+QEdge后台/QEdge.zip
+QEdge后台/QEdge/user.zip
+QEdge后台/QEdge/install.lock
+
+# ---------- PHP 运行时（服务器端生成，不入库）----------
+QEdge后台/QEdge/**/*.log
+QEdge后台/QEdge/sessions/
+QEdge后台/QEdge/cache/
+QEdge后台/QEdge/upload/
+QEdge后台/QEdge/backup/

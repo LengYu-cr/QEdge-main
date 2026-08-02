@@ -1,0 +1,7 @@
+# API目录安全配置
+Options -Indexes
+
+<LimitExcept POST GET HEAD>
+    Order Allow,Deny
+    Deny from all
+</LimitExcept>

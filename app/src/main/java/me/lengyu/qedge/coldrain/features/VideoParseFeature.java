@@ -1,0 +1,428 @@
+package me.lengyu.qedge.coldrain.features;
+
+import org.json.JSONArray;
+import org.json.JSONObject;
+
+import me.lengyu.qedge.coldrain.ColdRainCore;
+import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.plugin.bean.MsgData;
+import me.lengyu.qedge.utils.HttpUtils;
+import me.lengyu.qedge.utils.qq.MsgTool;
+
+public class VideoParseFeature implements ColdRainFeature {
+
+    private static final String MY_API = "https://api.yuafeng.cn/";
+    private static final String MY_WEB = "https://api.yuafeng.cn/API/ly/";
+
+    @Override
+    public boolean shouldHandle(MsgData msgData) {
+        if (msgData.msg == null || msgData.msg.isEmpty()) return false;
+        String text = msgData.msg.trim();
+        if (text.equals("视频解析") || text.equals("解析菜单")) {
+            return true;
+        }
+        if (text.contains("https://v.douyin.com/")) return true;
+        if (text.contains("https://v.kuaishou.com/")) return true;
+        if (text.contains("https://b23.tv/")) return true;
+        if (text.contains("http://xhslink.com/")) return true;
+        if (text.contains("https://h5.pipix.com/s/")) return true;
+        if (text.contains("https://pd.qq.com/s/")) return true;
+        if (text.contains("https://mp.weixin.qq.com/s/")) return true;
+        return false;
+    }
+
+    @Override
+    public void handle(MsgData msgData, ColdRainCore core) {
+        String text = msgData.msg.trim();
+        String qun = msgData.peerUin;
+        int mtype = msgData.type;
+
+        if (text.equals("视频解析") || text.equals("解析菜单")) {
+            boolean enabled;
+            if (mtype == 2 && qun != null && !qun.isEmpty()) {
+                enabled = core.isGroupFeatureEnabled("feature_video_parse", qun);
+            } else {
+                enabled = core.isFeatureEnabled("feature_video_parse");
+            }
+            if (enabled) {
+                String menu = "解析菜单:\nTips:1.开启后直接发链接(可加文字)\n" +
+                    "仅支持快手，抖音，小红书，哔哩哔哩，皮皮虾，西瓜视频的视频/图集解析\n" +
+                    "2.支持QQ小世界解析(转发卡片)\n" +
+                    "3.支持微信公众号/QQ频道图集/视频解析";
+                sendMsg(msgData, menu);
+                return;
+            } else {
+                sendMsg(msgData, "本聊天未开启视频解析");
+                return;
+            }
+        }
+
+        if (!core.isFeatureEnabled("feature_video_parse")) {
+            if (mtype == 2 && qun != null && !qun.isEmpty()) {
+                if (!core.isGroupFeatureEnabled("feature_video_parse", qun)) {
+                    return;
+                }
+            } else {
+                return;
+            }
+        }
+
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    parseVideo(msgData, text);
+                } catch (Throwable e) {
+                    sendMsg(msgData, "解析出错: " + e.getMessage());
+                }
+            }
+        }).start();
+    }
+
+    private void parseVideo(MsgData msgData, String text) throws Exception {
+        String peerUin = msgData.peerUin;
+        int mtype = msgData.type;
+
+        if (text.contains("https://v.douyin.com/")) {
+            String sl = findRealUrl(text);
+            String url = MY_API + "API/ly/dyjx.php?url=" + urlEncode(sl);
+            String sj = HttpUtils.get(url);
+            if (sj == null || sj.isEmpty()) {
+                sendMsg(msgData, "请求服务器出错");
+                return;
+            }
+            JSONObject json = new JSONObject(sj);
+            String msg = json.optString("msg");
+            if ("获取成功".equals(msg)) {
+                String type = json.getString("type");
+                JSONObject data1 = json.getJSONObject("data");
+                if ("视频".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String video = data1.getString("url");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                        "\n视频发送中...");
+                    sendVideo(msgData, video);
+                } else if ("图集".equals(type)) {
+                    String cover = data1.getString("cover");
+                    JSONArray ttp = data1.getJSONArray("images");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                        "\n图集发送中...");
+                    for (int i = 0; i < ttp.length(); i++) {
+                        sendImg(msgData, ttp.getString(i));
+                    }
+                } else if ("视频集合".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    JSONArray ttp = data1.getJSONArray("videos");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                        "\n视频集合发送中...(共" + ttp.length() + "个视频)");
+                    for (int i = 0; i < ttp.length(); i++) {
+                        sendVideo(msgData, ttp.getString(i));
+                    }
+                }
+            } else {
+                sendMsg(msgData, sj);
+            }
+            return;
+        }
+
+        if (text.contains("https://v.kuaishou.com/")) {
+            String sl = findRealUrl(text);
+            String url = MY_API + "API/ly/ksjx.php?url=" + urlEncode(sl);
+            String sj = HttpUtils.get(url);
+            if (sj == null || sj.isEmpty()) {
+                sendMsg(msgData, "请求服务器出错");
+                return;
+            }
+            JSONObject json = new JSONObject(sj);
+            String msg = json.optString("msg");
+            if ("获取成功".equals(msg)) {
+                String type = json.getString("type");
+                JSONObject data1 = json.getJSONObject("data");
+                if ("视频".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String video = data1.getString("url");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                        "\n视频发送中...");
+                    sendVideo(msgData, video);
+                } else if ("图集".equals(type)) {
+                    String cover = data1.getString("cover");
+                    JSONArray ttp = data1.getJSONArray("images");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                        "\n图集发送中...");
+                    for (int i = 0; i < ttp.length(); i++) {
+                        sendImg(msgData, ttp.getString(i));
+                    }
+                }
+            } else {
+                sendMsg(msgData, sj);
+            }
+            return;
+        }
+
+        if (text.contains("https://b23.tv/")) {
+            String msgs = fetchRedirectUrl(findRealUrl(text));
+            try {
+                String url = HttpUtils.get(MY_API + "API/ly/bilibili_jx.php?url=" + urlEncode(msgs));
+                if (url == null || url.isEmpty()) {
+                    sendMsg(msgData, "请求服务器出错");
+                    return;
+                }
+                JSONObject json = new JSONObject(url);
+                String msg = json.getString("msg");
+                if ("获取成功".equals(msg)) {
+                    JSONObject data1 = json.getJSONObject("data");
+                    String cover = data1.getString("cover");
+                    String video = data1.getString("video");
+                    String title = data1.getString("title");
+                    String duration = data1.getJSONObject("origin").getString("duration_format");
+                    String author = json.getJSONObject("author").getString("name");
+                    String desc = data1.getString("desc");
+                    String publish_time = data1.getString("publish_time");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n时长:" + duration + "\n发布时间:" + publish_time + "\n视频发送中...");
+                    sendVideo(msgData, video);
+                } else {
+                    sendMsg(msgData, "出现错误:" + json.optString("msg"));
+                }
+            } catch (Exception e) {
+                sendMsg(msgData, "出现错误:" + e.getMessage());
+            }
+            return;
+        }
+
+        if (text.contains("http://xhslink.com/") ||
+            text.contains("https://h5.pipix.com/s/")) {
+            String sl = findRealUrl(text);
+            String url = MY_API + "API/spjx/api.php?url=" + urlEncode(sl);
+            String sj = HttpUtils.get(url);
+            if (sj == null || sj.isEmpty()) {
+                sendMsg(msgData, "请求服务器出错");
+                return;
+            }
+            JSONObject json = new JSONObject(sj);
+            String msg = json.optString("msg");
+            if ("获取成功".equals(msg)) {
+                String data1 = json.getString("data");
+                if (!sj.contains("images")) {
+                    JSONObject json1 = new JSONObject(data1);
+                    String cover = json1.getString("cover");
+                    String video = json1.optString("url", json1.optString("video", ""));
+                    String title = json1.getString("title");
+                    sendMsg(msgData, "[pic=" + cover + "]\n" + title);
+                    if (!video.isEmpty()) {
+                        sendVideo(msgData, video);
+                    }
+                } else {
+                    JSONObject json1 = new JSONObject(data1);
+                    String cover = json1.getString("cover");
+                    JSONArray ttp = json1.getJSONArray("images");
+                    String title = json1.getString("title");
+                    String tp2 = "";
+                    for (int i = 0; i < ttp.length(); i++) {
+                        tp2 += "[pic=" + ttp.getString(i) + "]";
+                    }
+                    sendMsg(msgData, "图片来咯～" + tp2 + "标题:" + title);
+                }
+            } else {
+                sendMsg(msgData, sj);
+            }
+            return;
+        }
+
+        if (text.contains("https://pd.qq.com/s/")) {
+            String sl = findRealUrl(text);
+            String url = MY_WEB + "pdjx.php?url=" + urlEncode(sl);
+            String sj = HttpUtils.get(url);
+            if (sj == null || sj.isEmpty()) {
+                sendMsg(msgData, "请求服务器出错");
+                return;
+            }
+            JSONObject json = new JSONObject(sj);
+            String msg = json.optString("msg");
+            if ("获取成功".equals(msg)) {
+                String type = json.getString("type");
+                JSONObject data1 = json.getJSONObject("data");
+                if ("视频".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String video = data1.getString("video");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                        "\n视频发送中...");
+                    sendVideo(msgData, video);
+                } else if ("图集".equals(type)) {
+                    String cover = data1.getString("cover");
+                    JSONArray ttp = data1.getJSONArray("images");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                        "\n图集发送中...");
+                    for (int i = 0; i < ttp.length(); i++) {
+                        sendImg(msgData, ttp.getString(i));
+                    }
+                }
+            } else {
+                sendMsg(msgData, sj);
+            }
+            return;
+        }
+
+        if (text.contains("https://mp.weixin.qq.com/s/")) {
+            String sl = findRealUrl(text);
+            String url = MY_WEB + "wxjx.php?url=" + urlEncode(sl);
+            String sj = HttpUtils.get(url);
+            if (sj == null || sj.isEmpty()) {
+                sendMsg(msgData, "请求服务器出错");
+                return;
+            }
+            JSONObject json = new JSONObject(sj);
+            String msg = json.optString("msg");
+            if ("获取成功".equals(msg)) {
+                String type = json.getString("type");
+                JSONObject data1 = json.getJSONObject("data");
+                String title = data1.getString("title");
+                String desc = data1.getString("desc");
+                if ("视频".equals(type)) {
+                    JSONArray ttp = data1.getJSONArray("video");
+                    sendMsg(msgData, "标题:" + title + "\n文章内容:\n" + desc);
+                    if (ttp.length() > 1 || !ttp.getString(0).contains(".mp4")) {
+                        StringBuilder sb = new StringBuilder("视频列表:\n");
+                        for (int i = 0; i < ttp.length(); i++) {
+                            sb.append(ttp.getString(i)).append("\n");
+                        }
+                        sendMsg(msgData, sb.toString());
+                    } else {
+                        sendVideo(msgData, ttp.getString(0));
+                    }
+                } else if ("图集".equals(type)) {
+                    JSONArray ttp = data1.getJSONArray("images");
+                    StringBuilder sb = new StringBuilder("图片来咯～");
+                    for (int i = 0; i < ttp.length(); i++) {
+                        sb.append("[pic=").append(ttp.getString(i)).append("]");
+                    }
+                    sb.append("标题:").append(title).append("\n文章内容:\n").append(desc);
+                    sendMsg(msgData, sb.toString());
+                } else if ("图集and视频".equals(type)) {
+                    JSONArray ttp = data1.getJSONArray("images");
+                    StringBuilder sb = new StringBuilder("图片来咯～");
+                    for (int i = 0; i < ttp.length(); i++) {
+                        sb.append("[pic=").append(ttp.getString(i)).append("]");
+                    }
+                    sb.append("标题:").append(title).append("\n文章内容:\n").append(desc);
+                    sendMsg(msgData, sb.toString());
+                    JSONArray ttp2 = data1.getJSONArray("video");
+                    if (ttp2.length() > 1 || !ttp2.getString(0).contains(".mp4")) {
+                        StringBuilder sb2 = new StringBuilder("视频列表:\n");
+                        for (int i = 0; i < ttp2.length(); i++) {
+                            sb2.append(ttp2.getString(i)).append("\n");
+                        }
+                        sendMsg(msgData, sb2.toString());
+                    } else {
+                        sendVideo(msgData, ttp2.getString(0));
+                    }
+                }
+            } else {
+                sendMsg(msgData, sj);
+            }
+            return;
+        }
+    }
+
+    private static String findRealUrl(String text) {
+        try {
+            java.util.regex.Matcher matcher = java.util.regex.Pattern
+                .compile("(https?://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|])")
+                .matcher(text);
+            if (matcher.find()) {
+                return matcher.group(1);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return text;
+    }
+
+    private static String fetchRedirectUrl(String urlStr) {
+        try {
+            java.net.URL url = new java.net.URL(urlStr);
+            java.net.HttpURLConnection conn = (java.net.HttpURLConnection) url.openConnection();
+            conn.setInstanceFollowRedirects(false);
+            conn.setConnectTimeout(10000);
+            conn.setReadTimeout(10000);
+            conn.setRequestProperty("User-Agent",
+                "Mozilla/5.0 (Linux; Android 10; MI 9 Build/QKQ1.190825.002; wv) " +
+                "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/87.0.4280.101 " +
+                "Mobile Safari/537.36");
+            conn.connect();
+            String redirect = conn.getHeaderField("Location");
+            conn.disconnect();
+            if (redirect != null && !redirect.isEmpty()) {
+                return redirect;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return urlStr;
+    }
+
+    private static String urlEncode(String str) {
+        try {
+            return java.net.URLEncoder.encode(str, "UTF-8");
+        } catch (Exception e) {
+            return str;
+        }
+    }
+
+    private static void sendMsg(MsgData msgData, String text) {
+        ColdRainCore.getInstance().reply(msgData, text);
+    }
+
+    private static void sendImg(MsgData msgData, String imgUrl) {
+        try {
+            if (imgUrl == null || imgUrl.isEmpty()) return;
+            MsgTool.sendPic(msgData.peerUin, imgUrl, msgData.type);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void sendVideo(MsgData msgData, String videoUrl) {
+        try {
+            if (videoUrl == null || videoUrl.isEmpty()) return;
+            MsgTool.sendVideo(msgData.peerUin, videoUrl, msgData.type);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+}
