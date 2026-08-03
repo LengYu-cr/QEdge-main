@@ -97,6 +97,9 @@ dependencies {
     
     implementation libs.dalvik.dx
 
+    implementation libs.kavaref.core
+    implementation libs.kavaref.extension
+
     implementation "io.coil-kt:coil-compose:2.5.0"
 
     compileOnly project(':qqinterface')
