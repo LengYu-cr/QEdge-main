@@ -39,10 +39,6 @@
             android:name=".activity.SettingActivity"
             android:exported="false"
             android:theme="@style/Theme.QEdge" />
-        <activity
-            android:name=".activity.PluginActivity"
-            android:exported="false"
-            android:theme="@style/Theme.QEdge" />
         <meta-data
             android:name="xposedmodule"
             android:value="true" />
