@@ -65,6 +65,7 @@ import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.ModuleConfig
+import me.lengyu.qedge.hook.item.QZoneSchedule
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box as ComposeBox
 
@@ -103,7 +104,15 @@ fun HomeScreen(
     var videoToBubble by remember { mutableStateOf(ModuleConfig.getBoolean("video_to_bubble", false)) }
     var antiPokeDelay by remember { mutableStateOf(ModuleConfig.getBoolean("anti_poke_delay", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
+    var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
+    var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, false)) }
+    var dailySignEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_DAILY_SIGN_ENABLED, false)) }
+    var bigVipCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, false)) }
+    var moodEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_MOOD_ENABLED, false)) }
+    var moodTime by remember { mutableStateOf(QZoneSchedule.getMoodTime()) }
+    var moodText by remember { mutableStateOf(QZoneSchedule.getMoodText()) }
     var showCommentDialog by remember { mutableStateOf(false) }
+    var showMoodConfigDialog by remember { mutableStateOf(false) }
 
     fun loadOnlinePlugins() {
         isLoading = true
@@ -246,6 +255,13 @@ fun HomeScreen(
                         videoToBubble = videoToBubble,
                         antiPokeDelay = antiPokeDelay,
                         timArkCardBypass = timArkCardBypass,
+                        profileAutoLikeBack = profileAutoLikeBack,
+                        qzoneCheckinEnabled = qzoneCheckinEnabled,
+                        dailySignEnabled = dailySignEnabled,
+                        bigVipCheckinEnabled = bigVipCheckinEnabled,
+                        moodEnabled = moodEnabled,
+                        moodTime = moodTime,
+                        moodText = moodText,
                         onLikeToggle = {
                             qzoneAutoLike = it
                             Thread { ModuleConfig.putBoolean("qzone_auto_like", it) }.start()
@@ -278,7 +294,28 @@ fun HomeScreen(
                         onTimArkCardBypassToggle = {
                             timArkCardBypass = it
                             Thread { ModuleConfig.putBoolean("tim_ark_card_bypass", it) }.start()
-                        }
+                        },
+                        onProfileAutoLikeBackToggle = {
+                            profileAutoLikeBack = it
+                            Thread { ModuleConfig.putBoolean("profile_auto_like_back", it) }.start()
+                        },
+                        onCheckinToggle = {
+                            qzoneCheckinEnabled = it
+                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, it) }.start()
+                        },
+                        onDailySignToggle = {
+                            dailySignEnabled = it
+                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_DAILY_SIGN_ENABLED, it) }.start()
+                        },
+                        onBigVipCheckinToggle = {
+                            bigVipCheckinEnabled = it
+                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, it) }.start()
+                        },
+                        onMoodToggle = {
+                            moodEnabled = it
+                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_MOOD_ENABLED, it) }.start()
+                        },
+                        onMoodConfigClick = { showMoodConfigDialog = true }
                     )
                     1 -> JavaPluginsPage(
                         plugins = plugins,
@@ -309,6 +346,22 @@ fun HomeScreen(
                 qzoneCommentText = text
                 showCommentDialog = false
                 Thread { ModuleConfig.putString("qzone_comment_text", text) }.start()
+            }
+        )
+
+        MoodScheduleDialog(
+            show = showMoodConfigDialog,
+            initialTime = moodTime,
+            initialText = moodText,
+            onDismiss = { showMoodConfigDialog = false },
+            onConfirm = { t, txt ->
+                moodTime = t
+                moodText = txt.ifEmpty { QZoneSchedule.getMoodText() }
+                showMoodConfigDialog = false
+                Thread {
+                    ModuleConfig.putString(QZoneSchedule.SP_MOOD_TIME, t)
+                    ModuleConfig.putString(QZoneSchedule.SP_MOOD_TEXT, txt)
+                }.start()
             }
         )
     }
@@ -351,6 +404,13 @@ private fun HomePage(
     videoToBubble: Boolean,
     antiPokeDelay: Boolean,
     timArkCardBypass: Boolean,
+    profileAutoLikeBack: Boolean,
+    qzoneCheckinEnabled: Boolean,
+    dailySignEnabled: Boolean,
+    bigVipCheckinEnabled: Boolean,
+    moodEnabled: Boolean,
+    moodTime: String,
+    moodText: String,
     onLikeToggle: (Boolean) -> Unit,
     onCommentToggle: (Boolean) -> Unit,
     onCommentTextClick: () -> Unit,
@@ -359,7 +419,13 @@ private fun HomePage(
     onTransparentAvatarToggle: (Boolean) -> Unit,
     onVideoToBubbleToggle: (Boolean) -> Unit,
     onAntiPokeDelayToggle: (Boolean) -> Unit,
-    onTimArkCardBypassToggle: (Boolean) -> Unit
+    onTimArkCardBypassToggle: (Boolean) -> Unit,
+    onProfileAutoLikeBackToggle: (Boolean) -> Unit,
+    onCheckinToggle: (Boolean) -> Unit,
+    onDailySignToggle: (Boolean) -> Unit,
+    onBigVipCheckinToggle: (Boolean) -> Unit,
+    onMoodToggle: (Boolean) -> Unit,
+    onMoodConfigClick: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
 
@@ -422,6 +488,22 @@ private fun HomePage(
                     onClick = onCommentTextClick,
                     showArrow = true
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    icon = R.drawable.mood,
+                    title = "定时发说说",
+                    subtitle = run {
+                        val preview = if (moodText.length > 18) moodText.take(18) + "…" else moodText
+                        "$moodTime · $preview"
+                    },
+                    checked = moodEnabled,
+                    onCheckedChange = onMoodToggle,
+                    onClick = onMoodConfigClick,
+                    showArrow = true
+                )
+
             }
         }
 
@@ -565,6 +647,78 @@ private fun HomePage(
                     checked = transparentAvatar,
                     onCheckedChange = onTransparentAvatarToggle
                 )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    icon = R.drawable.like,
+                    title = "名片自动回赞",
+                    subtitle = "收到名片点赞自动回赞",
+                    checked = profileAutoLikeBack,
+                    onCheckedChange = onProfileAutoLikeBackToggle
+                )
+            }
+        }
+
+        QEdgeCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = androidx.compose.ui.res.painterResource(R.drawable.svip),
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "等级加速",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "00:00时自动空间打卡，qq日签打卡，大会员签到",
+                            fontSize = 13.sp,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingSwitchItemPlainIcon(
+                    icon = R.drawable.mood,
+                    title = "空间等级签到",
+                    subtitle = "每日 00:00 自动执行",
+                    checked = qzoneCheckinEnabled,
+                    onCheckedChange = onCheckinToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItemPlainIcon(
+                    icon = R.drawable.signin,
+                    title = "QQ 日签打卡",
+                    subtitle = "每日 00:00 自动执行",
+                    checked = dailySignEnabled,
+                    onCheckedChange = onDailySignToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItemPlainIcon(
+                    icon = R.drawable.bigvip,
+                    title = "大会员签到",
+                    subtitle = "每日 00:00 自动执行（无需开通大会员）",
+                    checked = bigVipCheckinEnabled,
+                    onCheckedChange = onBigVipCheckinToggle
+                )
             }
         }
     }
@@ -611,6 +765,71 @@ private fun SettingSwitchItem(
                 tint = if (checked) AccentGreen else colors.textSecondary
             )
         }
+        Spacer(modifier = Modifier.width(14.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                subtitle,
+                fontSize = 12.sp,
+                color = colors.textSecondary,
+                maxLines = 1,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+            )
+        }
+        if (showArrow) {
+            Icon(
+                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_chevron_right),
+                contentDescription = null,
+                modifier = Modifier.size(18.dp),
+                tint = colors.textSecondary.copy(alpha = 0.4f)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+        }
+        QEdgeSwitch(checked = checked, onCheckedChange = onCheckedChange)
+    }
+}
+
+/**
+ * 带开关的设置项（原生彩色图标版本）
+ * 不套 AccentGreen 背景圆角、不做 tint 变色，直接按 drawable 原图（彩色/png 原色）绘制。
+ * 其他布局/行为与 SettingSwitchItem 完全一致：可点击整行、showArrow 箭头、右侧 QEdgeSwitch。
+ */
+@Composable
+private fun SettingSwitchItemPlainIcon(
+    icon: Int,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    onClick: (() -> Unit)? = null,
+    showArrow: Boolean = false
+) {
+    val colors = QEdgeTheme.colors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .then(
+                if (onClick != null) Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onClick
+                ) else Modifier
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        // 直接画原 drawable，不做背景、不做 tint，保留原始颜色/形状
+        Image(
+            painter = androidx.compose.ui.res.painterResource(icon),
+            contentDescription = null,
+            modifier = Modifier.size(40.dp)
+        )
         Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
@@ -724,6 +943,160 @@ private fun CommentInputDialog(
                     contentAlignment = Alignment.Center
                 ) {
                     Text("确定", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = androidx.compose.ui.graphics.Color.White)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun MoodScheduleDialog(
+    show: Boolean,
+    initialTime: String,
+    initialText: String,
+    onDismiss: () -> Unit,
+    onConfirm: (time: String, text: String) -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var time by remember(initialTime) { mutableStateOf(initialTime) }
+    var text by remember(initialText) { mutableStateOf(initialText) }
+    val timeOk = QZoneSchedule.HH_MM_REGEX.matches(time.trim())
+    val canConfirm = timeOk
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+        ) {
+            Text(
+                "定时说说设置",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "仅需 HH:mm，无需日期，每天同一时间触发一次",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("发送时间 (HH:mm)", fontSize = 13.sp, color = colors.textPrimary)
+            Spacer(modifier = Modifier.height(6.dp))
+            ComposeBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.textSecondary.copy(alpha = 0.08f))
+                    .padding(14.dp)
+            ) {
+                BasicTextField(
+                    value = time,
+                    onValueChange = { v ->
+                        val t = v.filter { it.isDigit() || it == ':' }.take(5)
+                        time = t
+                    },
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = 16.sp,
+                        color = colors.textPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true,
+                    decorationBox = { innerTextField ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (time.isEmpty()) {
+                                Text("08:30", fontSize = 16.sp, color = colors.textSecondary)
+                            } else {
+                                innerTextField()
+                            }
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                if (timeOk) "格式正确" else "格式错误",
+                                fontSize = 12.sp,
+                                color = if (timeOk) AccentGreen else android.graphics.Color.parseColor("#FF5252").let { androidx.compose.ui.graphics.Color(it) }
+                            )
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("说说内容", fontSize = 13.sp, color = colors.textPrimary)
+            Spacer(modifier = Modifier.height(6.dp))
+            ComposeBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colors.textSecondary.copy(alpha = 0.08f))
+                    .padding(14.dp)
+            ) {
+                BasicTextField(
+                    value = text,
+                    onValueChange = { text = it },
+                    textStyle = androidx.compose.ui.text.TextStyle(
+                        fontSize = 14.sp,
+                        color = colors.textPrimary
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    maxLines = 6,
+                    decorationBox = { innerTextField ->
+                        if (text.isEmpty()) {
+                            Text("今天也要加油哦~", fontSize = 14.sp, color = colors.textSecondary)
+                        } else {
+                            innerTextField()
+                        }
+                    }
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                ComposeBox(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                ComposeBox(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (canConfirm) AccentGreen else colors.textSecondary.copy(alpha = 0.3f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                if (!canConfirm) return@clickable
+                                val t = time.trim()
+                                val txt = text.trim()
+                                onConfirm(t, txt)
+                            }
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "保存",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (canConfirm) androidx.compose.ui.graphics.Color.White else colors.textSecondary
+                    )
                 }
             }
         }

@@ -49,4 +49,12 @@ object ModuleConfig {
     fun getLong(key: String, defaultValue: Long): Long {
         return JsonConfigUtils.getLong(configDir, CONFIG_NAME, key, defaultValue)
     }
+
+    fun contains(key: String): Boolean {
+        return JsonConfigUtils.contains(configDir, CONFIG_NAME, key)
+    }
+
+    fun remove(key: String) {
+        JsonConfigUtils.remove(configDir, CONFIG_NAME, key)
+    }
 }
