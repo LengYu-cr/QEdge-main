@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string-array name="xposedscope">
+        <item>com.tencent.tim</item>
+        <item>com.tencent.mobileqq</item>
+        <item>im.weshine.keyboard</item>
+        <item>com.kugou.android</item>
+        <item>com.apowersoft.backgrounderaser</item>
+    </string-array>
+</resources>
