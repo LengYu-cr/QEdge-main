@@ -1,0 +1,336 @@
+package me.lengyu.qedge.utils.qq
+
+import me.lengyu.qedge.plugin.bean.ForbidInfo
+import me.lengyu.qedge.plugin.bean.GroupInfo
+import me.lengyu.qedge.plugin.bean.MemberInfo
+import me.lengyu.qedge.utils.ClassUtils
+import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.dexkit.DexKitTask
+import me.lengyu.qedge.utils.proto.PacketHelper
+import me.lengyu.qedge.utils.proto.packetListener
+import me.lengyu.qedge.utils.reflect.findMethod
+import me.lengyu.qedge.utils.reflect.findMethodOrNull
+import org.json.JSONObject
+import org.luckypray.dexkit.query.FindClass
+import org.luckypray.dexkit.query.matchers.MethodMatcher
+import org.luckypray.dexkit.query.base.BaseQuery
+import java.lang.reflect.Proxy
+import java.util.concurrent.CompletableFuture
+import java.util.concurrent.TimeUnit
+
+@Suppress("DEPRECATION")
+object TroopTool : DexKitTask {
+
+    private val modifyTroopShutUpTime by lazy {
+        Class.forName("com.tencent.qqnt.troop.ITroopOperationRepoApi").findMethod {
+            name = "modifyTroopShutUpTime"
+        }
+    }
+
+    private val fetchTroopMemberList by lazy {
+        Class.forName("com.tencent.qqnt.troopmemberlist.ITroopMemberListRepoApi").findMethod {
+            name = "fetchTroopMemberList"
+            paramCount = 5
+        }
+    }
+
+    private val fetchTroopMemberInfo by lazy {
+        Class.forName("com.tencent.qqnt.troopmemberlist.ITroopMemberListRepoApi").findMethod {
+            name = "fetchTroopMemberInfo"
+            paramCount = 6
+        }
+    }
+
+    private val shutUp by lazy {
+        val handler = Class.forName("com.tencent.mobileqq.troop.membersetting.handler.MemberSettingHandler")
+        handler.findMethodOrNull {
+            returnType = boolean
+            paramTypes(string, string, long)
+        } ?: handler.findMethod {
+            returnType = boolean
+            paramTypes(long, string, string)
+        }
+    }
+
+    private val setGroupAdmin by lazy {
+        requireClass("setting").findMethod {
+            returnType = void
+            paramTypes(byte, string, string)
+        }
+    }
+
+    private val setGroupMemberTitle by lazy {
+        val editActivity = Class.forName("com.tencent.biz.troop.EditUniqueTitleActivity")
+        editActivity.findMethodOrNull {
+            returnType = void
+            paramTypes(
+                Class.forName("com.tencent.mobileqq.app.QQAppInterface"),
+                string, string, string,
+                Class.forName("mqq.observer.BusinessObserver")
+            )
+        } ?: editActivity.findMethod {
+            returnType = void
+            paramTypes(string, string, string)
+        }
+    }
+
+    private val changeMemberName by lazy {
+        Class.forName("com.tencent.mobileqq.troop.handler.TroopMemberCardHandler").findMethod {
+            returnType = void
+            paramTypes(string, arrayList, arrayList)
+        }
+    }
+
+    private val clockIn by lazy {
+        Class.forName("com.tencent.mobileqq.troop.clockin.handler.TroopClockInHandler").findMethod {
+            returnType = void
+            paramTypes(string, string)
+        }
+    }
+
+    fun clockIn(troopUin: String) {
+        clockIn.invoke(
+            QQServiceHelper.getHandler(Class.forName("com.tencent.mobileqq.troop.clockin.handler.TroopClockInHandler")),
+            troopUin,
+            QQCurrentEnv.getCurrentUin()
+        )
+    }
+
+    fun getGroupList(): List<GroupInfo> {
+        val groupInfoList = mutableListOf<GroupInfo>()
+        try {
+            val service = QQServiceHelper.getApi(Class.forName("com.tencent.qqnt.troop.ITroopListRepoApi"))
+            if (service == null) return groupInfoList
+
+            val troopList = me.lengyu.qedge.utils.ReflectUtils.callMethod(service, "getSortedJoinedTroopInfoFromCache")
+            if (troopList is Iterable<*>) {
+                for (troop in troopList) {
+                    try {
+                        var troopUin = me.lengyu.qedge.utils.ReflectUtils.callMethod(troop, "getTroopUin") as String?
+                        if (troopUin == null) {
+                            troopUin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troop, "troopuin") as String?
+                        }
+                        val troopName = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troop, "troopNameFromNT") as String?
+                            ?: troopUin
+                        val troopOwnerUin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troop, "troopowneruin") as String?
+                        if (troopUin != null) {
+                            groupInfoList.add(GroupInfo(troopUin, troopName ?: troopUin, troopOwnerUin ?: "", troop))
+                        }
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                    }
+                }
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        return groupInfoList
+    }
+
+    fun getGroupInfo(troopUin: String): Any? {
+        try {
+            val service = QQServiceHelper.getRuntime(Class.forName("com.tencent.mobileqq.troop.api.ITroopInfoService"))
+            if (service != null) {
+                return me.lengyu.qedge.utils.ReflectUtils.callMethod(service, "getTroopInfo", troopUin)
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        return null
+    }
+
+    fun shutUpAll(troopUin: String, enable: Boolean) {
+        modifyTroopShutUpTime.invoke(
+            QQServiceHelper.getApi(Class.forName("com.tencent.qqnt.troop.ITroopOperationRepoApi")),
+            troopUin,
+            if (enable) 0x0FFFFFFF else 0,
+            null,
+            null
+        )
+    }
+
+    fun shutUp(troopUin: String, uin: String, time: Long) {
+        val handler = QQServiceHelper.getHandler(Class.forName("com.tencent.mobileqq.troop.membersetting.handler.MemberSettingHandler"))
+        runCatching {
+            shutUp.invoke(handler, troopUin, uin, time)
+        }.onFailure {
+            shutUp.invoke(handler, time, troopUin, uin)
+        }
+    }
+
+    fun setGroupAdmin(troopUin: String, uin: String, enable: Boolean) {
+        val byte: Byte = if (enable) 1 else 0
+        setGroupAdmin.invoke(
+            requireClass("setting").newInstance(),
+            byte,
+            troopUin,
+            uin
+        )
+    }
+
+    fun kickGroup(troopUin: String, uin: String, block: Boolean) {
+        val req = JSONObject().apply {
+            put("1", 0x8a0)
+            put("2", 0)
+            put("3", 0)
+            put("4", JSONObject().apply {
+                put("1", troopUin.toLong())
+                put("2", JSONObject().apply {
+                    put("1", 5)
+                    put("2", uin.toLong())
+                    put("3", if (block) 1 else 0)
+                })
+            })
+        }
+        PacketHelper.sendPacket("OidbSvc.0x8a0_0", req, object : packetListener {
+            override fun onResult(success: Boolean, json: JSONObject) {}
+        })
+    }
+
+    fun setGroupMemberTitle(troopUin: String, uin: String, title: String) {
+        val edit = Class.forName("com.tencent.biz.troop.EditUniqueTitleActivity").newInstance()
+        runCatching {
+            setGroupMemberTitle.invoke(
+                edit,
+                QQCurrentEnv.getQQAppInterface(),
+                troopUin,
+                uin,
+                title,
+                null
+            )
+        }.onFailure {
+            me.lengyu.qedge.utils.ReflectUtils.setFieldValue(edit, "app", QQCurrentEnv.getQQAppInterface())
+            me.lengyu.qedge.utils.ReflectUtils.setFieldValue(edit, "intent", android.content.Intent())
+            Class.forName("android.content.ContextWrapper")
+                .getDeclaredMethod("attachBaseContext", android.content.Context::class.java)
+                .apply { isAccessible = true }
+                .invoke(edit, me.lengyu.qedge.utils.HostInfo.getContext())
+            setGroupMemberTitle.invoke(edit, troopUin, uin, title)
+        }
+    }
+
+    fun changeMemberName(troopUin: String, uin: String, name: String) {
+        val cardInfoClass = Class.forName("com.tencent.mobileqq.data.troop.TroopMemberCardInfo")
+        val cardInfo = cardInfoClass.newInstance()
+        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "colorNick", "")
+        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "colorNickId", 0)
+        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "memberuin", uin)
+        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "name", name)
+        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "troopuin", troopUin)
+        changeMemberName.invoke(
+            QQServiceHelper.getHandler(Class.forName("com.tencent.mobileqq.troop.handler.TroopMemberCardHandler")),
+            troopUin, arrayListOf(cardInfo), arrayListOf(1)
+        )
+    }
+
+    fun isShutUp(troopUin: String): Boolean {
+        val info = getGroupInfo(troopUin) ?: return false
+        val dwGagTimeStamp = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(info, "dwGagTimeStamp") as Long
+        val dwGagTimeStamp_me = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(info, "dwGagTimeStamp_me") as Long
+        return !(dwGagTimeStamp == 0L && dwGagTimeStamp_me == 0L)
+    }
+
+    private fun processMemberInfo(troopMemberInfo: Any): MemberInfo {
+        val troopNick = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "troopnick") as String?
+        val uinName = if (troopNick.isNullOrEmpty()) {
+            me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "friendnick") as String?
+        } else {
+            troopNick
+        }
+
+        val joinTime = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "join_time") as Long
+        val lastActiveTime = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "last_active_time") as Long
+        val uin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "memberuin") as String? ?: ""
+        val realLevel = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "realLevel") as Int
+        val role = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "role").toString()
+
+        return MemberInfo(joinTime, lastActiveTime, uin, realLevel, uinName ?: "", role, troopMemberInfo)
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun getMemberInfoList(troopUin: String): List<Any> {
+        val completableFuture = CompletableFuture<ArrayList<Any>>()
+        val callback = Proxy.newProxyInstance(
+            ClassUtils.getHostClassLoader(),
+            arrayOf(fetchTroopMemberList.parameterTypes[4])
+        ) { _, method, args ->
+            if (method.returnType == Void.TYPE && method.parameterCount == 2) {
+                val list = when {
+                    args[0] is ArrayList<*> -> args[0]
+                    args[1] is ArrayList<*> -> args[1]
+                    else -> emptyList<Any>()
+                }
+                completableFuture.complete(list as ArrayList<Any>)
+            }
+            0
+        }
+        fetchTroopMemberList.invoke(
+            QQServiceHelper.getApi(Class.forName("com.tencent.qqnt.troopmemberlist.ITroopMemberListRepoApi")),
+            troopUin, null, true, "", callback
+        )
+        return completableFuture.get(5, TimeUnit.SECONDS)
+    }
+
+    fun getMemberInfo(troopUin: String, uin: String): MemberInfo {
+        val completableFuture = CompletableFuture<Any>()
+        val callback = Proxy.newProxyInstance(
+            ClassUtils.getHostClassLoader(),
+            arrayOf(fetchTroopMemberInfo.parameterTypes[5])
+        ) { _, method, args ->
+            if (method.returnType == Void.TYPE && method.parameterTypes[0] == Class.forName("com.tencent.mobileqq.data.troop.TroopMemberInfo")) {
+                completableFuture.complete(args[0])
+            }
+            0
+        }
+        fetchTroopMemberInfo.invoke(
+            QQServiceHelper.getApi(Class.forName("com.tencent.qqnt.troopmemberlist.ITroopMemberListRepoApi")),
+            troopUin, uin, true, null, "", callback
+        )
+        val troopMemberInfo = completableFuture.get(5, TimeUnit.SECONDS)
+        return processMemberInfo(troopMemberInfo)
+    }
+
+    fun getGroupMemberList(troopUin: String): List<MemberInfo> {
+        val memberList = ArrayList<MemberInfo>()
+        try {
+            getMemberInfoList(troopUin).forEach {
+                memberList.add(processMemberInfo(it))
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        return memberList
+    }
+
+    fun getForbidInfo(troopUin: String): List<ForbidInfo> {
+        val forbidList = ArrayList<ForbidInfo>()
+        try {
+            getMemberInfoList(troopUin).forEach {
+                val gagTime = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "gagTimeStamp") as Long
+                val troopNick = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "troopnick") as String?
+                val time = gagTime - System.currentTimeMillis() / 1000
+                val userName = if (troopNick.isNullOrEmpty()) {
+                    me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "friendnick") as String?
+                } else {
+                    troopNick
+                }
+                if (time > 0) {
+                    val uin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "memberuin") as String? ?: ""
+                    forbidList.add(ForbidInfo(uin, userName ?: "", time))
+                }
+            }
+        } catch (e: Throwable) {
+            e.printStackTrace()
+        }
+        return forbidList
+    }
+
+    override fun getQueryMap(): Map<String, BaseQuery> = mapOf(
+        "setting" to FindClass().apply {
+            searchPackages("com.tencent.mobileqq.troop.membersetting.part")
+            matcher {
+                usingStrings("MemberSettingGroupManagePart")
+            }
+        }
+    )
+}

@@ -27,7 +27,6 @@ libs/**/*.aar
 *.aab
 *.ap_
 *.dex
-QQ/
 QEdge后台/QEdge/PluginMethod/
 output-metadata.json
 
