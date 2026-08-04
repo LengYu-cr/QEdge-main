@@ -53,6 +53,9 @@
 # ByteBuddy - 保持不变
 -keep class net.bytebuddy.** { *; }
 
+# KavaRef references this reflection type, which is absent from Android SDK stubs.
+-dontwarn java.lang.reflect.AnnotatedType
+
 # =====================
 # 通用保持规则
 # =====================
