@@ -30,5 +30,5 @@ android {
 dependencies {
     compileOnly("androidx.annotation:annotation:1.7.0")
     compileOnly("org.jetbrains:annotations:24.1.0")
-    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:1.9.24")
+    compileOnly("org.jetbrains.kotlin:kotlin-stdlib:2.4.10")
 }
