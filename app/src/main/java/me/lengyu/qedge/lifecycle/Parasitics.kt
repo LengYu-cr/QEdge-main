@@ -73,7 +73,7 @@ object Parasitics {
     }
 
     private fun getModulePath(): String? = ModulePathHolder.modulePath
-
+    @JvmStatic
     fun initForStubActivity(ctx: Context) {
         runCatching {
             val activityThreadClass = "android.app.ActivityThread".toClass
