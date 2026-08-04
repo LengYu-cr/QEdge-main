@@ -1,20 +1,23 @@
 [versions]
-agp = "8.5.0"
-kotlin = "1.9.0"
-coreKtx = "1.10.1"
+agp = "9.1.1"
+coilCompose = "2.7.0"
+kotlin = "2.4.10"
+coreKtx = "1.19.0"
 junit = "4.13.2"
-junitVersion = "1.1.5"
-espressoCore = "3.5.1"
-lifecycleRuntimeKtx = "2.6.1"
-activityCompose = "1.8.0"
-composeBom = "2024.04.01"
-dexkit = "2.0.7"
-protobuf = "3.25.3"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+lifecycleRuntimeKtx = "2.11.0"
+activityCompose = "1.13.0"
+composeBom = "2026.06.01"
+dexkit = "2.2.0"
+protobuf = "4.35.1"
 xposed = "82"
-dalvikDx = "9.0.0_r3"
-
+dalvikDx = "16.0.1"
+kavaref = "1.1.0"
+androidx-savedstate="1.5.0"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
+coil-compose = { module = "io.coil-kt:coil-compose", version.ref = "coilCompose" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 androidx-junit = { group = "androidx.test.ext", name = "junit", version.ref = "junitVersion" }
 androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-core", version.ref = "espressoCore" }
@@ -30,13 +33,17 @@ androidx-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit
 androidx-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-common-java8 = { group = "androidx.lifecycle", name = "lifecycle-common-java8", version.ref = "lifecycleRuntimeKtx" }
-androidx-savedstate = { group = "androidx.savedstate", name = "savedstate", version = "1.2.1" }
+androidx-savedstate = { group = "androidx.savedstate", name = "savedstate", version.ref = "androidx-savedstate" }
 dexkit = { group = "org.luckypray", name = "dexkit", version.ref = "dexkit" }
 protobuf-java = { group = "com.google.protobuf", name = "protobuf-java", version.ref = "protobuf" }
 xposed = { group = "de.robv.android.xposed", name = "api", version.ref = "xposed" }
 dalvik-dx = { module = "com.jakewharton.android.repackaged:dalvik-dx", version.ref = "dalvikDx" }
+kavaref-core = { module = "com.highcapable.kavaref:kavaref-core", version.ref = "kavaref" }
+kavaref-extension = { module = "com.highcapable.kavaref:kavaref-extension", version.ref = "kavaref" }
+kavaref-android = { module = "com.highcapable.kavaref:kavaref-android", version.ref = "kavaref" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "agp" }
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 

@@ -25,7 +25,7 @@ import me.lengyu.qedge.hook.aoruan.AoRuanHook;
 public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteInit {
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
     private static String modulePath = null;
-    private static String[] supportedPackages = {"com.tencent.mobileqq", "com.tencent.tim", "im.weshine.keyboard", "com.kugou.android", "com.apowersoft.backgrounderaser"};
+    private static final String[] supportedPackages = {"com.tencent.mobileqq", "com.tencent.tim", "im.weshine.keyboard", "com.kugou.android", "com.apowersoft.backgrounderaser"};
 
     public void initZygote(IXposedHookZygoteInit.StartupParam startupParam) throws Throwable {
         modulePath = startupParam.modulePath;
@@ -102,8 +102,6 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
             } else if (lpparam.packageName.equals("com.apowersoft.backgrounderaser")) {
                 hookAoRuan(lpparam.classLoader);
             }
-            
-            return;
         } catch (Throwable e) {
             XposedBridge.log("[QEdge] Hook load failed: " + e.getMessage());
             XposedBridge.log(e);
@@ -140,7 +138,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             Context hostContext = (Context) param.thisObject;
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
-                            Parasitics.INSTANCE.initForStubActivity(hostContext);
+                            Parasitics.initForStubActivity(hostContext);
                             
                             boolean cacheValid = DexKitCache.initCache();
                             if (cacheValid && DexKitCache.validateAllTasks()) {
@@ -211,7 +209,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             Context hostContext = (Context) param.thisObject;
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
-                            Parasitics.INSTANCE.initForStubActivity(hostContext);
+                            Parasitics.initForStubActivity(hostContext);
                             KKHook.loadHook();
                             android.widget.Toast.makeText(hostContext, "QEdge 注入成功", android.widget.Toast.LENGTH_LONG).show();
                         } catch (Throwable e) {
@@ -235,7 +233,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             Context hostContext = (Context) param.thisObject;
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
-                            Parasitics.INSTANCE.initForStubActivity(hostContext);
+                            Parasitics.initForStubActivity(hostContext);
                             AoRuanHook.loadHook();
                             android.widget.Toast.makeText(hostContext, "QEdge 注入成功", android.widget.Toast.LENGTH_LONG).show();
                         } catch (Throwable e) {
