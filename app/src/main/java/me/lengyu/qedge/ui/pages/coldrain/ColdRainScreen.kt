@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -601,7 +601,7 @@ private fun ConfigItemColdRain(
             .fillMaxWidth()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             )
             .padding(vertical = 8.dp),
@@ -692,7 +692,7 @@ private fun QEdgeTopBarColdRain(
                     .background(colors.cardBackground)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
-                        indication = rememberRipple(color = colors.ripple),
+                        indication = ripple(color = colors.ripple),
                         onClick = onBackClick
                     ),
                 contentAlignment = Alignment.Center
@@ -722,7 +722,7 @@ private fun QEdgeTopBarColdRain(
                 .background(colors.cardBackground)
                 .clickable(
                     interactionSource = remember { MutableInteractionSource() },
-                    indication = rememberRipple(color = colors.ripple),
+                    indication = ripple(color = colors.ripple),
                     onClick = onThemeToggle
                 ),
             contentAlignment = Alignment.Center

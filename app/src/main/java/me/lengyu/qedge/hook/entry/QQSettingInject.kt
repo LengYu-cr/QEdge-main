@@ -18,7 +18,7 @@ import me.lengyu.qedge.utils.reflect.clazz
 import me.lengyu.qedge.utils.reflect.findMethod
 import me.lengyu.qedge.utils.reflect.toClass
 import org.luckypray.dexkit.query.FindClass
-import org.luckypray.dexkit.query.base.BaseQuery
+import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Proxy
 
 @HookItemAnnotation(category = "entry", process = "All", value = "QQ设置入口")
@@ -300,7 +300,7 @@ object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
         }
     }
 
-    override fun getQueryMap(): Map<String, BaseQuery> = mapOf(
+    override fun getQueryMap(): Map<String, BaseFinder> = mapOf(
         "provider" to FindClass().apply {
             searchPackages("com.tencent.mobileqq.setting.main")
             matcher {

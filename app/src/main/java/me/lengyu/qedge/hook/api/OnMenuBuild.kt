@@ -23,7 +23,7 @@ import me.lengyu.qedge.utils.reflect.newInstanceWithArgs
 import me.lengyu.qedge.utils.reflect.getObjectByType
 import me.lengyu.qedge.utils.reflect.getObjectByTypeOrNull
 import org.luckypray.dexkit.query.FindClass
-import org.luckypray.dexkit.query.base.BaseQuery
+import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Method
 
 @HookItemAnnotation(value = "监听消息菜单", category = "api")
@@ -385,7 +385,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
         getListenerSet().removeIf { l -> (l as? MenuClickListener)?.let { predicate(it.menuKey) } == true }
     }
 
-    override fun getQueryMap(): Map<String, BaseQuery> = mapOf(
+    override fun getQueryMap(): Map<String, BaseFinder> = mapOf(
         MENU_TYPE to FindClass().apply {
             searchPackages("com.tencent.qqnt.aio.menu")
             matcher {

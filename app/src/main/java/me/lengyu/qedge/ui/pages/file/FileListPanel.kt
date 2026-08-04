@@ -20,7 +20,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -284,7 +284,7 @@ private fun FileListItem(
             .background(if (isSelected) colors.accentBlue.copy(alpha = 0.15f) else androidx.compose.ui.graphics.Color.Transparent)
             .combinedClickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick,
                 onLongClick = { if (!isParent) onLongClick() }
             )

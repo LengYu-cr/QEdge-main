@@ -363,7 +363,7 @@ private fun PluginMenuContent(
                 )
                 .padding(vertical = 4.dp),
             colors.textPrimary,
-            22.sp,
+            fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
@@ -372,7 +372,7 @@ private fun PluginMenuContent(
             "点击脚本名称可重载脚本",
             Modifier.fillMaxWidth(),
             colors.textSecondary,
-            12.sp,
+            fontSize = 12.sp,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(20.dp))
@@ -418,7 +418,7 @@ private fun PluginHeaderItem(name: String, onClick: () -> Unit) {
             .clickable(onClick = onClick)
             .padding(12.dp, 14.dp),
         AccentGreen,
-        16.sp,
+        fontSize = 16.sp,
         fontWeight = FontWeight.Bold
     )
 }
@@ -466,7 +466,7 @@ private fun GroupSwitchContent(
                 .fillMaxWidth()
                 .padding(vertical = 4.dp),
             colors.textPrimary,
-            22.sp,
+            fontSize = 22.sp,
             fontWeight = FontWeight.Bold,
             textAlign = TextAlign.Center
         )
@@ -475,7 +475,7 @@ private fun GroupSwitchContent(
             "共 ${features.size} 个功能",
             Modifier.fillMaxWidth(),
             colors.textSecondary,
-            12.sp,
+            fontSize = 12.sp,
             textAlign = TextAlign.Center
         )
         Spacer(Modifier.height(20.dp))

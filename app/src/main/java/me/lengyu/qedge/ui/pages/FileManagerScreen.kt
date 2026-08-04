@@ -23,7 +23,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
@@ -689,7 +689,7 @@ fun FileManagerScreen(
                                         )
                                         .clickable(
                                             interactionSource = remember { MutableInteractionSource() },
-                                            indication = rememberRipple(color = colors.ripple),
+                                            indication = ripple(color = colors.ripple),
                                             onClick = { newItemType = "folder" }
                                         ),
                                     contentAlignment = Alignment.Center
@@ -712,7 +712,7 @@ fun FileManagerScreen(
                                         )
                                         .clickable(
                                             interactionSource = remember { MutableInteractionSource() },
-                                            indication = rememberRipple(color = colors.ripple),
+                                            indication = ripple(color = colors.ripple),
                                             onClick = { newItemType = "file" }
                                         ),
                                     contentAlignment = Alignment.Center
@@ -783,7 +783,7 @@ private fun TopBarActionButton(
             .background(colors.cardBackground)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -809,7 +809,7 @@ private fun MenuItem(
             .fillMaxWidth()
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             )
             .padding(horizontal = 20.dp, vertical = 14.dp),
@@ -869,7 +869,7 @@ private fun BottomActionBar(
                     .background(if (canTransfer) colors.accentBlue else colors.textSecondary.copy(alpha = 0.2f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
-                        indication = if (canTransfer) rememberRipple(color = Color.White.copy(alpha = 0.3f)) else null,
+                        indication = if (canTransfer) ripple(color = Color.White.copy(alpha = 0.3f)) else null,
                         onClick = {
                             if (canTransfer) {
                                 if (activePanel == PanelSide.LEFT) {
@@ -939,7 +939,7 @@ private fun BottomActionItem(
             .clip(RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = if (enabled) rememberRipple(color = colors.ripple) else null,
+                indication = if (enabled) ripple(color = colors.ripple) else null,
                 onClick = { if (enabled) onClick() },
                 enabled = enabled
             )

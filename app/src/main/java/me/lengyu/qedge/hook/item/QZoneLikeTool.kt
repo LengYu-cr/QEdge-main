@@ -6,7 +6,7 @@ import me.lengyu.qedge.utils.dexkit.DexKitTask
 import me.lengyu.qedge.utils.qq.CookieTool
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation
 import me.lengyu.qedge.hook.annotation.HookCategory
-import org.luckypray.dexkit.query.base.BaseQuery
+import org.luckypray.dexkit.query.base.BaseFinder
 import java.io.BufferedReader
 import java.io.DataOutputStream
 import java.io.InputStreamReader
@@ -327,5 +327,5 @@ object QZoneLikeTool : DexKitTask {
         }.getOrDefault(false)
     }
 
-    override fun getQueryMap(): Map<String, BaseQuery> = emptyMap()
+    override fun getQueryMap(): Map<String, BaseFinder> = emptyMap()
 }

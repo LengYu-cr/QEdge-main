@@ -13,7 +13,7 @@ import me.lengyu.qedge.utils.reflect.findMethod
 import me.lengyu.qedge.utils.reflect.findMethodOrNull
 import org.luckypray.dexkit.DexKitBridge
 import org.luckypray.dexkit.query.FindClass
-import org.luckypray.dexkit.query.base.BaseQuery
+import org.luckypray.dexkit.query.base.BaseFinder
 import dalvik.system.DexFile
 import java.lang.reflect.Method
 
@@ -32,7 +32,7 @@ object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListe
         return ModuleConfig.getBoolean(CONFIG_KEY, true)
     }
 
-    override fun getQueryMap(): Map<String, BaseQuery> = mapOf(
+    override fun getQueryMap(): Map<String, BaseFinder> = mapOf(
         KEY_ARK_CONFIG_MODEL to FindClass().apply {
             searchPackages(ARK_PACKAGE_PREFIX)
             matcher {

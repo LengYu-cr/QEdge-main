@@ -13,7 +13,7 @@ import me.lengyu.qedge.utils.reflect.findMethodOrNull
 import org.json.JSONObject
 import org.luckypray.dexkit.query.FindClass
 import org.luckypray.dexkit.query.matchers.MethodMatcher
-import org.luckypray.dexkit.query.base.BaseQuery
+import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Proxy
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -325,7 +325,7 @@ object TroopTool : DexKitTask {
         return forbidList
     }
 
-    override fun getQueryMap(): Map<String, BaseQuery> = mapOf(
+    override fun getQueryMap(): Map<String, BaseFinder> = mapOf(
         "setting" to FindClass().apply {
             searchPackages("com.tencent.mobileqq.troop.membersetting.part")
             matcher {

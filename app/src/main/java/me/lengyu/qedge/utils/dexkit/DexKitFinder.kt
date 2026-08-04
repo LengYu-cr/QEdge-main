@@ -38,7 +38,7 @@ import me.lengyu.qedge.hook.item.QZoneLikeTool
 import org.luckypray.dexkit.DexKitBridge
 import org.luckypray.dexkit.query.FindClass
 import org.luckypray.dexkit.query.FindMethod
-import org.luckypray.dexkit.query.base.BaseQuery
+import org.luckypray.dexkit.query.base.BaseFinder
 
 object DexKitFinder {
 

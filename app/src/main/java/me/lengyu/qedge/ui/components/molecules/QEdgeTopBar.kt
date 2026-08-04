@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -93,7 +93,7 @@ fun QEdgeTopBar(
                         .background(colors.accentGreen)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(color = colors.ripple),
+                            indication = ripple(color = colors.ripple),
                             onClick = onCreateClick
                         ),
                     contentAlignment = Alignment.Center
@@ -111,7 +111,7 @@ fun QEdgeTopBar(
                         .background(colors.cardBackground)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(color = colors.ripple),
+                            indication = ripple(color = colors.ripple),
                             onClick = onDocClick
                         ),
                     contentAlignment = Alignment.Center
@@ -129,7 +129,7 @@ fun QEdgeTopBar(
                         .background(colors.cardBackground)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(color = colors.ripple),
+                            indication = ripple(color = colors.ripple),
                             onClick = onUpdateLogClick
                         ),
                     contentAlignment = Alignment.Center
@@ -147,7 +147,7 @@ fun QEdgeTopBar(
                         .background(colors.cardBackground)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(color = colors.ripple),
+                            indication = ripple(color = colors.ripple),
                             onClick = onThemeToggle
                         ),
                     contentAlignment = Alignment.Center
@@ -176,7 +176,7 @@ fun TopBarIconButton(iconRes: Int, contentDescription: String, onClick: () -> Un
             .background(colors.cardBackground)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center

@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -199,7 +199,7 @@ private fun TopBarActionButton(
             .background(colors.cardBackground)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -284,7 +284,7 @@ private fun BottomBarButton(
             .clip(RoundedCornerShape(12.dp))
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             )
             .padding(horizontal = 12.dp, vertical = 6.dp)

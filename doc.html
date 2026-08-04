@@ -1,0 +1,2294 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=yes">
+    <title>QEdge 简介及脚本开发文档</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #ffffff;
+            color: #333333;
+            line-height: 1.7;
+            padding-top: 60px;
+        }
+
+        /* 移动端顶部导航栏 */
+        .mobile-header {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: #ffffff;
+            border-bottom: 1px solid #eeeeee;
+            padding: 12px 16px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .mobile-header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .mobile-header-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #1a1a1a;
+        }
+
+        .menu-toggle {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            padding: 4px 8px;
+            color: #333;
+            display: none;
+        }
+
+        .menu-toggle:hover {
+            color: #1a73e8;
+        }
+
+        /* 侧边导航 */
+        .nav {
+            position: fixed;
+            left: 0;
+            top: 0;
+            width: 260px;
+            height: 100vh;
+            background-color: #fafafa;
+            border-right: 1px solid #eeeeee;
+            overflow-y: auto;
+            padding: 20px 0;
+            z-index: 999;
+            transition: transform 0.3s ease;
+            transform: translateX(0);
+        }
+
+        .nav.closed {
+            transform: translateX(-100%);
+        }
+
+        .nav-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #999999;
+            padding: 12px 20px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .nav-item {
+            display: block;
+            padding: 10px 20px;
+            color: #555555;
+            text-decoration: none;
+            font-size: 14px;
+            transition: background-color 0.2s;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item:hover {
+            background-color: #f0f0f0;
+        }
+
+        .nav-item.active {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+            border-left-color: #1a73e8;
+        }
+
+        /* 主内容 */
+        .main-content {
+            margin-left: 260px;
+            padding: 40px 50px;
+            max-width: 1200px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            padding-bottom: 40px;
+            border-bottom: 1px solid #eeeeee;
+        }
+
+        .header h1 {
+            font-size: 36px;
+            font-weight: 700;
+            color: #1a1a1a;
+            margin-bottom: 12px;
+        }
+
+        .header p {
+            font-size: 16px;
+            color: #666666;
+        }
+
+        .section {
+            margin-bottom: 50px;
+        }
+
+        .section-title {
+            font-size: 24px;
+            font-weight: 600;
+            color: #1a1a1a;
+            margin-bottom: 24px;
+            padding-bottom: 12px;
+            border-bottom: 2px solid #1a73e8;
+        }
+
+        .subsection-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333333;
+            margin-bottom: 16px;
+            margin-top: 30px;
+        }
+
+        .subsubsection-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #444444;
+            margin-bottom: 12px;
+            margin-top: 20px;
+        }
+
+        .code-block {
+            background-color: #f8f9fa;
+            border-radius: 6px;
+            padding: 16px;
+            margin: 16px 0;
+            overflow-x: auto;
+            border: 1px solid #e9ecef;
+        }
+
+        .code-block pre {
+            margin: 0;
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            color: #333333;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+
+        .code-block code {
+            font-family: inherit;
+        }
+
+        .highlight {
+            color: #d73a49;
+        }
+
+        .highlight-keyword {
+            color: #005cc5;
+        }
+
+        .highlight-string {
+            color: #032f62;
+        }
+
+        .highlight-function {
+            color: #6f42c1;
+        }
+
+        /* 表格响应式 */
+        .table-wrapper {
+            overflow-x: auto;
+            margin: 16px 0;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            min-width: 600px;
+        }
+
+        table th, table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            color: #333333;
+        }
+
+        table tr:hover {
+            background-color: #fafafa;
+        }
+
+        .description {
+            font-size: 15px;
+            color: #555555;
+            margin-bottom: 16px;
+        }
+
+        .note {
+            background-color: #fff3cd;
+            border-left: 4px solid #ffc107;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 4px 4px 0;
+            font-size: 14px;
+            color: #856404;
+        }
+
+        .warning {
+            background-color: #f8d7da;
+            border-left: 4px solid #dc3545;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 4px 4px 0;
+            font-size: 14px;
+            color: #721c24;
+        }
+
+        .success {
+            background-color: #d4edda;
+            border-left: 4px solid #28a745;
+            padding: 12px 16px;
+            margin: 16px 0;
+            border-radius: 0 4px 4px 0;
+            font-size: 14px;
+            color: #155724;
+        }
+
+        .method-signature {
+            font-family: "SF Mono", Monaco, "Courier New", monospace;
+            font-size: 14px;
+            color: #333333;
+            background-color: #f8f9fa;
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin-bottom: 8px;
+            overflow-x: auto;
+            word-break: break-all;
+        }
+
+        .method-name {
+            font-weight: 600;
+            color: #6f42c1;
+        }
+
+        .param-name {
+            color: #005cc5;
+        }
+
+        .return-type {
+            color: #28a745;
+        }
+
+        .example-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: #666666;
+            margin-bottom: 8px;
+        }
+
+        .menu-link {
+            display: inline-block;
+            padding: 6px 12px;
+            background-color: #1a73e8;
+            color: #ffffff;
+            text-decoration: none;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: background-color 0.2s;
+        }
+
+        .menu-link:hover {
+            background-color: #1557b0;
+        }
+
+        /* 移动端遮罩 */
+        .nav-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 998;
+        }
+
+        .nav-overlay.show {
+            display: block;
+        }
+
+        /* ===== 响应式设计 ===== */
+        @media (max-width: 768px) {
+            .mobile-header {
+                display: block;
+            }
+
+            .menu-toggle {
+                display: block;
+            }
+
+            .nav {
+                transform: translateX(-100%);
+                width: 280px;
+                padding-top: 60px;
+            }
+
+            .nav.open {
+                transform: translateX(0);
+            }
+
+            .nav-overlay.show {
+                display: block;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px 16px;
+            }
+
+            .header h1 {
+                font-size: 26px;
+            }
+
+            .header p {
+                font-size: 14px;
+            }
+
+            .section-title {
+                font-size: 20px;
+            }
+
+            .subsection-title {
+                font-size: 17px;
+            }
+
+            .subsubsection-title {
+                font-size: 15px;
+            }
+
+            .code-block {
+                padding: 12px;
+                font-size: 13px;
+            }
+
+            .code-block pre {
+                font-size: 13px;
+            }
+
+            .method-signature {
+                font-size: 13px;
+                padding: 6px 10px;
+                word-break: break-all;
+            }
+
+            table {
+                font-size: 13px;
+                min-width: 500px;
+            }
+
+            table th, table td {
+                padding: 8px 12px;
+            }
+
+            .description {
+                font-size: 14px;
+            }
+
+            .note, .warning, .success {
+                font-size: 13px;
+                padding: 10px 14px;
+            }
+
+            .nav-item {
+                font-size: 13px;
+                padding: 8px 16px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .mobile-header-title {
+                font-size: 16px;
+            }
+
+            .main-content {
+                padding: 16px 12px;
+            }
+
+            .header h1 {
+                font-size: 22px;
+            }
+
+            .header {
+                margin-bottom: 30px;
+                padding-bottom: 20px;
+            }
+
+            .section {
+                margin-bottom: 30px;
+            }
+
+            .section-title {
+                font-size: 18px;
+                margin-bottom: 16px;
+            }
+
+            .subsection-title {
+                font-size: 16px;
+                margin-top: 20px;
+            }
+
+            .subsubsection-title {
+                font-size: 14px;
+                margin-top: 16px;
+            }
+
+            .code-block {
+                padding: 10px;
+                font-size: 12px;
+                margin: 12px 0;
+            }
+
+            .code-block pre {
+                font-size: 12px;
+            }
+
+            .method-signature {
+                font-size: 12px;
+                padding: 4px 8px;
+                word-break: break-all;
+            }
+
+            table {
+                font-size: 12px;
+                min-width: 400px;
+            }
+
+            table th, table td {
+                padding: 6px 10px;
+            }
+
+            .description {
+                font-size: 13px;
+            }
+
+            .note, .warning, .success {
+                font-size: 12px;
+                padding: 8px 12px;
+            }
+
+            .nav {
+                width: 260px;
+            }
+
+            .nav-item {
+                font-size: 12px;
+                padding: 6px 14px;
+            }
+        }
+
+        /* 打印样式 */
+        @media print {
+            .mobile-header, .menu-toggle, .nav-overlay {
+                display: none !important;
+            }
+
+            .nav {
+                position: static;
+                width: auto;
+                height: auto;
+                border-right: none;
+                padding: 0;
+                transform: none !important;
+            }
+
+            .main-content {
+                margin-left: 0;
+                padding: 20px;
+            }
+
+            .code-block {
+                break-inside: avoid;
+            }
+
+            table {
+                break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 移动端顶部导航 -->
+    <div class="mobile-header">
+        <div class="mobile-header-content">
+            <span class="mobile-header-title">📖 QEdge 文档</span>
+            <button class="menu-toggle" id="menuToggle" aria-label="切换菜单">☰</button>
+        </div>
+    </div>
+
+    <!-- 遮罩 -->
+    <div class="nav-overlay" id="navOverlay"></div>
+
+    <!-- 侧边导航 -->
+    <div class="nav" id="sideNav">
+        <div class="nav-title">文档导航</div>
+        <a href="#intro" class="nav-item">简介</a>
+        <a href="#environment" class="nav-item">开发环境</a>
+        <a href="#files" class="nav-item">脚本必须文件</a>
+        <a href="#globals" class="nav-item">全局变量</a>
+        <a href="#structures" class="nav-item">核心数据结构</a>
+        <a href="#msg-methods" class="nav-item">消息相关方法</a>
+        <a href="#friend-methods" class="nav-item">好友相关方法</a>
+        <a href="#group-methods" class="nav-item">群管理方法</a>
+        <a href="#cookie-methods" class="nav-item">Cookie与Token</a>
+        <a href="#storage-methods" class="nav-item">数据存储</a>
+        <a href="#callbacks" class="nav-item">回调方法</a>
+        <a href="#menu" class="nav-item">菜单功能</a>
+        <a href="#http-methods" class="nav-item">网络请求</a>
+                <a href="#reflect-methods" class="nav-item">反射与Hook</a>
+                <a href="#convert-methods" class="nav-item">UIN/UID转换</a>
+                <a href="#file-methods" class="nav-item">文件操作</a>
+                <a href="#encode-methods" class="nav-item">编码解码</a>
+                <a href="#other-methods" class="nav-item">其他方法</a>
+                <a href="#example" class="nav-item">示例脚本</a>
+    </div>
+
+    <div class="main-content">
+        <div class="container">
+            <div class="header">
+                <h1>QEdge 简介及脚本开发文档</h1>
+                <p>基于 Xposed 的 QQ 扩展模块 · 脚本开发指南</p>
+            </div>
+
+            <div class="section" id="intro">
+                <div class="section-title">简介</div>
+                <div class="description">
+                    QEdge 是一个基于 Xposed 框架的 QQ 扩展模块，允许开发者通过编写脚本扩展 QQ 的功能。脚本引擎基于 BeanShell，支持 Java 8 语法。
+                </div>
+                <div class="description">
+                    脚本目录位于 QQ 数据目录下的 <code style="background-color:#f8f9fa;padding:2px 6px;border-radius:3px;">QEdge/plugin</code> 文件夹中。
+                </div>
+            </div>
+
+            <div class="section" id="environment">
+                <div class="section-title">开发环境说明</div>
+                <div class="description">
+                    脚本运行于 Modern BeanShell 环境，支持 Java 8+ 特性。编写时请遵循以下规范：
+                </div>
+                <ul style="margin-left:24px;margin-bottom:16px;font-size:15px;color:#555555;">
+                    <li><strong>属性访问</strong>：推荐使用成员符 <code style="background-color:#f8f9fa;padding:2px 4px;">.</code> 直接访问对象属性（如 <code style="background-color:#f8f9fa;padding:2px 4px;">msgData.msg</code>），无需调用 Getter 方法。</li>
+                    <li><strong>方法访问</strong>：无需强制类型转换即可自动调用对应签名的方法和字段。</li>
+                    <li><strong>全局作用域</strong>：所有 API 方法在脚本任意位置均可直接调用，无需传递。</li>
+                    <li><strong>语法支持</strong>：完整支持 Java 8 特性，包括 Lambda 表达式、流式 API。</li>
+                    <li><strong>线程模型</strong>：事件回调默认在 IO 线程执行。操作 UI 需切换至主线程。</li>
+                </ul>
+            </div>
+
+            <div class="section" id="files">
+                <div class="section-title">脚本必须文件</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>文件名称</th>
+                            <th>说明</th>
+                            <th>是否必需</th>
+                        </tr>
+                        <tr>
+                            <td>main.java</td>
+                            <td>脚本执行入口</td>
+                            <td>是</td>
+                        </tr>
+                        <tr>
+                            <td>desc.txt</td>
+                            <td>脚本描述文件</td>
+                            <td>否</td>
+                        </tr>
+                        <tr>
+                            <td>info.prop</td>
+                            <td>配置文件</td>
+                            <td>是</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="subsection-title">info.prop 配置项</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>配置项</th>
+                            <th>说明</th>
+                            <th>示例</th>
+                        </tr>
+                        <tr>
+                            <td>id</td>
+                            <td>脚本唯一标识符</td>
+                            <td>example_123456</td>
+                        </tr>
+                        <tr>
+                            <td>pluginName</td>
+                            <td>脚本名称</td>
+                            <td>示例脚本</td>
+                        </tr>
+                        <tr>
+                            <td>author</td>
+                            <td>作者</td>
+                            <td>Developer</td>
+                        </tr>
+                        <tr>
+                            <td>versionCode</td>
+                            <td>版本号</td>
+                            <td>1.0</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="globals">
+                <div class="section-title">全局变量</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>变量名</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                        </tr>
+                        <tr>
+                            <td>context</td>
+                            <td>android.content.Context</td>
+                            <td>宿主 App 全局上下文</td>
+                        </tr>
+                        <tr>
+                            <td>pluginId</td>
+                            <td>String</td>
+                            <td>当前加载脚本 ID</td>
+                        </tr>
+                        <tr>
+                            <td>pluginPath</td>
+                            <td>String</td>
+                            <td>当前加载脚本的文件夹绝对路径</td>
+                        </tr>
+                        <tr>
+                            <td>myUin</td>
+                            <td>String</td>
+                            <td>当前登录的 QQ 号</td>
+                        </tr>
+                        <tr>
+                            <td>classLoader</td>
+                            <td>ClassLoader</td>
+                            <td>QQ 宿主类加载器</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="structures">
+                <div class="section-title">核心数据结构</div>
+
+                <div class="subsection-title">MsgData (消息对象)</div>
+                <div class="description">用于 onMsg 回调中。</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>字段</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                        </tr>
+                        <tr>
+                            <td>type</td>
+                            <td>int</td>
+                            <td>聊天类型 (1:好友/私聊, 2:群聊, 100:陌生人)</td>
+                        </tr>
+                        <tr>
+                            <td>msgType</td>
+                            <td>int</td>
+                            <td>消息类型</td>
+                        </tr>
+                        <tr>
+                            <td>peerUin</td>
+                            <td>String</td>
+                            <td>群号或好友QQ号</td>
+                        </tr>
+                        <tr>
+                            <td>peerUid</td>
+                            <td>String</td>
+                            <td>群号或好友UID</td>
+                        </tr>
+                        <tr>
+                            <td>userUin</td>
+                            <td>String</td>
+                            <td>发送者QQ号</td>
+                        </tr>
+                        <tr>
+                            <td>userUid</td>
+                            <td>String</td>
+                            <td>发送者UID</td>
+                        </tr>
+                        <tr>
+                            <td>time</td>
+                            <td>long</td>
+                            <td>发送时间戳 (秒)</td>
+                        </tr>
+                        <tr>
+                            <td>msgId</td>
+                            <td>long</td>
+                            <td>消息ID</td>
+                        </tr>
+                        <tr>
+                            <td>msg</td>
+                            <td>String</td>
+                            <td>文本消息内容</td>
+                        </tr>
+                        <tr>
+                            <td>path</td>
+                            <td>String</td>
+                            <td>文件/视频/语音保存路径</td>
+                        </tr>
+                        <tr>
+                            <td>atList</td>
+                            <td>List&lt;String&gt;</td>
+                            <td>消息中艾特的QQ号列表</td>
+                        </tr>
+                        <tr>
+                            <td>atMap</td>
+                            <td>Map&lt;String, String&gt;</td>
+                            <td>艾特映射表</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">FriendInfo (好友信息)</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>字段</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                        </tr>
+                        <tr>
+                            <td>uin</td>
+                            <td>String</td>
+                            <td>QQ号</td>
+                        </tr>
+                        <tr>
+                            <td>uid</td>
+                            <td>String</td>
+                            <td>UID</td>
+                        </tr>
+                        <tr>
+                            <td>name</td>
+                            <td>String</td>
+                            <td>昵称</td>
+                        </tr>
+                        <tr>
+                            <td>remark</td>
+                            <td>String</td>
+                            <td>备注</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">GroupInfo (群信息)</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>字段</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                        </tr>
+                        <tr>
+                            <td>group</td>
+                            <td>String</td>
+                            <td>群号</td>
+                        </tr>
+                        <tr>
+                            <td>groupName</td>
+                            <td>String</td>
+                            <td>群名称</td>
+                        </tr>
+                        <tr>
+                            <td>groupOwner</td>
+                            <td>String</td>
+                            <td>群主QQ号</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">MemberInfo (群成员信息)</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>字段</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                        </tr>
+                        <tr>
+                            <td>uin</td>
+                            <td>String</td>
+                            <td>成员QQ号</td>
+                        </tr>
+                        <tr>
+                            <td>uinName</td>
+                            <td>String</td>
+                            <td>群名片/昵称</td>
+                        </tr>
+                        <tr>
+                            <td>role</td>
+                            <td>String</td>
+                            <td>角色 (OWNER/ADMIN/MEMBER)</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">ForbidInfo (禁言信息)</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>字段</th>
+                            <th>类型</th>
+                            <th>描述</th>
+                        </tr>
+                        <tr>
+                            <td>user</td>
+                            <td>String</td>
+                            <td>被禁言成员QQ号</td>
+                        </tr>
+                        <tr>
+                            <td>userName</td>
+                            <td>String</td>
+                            <td>被禁言成员昵称</td>
+                        </tr>
+                        <tr>
+                            <td>time</td>
+                            <td>long</td>
+                            <td>剩余禁言时长 (秒)</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="msg-methods">
+                <div class="section-title">消息相关方法</div>
+
+                <div class="subsubsection-title">sendMsg - 发送消息</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendMsg</span>(<span class="param-name">String</span> peerUin, <span class="param-name">String</span> msg, <span class="param-name">int</span> chatType)
+                </div>
+                <div class="description">发送文本消息。</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>参数</th>
+                            <th>类型</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>peerUin</td>
+                            <td>String</td>
+                            <td>好友QQ号或群号</td>
+                        </tr>
+                        <tr>
+                            <td>msg</td>
+                            <td>String</td>
+                            <td>消息内容</td>
+                        </tr>
+                        <tr>
+                            <td>chatType</td>
+                            <td>int</td>
+                            <td>聊天类型 (1好友/2群聊/100陌生人)</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="note">
+                    支持格式：
+                    <br>艾特：<code>[atUin=QQ号]</code>（QQ号为0时表示艾特全体）
+                    <br>图片：<code>[pic=图片链接或绝对路径]</code>
+                </div>
+
+                <div class="subsubsection-title">sendPic - 发送图片</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendPic</span>(<span class="param-name">String</span> peerUin, <span class="param-name">String</span> path, <span class="param-name">int</span> chatType)
+                </div>
+
+                <div class="subsubsection-title">sendPtt - 发送语音</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendPtt</span>(<span class="param-name">String</span> peerUin, <span class="param-name">String</span> path, <span class="param-name">int</span> chatType)
+                </div>
+
+                <div class="subsubsection-title">sendCard - 发送卡片</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendCard</span>(<span class="param-name">String</span> peerUin, <span class="param-name">String</span> data, <span class="param-name">int</span> chatType)
+                </div>
+
+                <div class="subsubsection-title">sendFile - 发送文件</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendFile</span>(<span class="param-name">String</span> peerUin, <span class="param-name">String</span> path, <span class="param-name">int</span> chatType)
+                </div>
+
+                <div class="subsubsection-title">sendVideo - 发送视频</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendVideo</span>(<span class="param-name">String</span> peerUin, <span class="param-name">String</span> path, <span class="param-name">int</span> chatType)
+                </div>
+
+                <div class="subsubsection-title">sendPai - 拍一拍</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendPai</span>(<span class="param-name">String</span> toUin, <span class="param-name">String</span> peerUin, <span class="param-name">int</span> chatType)</br>
+                    <span class="return-type">void</span> <span class="method-name">sendPai</span>(<span class="param-name">String</span> toUin, <span class="param-name">String</span> peerUin)
+                </div>
+
+                <div class="subsubsection-title">recallMsg - 撤回消息</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">recallMsg</span>(<span class="param-name">int</span> chatType, <span class="param-name">String</span> peerUin, <span class="param-name">long</span> msgId)
+                </div>
+                
+                <div class="subsubsection-title">sendMusic - 发送音乐卡片</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendMusic</span>(<span class="param-name">String</span> platform, <span class="param-name">String</span> peerUin, <span class="param-name">String</span> title, <span class="param-name">String</span> desc, <span class="param-name">String</span> jumpUrl, <span class="param-name">String</span> musicUrl, <span class="param-name">String</span> imgUrl, <span class="param-name">int</span> chatType)
+                </div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>参数</th>
+                            <th>类型</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>platform</td>
+                            <td>String</td>
+                            <td>qq,wy,mg,kw(已废弃，自测),kg,mg,bd</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">快捷消息方法</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>sendPrivateMsg</td>
+                            <td>void</td>
+                            <td>String uin, String msg</td>
+                            <td>发送私聊文本消息</td>
+                        </tr>
+                        <tr>
+                            <td>sendGroupMsg</td>
+                            <td>void</td>
+                            <td>String qun, String msg</td>
+                            <td>发送群文本消息</td>
+                        </tr>
+                        <tr>
+                            <td>sendPrivatePic</td>
+                            <td>void</td>
+                            <td>String uin, String path</td>
+                            <td>发送私聊图片</td>
+                        </tr>
+                        <tr>
+                            <td>sendGroupPic</td>
+                            <td>void</td>
+                            <td>String qun, String path</td>
+                            <td>发送群图片</td>
+                        </tr>
+                        <tr>
+                            <td>sendPrivatePtt</td>
+                            <td>void</td>
+                            <td>String uin, String path</td>
+                            <td>发送私聊语音</td>
+                        </tr>
+                        <tr>
+                            <td>sendGroupPtt</td>
+                            <td>void</td>
+                            <td>String qun, String path</td>
+                            <td>发送群语音</td>
+                        </tr>
+                        <tr>
+                            <td>sendPrivateCard</td>
+                            <td>void</td>
+                            <td>String uin, String data</td>
+                            <td>发送私聊卡片</td>
+                        </tr>
+                        <tr>
+                            <td>sendGroupCard</td>
+                            <td>void</td>
+                            <td>String qun, String data</td>
+                            <td>发送群卡片</td>
+                        </tr>
+                        <tr>
+                            <td>sendPrivateVideo</td>
+                            <td>void</td>
+                            <td>String uin, String path</td>
+                            <td>发送私聊视频</td>
+                        </tr>
+                        <tr>
+                            <td>sendGroupVideo</td>
+                            <td>void</td>
+                            <td>String qun, String path</td>
+                            <td>发送群视频</td>
+                        </tr>
+                        <tr>
+                            <td>sendPrivateFile</td>
+                            <td>void</td>
+                            <td>String uin, String path</td>
+                            <td>发送私聊文件</td>
+                        </tr>
+                        <tr>
+                            <td>sendGroupFile</td>
+                            <td>void</td>
+                            <td>String qun, String path</td>
+                            <td>发送群文件</td>
+                        </tr>
+                        <tr>
+                            <td>recallPrivateMsg</td>
+                            <td>void</td>
+                            <td>String uin, long msgId</td>
+                            <td>撤回私聊消息</td>
+                        </tr>
+                        <tr>
+                            <td>recallGroupMsg</td>
+                            <td>void</td>
+                            <td>String qun, long msgId</td>
+                            <td>撤回群消息</td>
+                        </tr>
+                        <tr>
+                            <td>addLocalGrayTipMsg</td>
+                            <td>void</td>
+                            <td>String peerUin, String jsonStr, long busiId, int chatType</td>
+                            <td>添加本地灰条提示消息</td>
+                        </tr>
+                        <tr>
+                            <td>sendReplyMsg</td>
+                            <td>void</td>
+                            <td>String peerUin, long replyMsgId, String msg, int chatType</td>
+                            <td>发送引用回复消息</td>
+                        </tr>
+                        <tr>
+                            <td>sendPrivateReplyMsg</td>
+                            <td>void</td>
+                            <td>String uin, long replyMsgId, String msg</td>
+                            <td>发送私聊引用回复</td>
+                        </tr>
+                        <tr>
+                            <td>sendGroupReplyMsg</td>
+                            <td>void</td>
+                            <td>String qun, long replyMsgId, String msg</td>
+                            <td>发送群引用回复</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">平台音乐卡片</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>qqsendTroopMusic</td>
+                            <td>void</td>
+                            <td>String qun, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送QQ音乐群卡片</td>
+                        </tr>
+                        <tr>
+                            <td>qqsendFriendMusic</td>
+                            <td>void</td>
+                            <td>String uin, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送QQ音乐好友卡片</td>
+                        </tr>
+                        <tr>
+                            <td>wysendTroopMusic</td>
+                            <td>void</td>
+                            <td>String qun, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送网易云音乐群卡片</td>
+                        </tr>
+                        <tr>
+                            <td>wysendFriendMusic</td>
+                            <td>void</td>
+                            <td>String uin, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送网易云音乐好友卡片</td>
+                        </tr>
+                        <tr>
+                            <td>kgsendTroopMusic</td>
+                            <td>void</td>
+                            <td>String qun, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送酷狗音乐群卡片</td>
+                        </tr>
+                        <tr>
+                            <td>kgsendFriendMusic</td>
+                            <td>void</td>
+                            <td>String uin, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送酷狗音乐好友卡片</td>
+                        </tr>
+                        <tr>
+                            <td>kwsendTroopMusic</td>
+                            <td>void</td>
+                            <td>String qun, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送酷我音乐群卡片</td>
+                        </tr>
+                        <tr>
+                            <td>kwsendFriendMusic</td>
+                            <td>void</td>
+                            <td>String uin, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送酷我音乐好友卡片</td>
+                        </tr>
+                        <tr>
+                            <td>bdsendTroopMusic</td>
+                            <td>void</td>
+                            <td>String qun, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送百度音乐群卡片</td>
+                        </tr>
+                        <tr>
+                            <td>bdsendFriendMusic</td>
+                            <td>void</td>
+                            <td>String uin, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送百度音乐好友卡片</td>
+                        </tr>
+                        <tr>
+                            <td>mgsendTroopMusic</td>
+                            <td>void</td>
+                            <td>String qun, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送咪咕音乐群卡片</td>
+                        </tr>
+                        <tr>
+                            <td>mgsendFriendMusic</td>
+                            <td>void</td>
+                            <td>String uin, String title, String desc, String detailUrl, String audio, String img</td>
+                            <td>发送咪咕音乐好友卡片</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="friend-methods">
+                <div class="section-title">好友相关方法</div>
+
+                <div class="subsubsection-title">getAllFriend - 获取好友列表</div>
+                <div class="method-signature">
+                    <span class="return-type">List&lt;FriendInfo&gt;</span> <span class="method-name">getAllFriend</span>()
+                </div>
+
+                <div class="subsubsection-title">isFriend - 判断好友</div>
+                <div class="method-signature">
+                    <span class="return-type">boolean</span> <span class="method-name">isFriend</span>(<span class="param-name">String</span> uin)
+                </div>
+
+                <div class="subsubsection-title">sendZan - 点赞</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">sendZan</span>(<span class="param-name">String</span> uin, <span class="param-name">int</span> num)
+                </div>
+
+                <div class="subsubsection-title">getCurrentUin - 获取当前QQ号</div>
+                <div class="method-signature">
+                    <span class="return-type">String</span> <span class="method-name">getCurrentUin</span>()
+                </div>
+
+                <div class="subsubsection-title">getCurrentUid - 获取当前UID</div>
+                <div class="method-signature">
+                    <span class="return-type">String</span> <span class="method-name">getCurrentUid</span>()
+                </div>
+                <div class="subsubsection-title">getCurrentName - 获取当前昵称</div>
+                <div class="method-signature">
+                    <span class="return-type">String</span> <span class="method-name">getCurrentName</span>()
+                </div>
+            </div>
+
+            <div class="section" id="group-methods">
+                <div class="section-title">群管理方法</div>
+
+                <div class="subsubsection-title">getGroupList - 获取群列表</div>
+                <div class="method-signature">
+                    <span class="return-type">List&lt;GroupInfo&gt;</span> <span class="method-name">getGroupList</span>()
+                </div>
+
+                <div class="subsubsection-title">getGroupInfo - 获取群信息</div>
+                <div class="method-signature">
+                    <span class="return-type">Object</span> <span class="method-name">getGroupInfo</span>(<span class="param-name">String</span> group)
+                </div>
+                <div class="description">获取指定群的详细信息对象。</div>
+
+                <div class="subsubsection-title">getGroupMemberList - 获取群成员列表</div>
+                <div class="method-signature">
+                    <span class="return-type">List&lt;MemberInfo&gt;</span> <span class="method-name">getGroupMemberList</span>(<span class="param-name">String</span> group)
+                </div>
+
+                <div class="subsubsection-title">getForbidInfo - 获取禁言列表</div>
+                <div class="method-signature">
+                    <span class="return-type">List&lt;ForbidInfo&gt;</span> <span class="method-name">getForbidInfo</span>(<span class="param-name">String</span> group)
+                </div>
+
+                <div class="subsubsection-title">shutUp - 禁言成员</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">shutUp</span>(<span class="param-name">String</span> group, <span class="param-name">String</span> uin, <span class="param-name">long</span> time)
+                </div>
+                <div class="note">传 0 为解禁。</div>
+
+                <div class="subsubsection-title">shutUpAll - 全员禁言</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">shutUpAll</span>(<span class="param-name">String</span> group, <span class="param-name">boolean</span> enable)
+                </div>
+                
+                <div class="subsubsection-title">setMemberTitle - 设置群头衔</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">setMemberTitle</span>(<span class="param-name">String</span> group, <span class="param-name">String</span> uin, <span class="param-name">String</span> title)
+                </div>
+
+                <div class="subsubsection-title">kickGroup - 踢出群成员</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">kickGroup</span>(<span class="param-name">String</span> group, <span class="param-name">String</span> uin, <span class="param-name">boolean</span> block)
+                </div>
+
+                <div class="subsubsection-title">setGroupAdmin - 设置管理员</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">setGroupAdmin</span>(<span class="param-name">String</span> group, <span class="param-name">String</span> uin, <span class="param-name">boolean</span> enable)
+                </div>
+
+                <div class="subsubsection-title">clockIn - 群打卡</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">clockIn</span>(<span class="param-name">String</span> group)
+                </div>
+                
+                <div class="subsubsection-title">changeGroupName - 更换群名</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">changeGroupName</span>(<span class="param-name">String</span> group, <span class="param-name">String</span> name)
+                </div>
+                
+                <div class="subsubsection-title">getAbnormalUserList - 获取群内异常用户列表</div>
+                <div class="method-signature">
+                    <span class="return-type">List<String></span> <span class="method-name">getAbnormalUserList</span>(<span class="param-name">String</span> group)
+                </div>
+                
+                <div class="subsubsection-title"> setGroupLocation - 设置群地点</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">setGroupLocation</span>(<span class="param-name">String</span> group, <span class="param-name">String</span> location)
+                </div>
+                
+                <div class="subsubsection-title"> setGroupShortcutBar - 设置群快捷栏</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">setGroupShortcutBar</span>(<span class="param-name">String</span> group, <span class="param-name">String</span> desc, <span class="param-name">String</span> link, <span class="param-name">String</span> name, <span class="param-name">String</span> cover)
+                </div>
+                
+            </div>
+
+            <div class="section" id="cookie-methods">
+                <div class="section-title">Cookie与Token</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>getSkey()</td>
+                            <td>String</td>
+                            <td>获取skey</td>
+                        </tr>
+                        <tr>
+                            <td>getRealSkey()</td>
+                            <td>String</td>
+                            <td>获取RealSkey(鬼知道是什么玩意)</td>
+                        </tr>
+                        <tr>
+                            <td>getPskey(String url)</td>
+                            <td>String</td>
+                            <td>获取指定域名的pskey</td>
+                        </tr>
+                        <tr>
+                            <td>getPt4Token(String url)</td>
+                            <td>String</td>
+                            <td>获取Pt4Token</td>
+                        </tr>
+                        <tr>
+                            <td>getStweb()</td>
+                            <td>String</td>
+                            <td>获取stweb</td>
+                        </tr>
+                        <tr>
+                            <td>getGTK(String url)</td>
+                            <td>String</td>
+                            <td>根据URL获取GTK</td>
+                        </tr>
+                        <tr>
+                            <td>getGtk(String skey)</td>
+                            <td>String</td>
+                            <td>根据skey计算GTK</td>
+                        </tr>
+                        <tr>
+                            <td>getBkn(String key)</td>
+                            <td>long</td>
+                            <td>计算Bkn</td>
+                        </tr>
+                        <tr>
+                            <td>getGroupRKey()</td>
+                            <td>String</td>
+                            <td>群聊图片RKey</td>
+                        </tr>
+                        <tr>
+                            <td>getFriendRKey()</td>
+                            <td>String</td>
+                            <td>私聊图片RKey</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="storage-methods">
+                <div class="section-title">数据存储</div>
+                <div class="description">数据保存在 <code style="background-color:#f8f9fa;padding:2px 6px;border-radius:3px;">plugin/脚本ID/config/</code> 下的 JSON 文件中。</div>
+
+                <div class="subsection-title">写入数据</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>putString(configName, key, value)</td>
+                            <td>写入字符串</td>
+                        </tr>
+                        <tr>
+                            <td>putInt(configName, key, value)</td>
+                            <td>写入整数</td>
+                        </tr>
+                        <tr>
+                            <td>putLong(configName, key, value)</td>
+                            <td>写入长整数</td>
+                        </tr>
+                        <tr>
+                            <td>putBoolean(configName, key, value)</td>
+                            <td>写入布尔值</td>
+                        </tr>
+                        <tr>
+                            <td>putDouble(configName, key, value)</td>
+                            <td>写入浮点数</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">读取数据</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>getString(configName, key, defaultValue)</td>
+                            <td>读取字符串</td>
+                        </tr>
+                        <tr>
+                            <td>getInt(configName, key, defaultValue)</td>
+                            <td>读取整数</td>
+                        </tr>
+                        <tr>
+                            <td>getLong(configName, key, defaultValue)</td>
+                            <td>读取长整数</td>
+                        </tr>
+                        <tr>
+                            <td>getBoolean(configName, key, defaultValue)</td>
+                            <td>读取布尔值</td>
+                        </tr>
+                        <tr>
+                            <td>getDouble(configName, key, defaultValue)</td>
+                            <td>读取浮点数</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">其他操作</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>remove(configName, key)</td>
+                            <td>删除键</td>
+                        </tr>
+                        <tr>
+                            <td>contains(configName, key)</td>
+                            <td>判断键是否存在</td>
+                        </tr>
+                        <tr>
+                            <td>clear(configName)</td>
+                            <td>清空配置文件</td>
+                        </tr>
+                        <tr>
+                            <td>getConfigMap(configName)</td>
+                            <td>获取配置文件的所有键值</td>
+                        </tr>
+                        <tr>
+                            <td>getConfigPath(configName)</td>
+                            <td>获取配置文件完整路径</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="callbacks">
+                <div class="section-title">回调方法</div>
+                <div class="description">在脚本中实现以下方法以接收事件。</div>
+
+                <div class="subsubsection-title">onMsg - 接收消息</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">onMsg</span>(<span class="param-name">Object</span> msgData)
+                </div>
+                <div class="description">接收消息时触发，参数为 MsgData 对象。</div>
+
+                <div class="subsubsection-title">群变动事件</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>joinGroup(group, memberUin)</td>
+                            <td>成员入群</td>
+                        </tr>
+                        <tr>
+                            <td>quitGroup(group, memberUin)</td>
+                            <td>成员退群</td>
+                        </tr>
+                        <tr>
+                            <td>shutUpGroup(group, memberUin, time, operatorUin)</td>
+                            <td>群禁言事件</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsubsection-title">交互事件</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>chatInterface(chatType, peerUin, name)</td>
+                            <td>进入聊天界面</td>
+                        </tr>
+                        <tr>
+                            <td>onPaiYiPai(peerUin, chatType, operatorUin)</td>
+                            <td>拍一拍事件</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsubsection-title">生命周期</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">unLoadPlugin</span>()
+                </div>
+                <div class="description">脚本停止/卸载时触发。</div>
+            </div>
+
+            <div class="section" id="menu">
+                <div class="section-title">菜单功能</div>
+
+                <div class="subsection-title">脚本菜单 (悬浮窗)</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">addItem</span>(<span class="param-name">String</span> name, <span class="param-name">String</span> callback)
+                </div>
+                <div class="description">添加脚本菜单项目。入口在聊天页面(长按右上角三条杠或者右下角加号)</div>
+                <div class="example-title">回调定义：</div>
+                <div class="code-block">
+                    <pre>void 回调方法名(int 聊天类型, String PeerUin, String 名称) {
+    // 处理逻辑
+}</pre>
+                </div>
+
+                <div class="subsection-title">消息菜单 (长按消息)</div>
+                <div class="method-signature">
+                    <span class="return-type">void</span> <span class="method-name">addMenuItem</span>(<span class="param-name">String</span> name, <span class="param-name">String</span> callback, <span class="param-name">int[]</span> msgTypes)
+                </div>
+                <div class="description">添加消息菜单项目。最后一个参数为空或不写则默认所有消息。</div>
+                <div class="example-title">回调定义：</div>
+                <div class="code-block">
+                    <pre>void 回调方法名(Object msgData) {
+    // msgData为MsgData对象
+}</pre>
+                </div>
+            </div>
+
+            <div class="section" id="http-methods">
+                <div class="section-title">网络请求</div>
+
+                <div class="subsubsection-title">httpGet - GET请求</div>
+                <div class="method-signature">
+                    <span class="return-type">String</span> <span class="method-name">httpGet</span>(<span class="param-name">String</span> url)
+                </div>
+                <div class="method-signature">
+                    <span class="return-type">String</span> <span class="method-name">httpGet</span>(<span class="param-name">String</span> url, <span class="param-name">int</span> connectTimeout, <span class="param-name">int</span> readTimeout)
+                </div>
+
+                <div class="subsubsection-title">httpPost - POST请求</div>
+                <div class="method-signature">
+                    <span class="return-type">String</span> <span class="method-name">httpPost</span>(<span class="param-name">String</span> url, <span class="param-name">String</span> body)
+                </div>
+                <div class="method-signature">
+                    <span class="return-type">String</span> <span class="method-name">httpPost</span>(<span class="param-name">String</span> url, <span class="param-name">String</span> body, <span class="param-name">String</span> contentType)
+                </div>
+
+                <div class="subsubsection-title">downloadFile - 下载文件</div>
+                <div class="method-signature">
+                    <span class="return-type">boolean</span> <span class="method-name">downloadFile</span>(<span class="param-name">String</span> url, <span class="param-name">String</span> savePath)
+                </div>
+            </div>
+
+            <div class="section" id="reflect-methods">
+                <div class="section-title">反射与Hook</div>
+
+                <div class="subsection-title">反射方法</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>callMethod</td>
+                            <td>Object</td>
+                            <td>Object obj, String methodName, Object... args</td>
+                            <td>调用对象方法</td>
+                        </tr>
+                        <tr>
+                            <td>callStaticMethod</td>
+                            <td>Object</td>
+                            <td>String className, String methodName, Object... args</td>
+                            <td>调用静态方法</td>
+                        </tr>
+                        <tr>
+                            <td>getFieldValue</td>
+                            <td>Object</td>
+                            <td>Object obj, String fieldName</td>
+                            <td>获取字段值</td>
+                        </tr>
+                        <tr>
+                            <td>setFieldValue</td>
+                            <td>void</td>
+                            <td>Object obj, String fieldName, Object value</td>
+                            <td>设置字段值</td>
+                        </tr>
+                        <tr>
+                            <td>newInstance</td>
+                            <td>Object</td>
+                            <td>String className, Object... args</td>
+                            <td>创建类实例</td>
+                        </tr>
+                        <tr>
+                            <td>findClass</td>
+                            <td>Class</td>
+                            <td>String className</td>
+                            <td>查找类</td>
+                        </tr>
+                        <tr>
+                            <td>findMethod</td>
+                            <td>Method</td>
+                            <td>Object obj, String methodName, int paramCount</td>
+                            <td>根据参数数量查找方法</td>
+                        </tr>
+                        <tr>
+                            <td>findMethod</td>
+                            <td>Method</td>
+                            <td>Object obj, String methodName, Class... parameterTypes</td>
+                            <td>根据参数类型查找方法</td>
+                        </tr>
+                        <tr>
+                            <td>findField</td>
+                            <td>Field</td>
+                            <td>Object obj, String fieldName</td>
+                            <td>查找字段</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">Hook方法</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>hookAfter</td>
+                            <td>XC_MethodHook.Unhook</td>
+                            <td>Object member, Object callback</td>
+                            <td>方法执行后Hook</td>
+                        </tr>
+                        <tr>
+                            <td>hookBefore</td>
+                            <td>XC_MethodHook.Unhook</td>
+                            <td>Object member, Object callback</td>
+                            <td>方法执行前Hook</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="note">
+                    callback为Lambda表达式，参数为XC_MethodHook.MethodHookParam，可访问param.thisObject、param.args、param.getResult()等
+                </div>
+            </div>
+
+            <div class="section" id="convert-methods">
+                <div class="section-title">UIN/UID转换</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>getUidFromUin</td>
+                            <td>String</td>
+                            <td>String uin</td>
+                            <td>UIN转UID</td>
+                        </tr>
+                        <tr>
+                            <td>getUinFromUid</td>
+                            <td>String</td>
+                            <td>String uid</td>
+                            <td>UID转UIN</td>
+                        </tr>
+                        <tr>
+                            <td>isValidUin</td>
+                            <td>boolean</td>
+                            <td>String uin</td>
+                            <td>验证UIN是否有效</td>
+                        </tr>
+                        <tr>
+                            <td>isValidUid</td>
+                            <td>boolean</td>
+                            <td>String uid</td>
+                            <td>验证UID是否有效</td>
+                        </tr>
+                        <tr>
+                            <td>isValidQQ</td>
+                            <td>boolean</td>
+                            <td>String qq</td>
+                            <td>验证QQ号是否有效</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="file-methods">
+                <div class="section-title">文件操作</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>deleteFile</td>
+                            <td>boolean</td>
+                            <td>String path</td>
+                            <td>删除文件</td>
+                        </tr>
+                        <tr>
+                            <td>existsFile</td>
+                            <td>boolean</td>
+                            <td>String path</td>
+                            <td>检查文件是否存在</td>
+                        </tr>
+                        <tr>
+                            <td>mkdirs</td>
+                            <td>boolean</td>
+                            <td>String path</td>
+                            <td>创建目录</td>
+                        </tr>
+                        <tr>
+                            <td>getFileName</td>
+                            <td>String</td>
+                            <td>String path</td>
+                            <td>获取文件名</td>
+                        </tr>
+                        <tr>
+                            <td>getFileSize</td>
+                            <td>long</td>
+                            <td>String path</td>
+                            <td>获取文件大小(字节)</td>
+                        </tr>
+                        <tr>
+                            <td>getFileLastModified</td>
+                            <td>long</td>
+                            <td>String path</td>
+                            <td>获取文件最后修改时间</td>
+                        </tr>
+                        <tr>
+                            <td>getParentPath</td>
+                            <td>String</td>
+                            <td>String path</td>
+                            <td>获取父目录路径</td>
+                        </tr>
+                        <tr>
+                            <td>listFiles</td>
+                            <td>List&lt;String&gt;</td>
+                            <td>String dirPath</td>
+                            <td>列出目录下文件</td>
+                        </tr>
+                        <tr>
+                            <td>readFile</td>
+                            <td>String</td>
+                            <td>String path</td>
+                            <td>读取文件内容</td>
+                        </tr>
+                        <tr>
+                            <td>writeFile</td>
+                            <td>void</td>
+                            <td>String path, String content</td>
+                            <td>写入文件内容</td>
+                        </tr>
+                        <tr>
+                            <td>appendFile</td>
+                            <td>void</td>
+                            <td>String path, String content</td>
+                            <td>追加写入文件</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="encode-methods">
+                <div class="section-title">编码解码</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>urlEncode</td>
+                            <td>String</td>
+                            <td>String str</td>
+                            <td>URL编码</td>
+                        </tr>
+                        <tr>
+                            <td>urlDecode</td>
+                            <td>String</td>
+                            <td>String str</td>
+                            <td>URL解码</td>
+                        </tr>
+                        <tr>
+                            <td>base64Encode</td>
+                            <td>String</td>
+                            <td>String str</td>
+                            <td>Base64编码</td>
+                        </tr>
+                        <tr>
+                            <td>base64Decode</td>
+                            <td>String</td>
+                            <td>String str</td>
+                            <td>Base64解码</td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+
+            <div class="section" id="other-methods">
+                <div class="section-title">其他方法</div>
+
+                <div class="subsection-title">日志与提示</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>log</td>
+                            <td>void</td>
+                            <td>String msg</td>
+                            <td>追加写入日志到脚本目录</td>
+                        </tr>
+                        <tr>
+                            <td>log</td>
+                            <td>void</td>
+                            <td>String fileName, String msg</td>
+                            <td>写入指定日志文件</td>
+                        </tr>
+                        <tr>
+                            <td>toast</td>
+                            <td>void</td>
+                            <td>Object msg</td>
+                            <td>系统Toast</td>
+                        </tr>
+                        <tr>
+                            <td>toastLong</td>
+                            <td>void</td>
+                            <td>Object msg</td>
+                            <td>系统长Toast</td>
+                        </tr>
+                        <tr>
+                            <td>qqToast</td>
+                            <td>void</td>
+                            <td>int icon, Object msg</td>
+                            <td>QQ风格顶部弹窗 (0警告/1错误/2成功)</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">动态加载</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>loadJava</td>
+                            <td>void</td>
+                            <td>String path</td>
+                            <td>加载Java文件</td>
+                        </tr>
+                        <tr>
+                            <td>loadJar</td>
+                            <td>void</td>
+                            <td>String path</td>
+                            <td>加载Jar文件</td>
+                        </tr>
+                        <tr>
+                            <td>loadDex</td>
+                            <td>void</td>
+                            <td>String path</td>
+                            <td>加载Dex文件</td>
+                        </tr>
+                        <tr>
+                            <td>registerActivity</td>
+                            <td>void</td>
+                            <td>Class&lt;?&gt; activityClass</td>
+                            <td>注册Activity</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">Activity操作</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>startQQActivity</td>
+                            <td>void</td>
+                            <td>String activityClass</td>
+                            <td>启动QQ Activity</td>
+                        </tr>
+                        <tr>
+                            <td>startQQActivity</td>
+                            <td>void</td>
+                            <td>String activityClass, Map&lt;String, String&gt; extras</td>
+                            <td>启动QQ Activity(带参数)</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">工具方法</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>getNowActivity</td>
+                            <td>Activity</td>
+                            <td></td>
+                            <td>获取当前顶层Activity</td>
+                        </tr>
+                        <tr>
+                            <td>runOnUiThread</td>
+                            <td>void</td>
+                            <td>Runnable runnable</td>
+                            <td>在主线程执行</td>
+                        </tr>
+                        <tr>
+                            <td>runOnBackgroundThread</td>
+                            <td>void</td>
+                            <td>Runnable runnable</td>
+                            <td>在后台线程执行</td>
+                        </tr>
+                        <tr>
+                            <td>isMainThread</td>
+                            <td>boolean</td>
+                            <td></td>
+                            <td>判断是否为主线程</td>
+                        </tr>
+                        <tr>
+                            <td>sleep</td>
+                            <td>void</td>
+                            <td>long millis</td>
+                            <td>休眠指定毫秒数</td>
+                        </tr>
+                        <tr>
+                            <td>formatTime</td>
+                            <td>String</td>
+                            <td>long timestamp</td>
+                            <td>格式化时间戳(默认格式)</td>
+                        </tr>
+                        <tr>
+                            <td>formatTime</td>
+                            <td>String</td>
+                            <td>long timestamp, String format</td>
+                            <td>格式化时间戳(自定义格式)</td>
+                        </tr>
+                        <tr>
+                            <td>getCurrentTimeMillis</td>
+                            <td>long</td>
+                            <td></td>
+                            <td>获取当前时间戳(毫秒)</td>
+                        </tr>
+                        <tr>
+                            <td>getCurrentTimeSeconds</td>
+                            <td>long</td>
+                            <td></td>
+                            <td>获取当前时间戳(秒)</td>
+                        </tr>
+                        <tr>
+                            <td>getDeviceId</td>
+                            <td>String</td>
+                            <td></td>
+                            <td>获取设备ID</td>
+                        </tr>
+                        <tr>
+                            <td>getVersionName</td>
+                            <td>String</td>
+                            <td></td>
+                            <td>获取模块版本名</td>
+                        </tr>
+                        <tr>
+                            <td>getVersionCode</td>
+                            <td>int</td>
+                            <td></td>
+                            <td>获取模块版本号</td>
+                        </tr>
+                        <tr>
+                            <td>sendPacket</td>
+                            <td>boolean</td>
+                            <td>String cmd, String jsonStr</td>
+                            <td>发包: 命令字, Json包体</td>
+                        </tr>
+                        <tr>
+                            <td>fetchPacket</td>
+                            <td>String</td>
+                            <td>String cmd, String jsonStr</td>
+                            <td>发包: 命令字, Json包体(可返回数据)</td>
+                        </tr>
+                        <tr>
+                            <td>sendPacket</td>
+                            <td>boolean</td>
+                            <td>String cmd, JSONObject json</td>
+                            <td>发包: 命令字, JSONObject包体</td>
+                        </tr>
+                        <tr>
+                            <td>fetchPacket</td>
+                            <td>String</td>
+                            <td>String cmd, JSONObject json</td>
+                            <td>发包: 命令字, JSONObject包体(可返回数据)</td>
+                        </tr>
+                        <tr>
+                            <td>readprop</td>
+                            <td>String</td>
+                            <td>String file, String name</td>
+                            <td>读取properties文件中的指定键值</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="subsection-title">自身操作</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>uploadAvatar</td>
+                            <td>boolean</td>
+                            <td>String filePath</td>
+                            <td>上传头像(支持透明)</td>
+                        </tr>
+                        <tr>
+                            <td>uploadCover</td>
+                            <td>boolean</td>
+                            <td>String filePath</td>
+                            <td>上传主页名片图(支持透明)</td>
+                        </tr>
+                        <tr>
+                            <td>changeMyName</td>
+                            <td>void</td>
+                            <td>String nickname</td>
+                            <td>修改昵称</td>
+                        </tr>
+                        <tr>
+                            <td>uploadTroopAvatar</td>
+                            <td>boolean</td>
+                            <td>String qun, String filepath</td>
+                            <td>上传群头像</td>
+                        </tr>
+                        <tr>
+                            <td>uploadTroopCover</td>
+                            <td>boolean</td>
+                            <td>String qun, String filepath</td>
+                            <td>上传群封面</td>
+                        </tr>
+                    </table>
+                </div>
+                
+                <div class="subsection-title">JSON处理</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>toJson</td>
+                            <td>String</td>
+                            <td>Object obj</td>
+                            <td>对象转JSON字符串</td>
+                        </tr>
+                        <tr>
+                            <td>parseJson</td>
+                            <td>JSONObject</td>
+                            <td>String jsonStr</td>
+                            <td>解析JSON对象</td>
+                        </tr>
+                        <tr>
+                            <td>parseJsonArray</td>
+                            <td>JSONArray</td>
+                            <td>String jsonStr</td>
+                            <td>解析JSON数组</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">随机数</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>generateRandomString</td>
+                            <td>String</td>
+                            <td>int length</td>
+                            <td>生成随机字符串</td>
+                        </tr>
+                        <tr>
+                            <td>generateRandomInt</td>
+                            <td>int</td>
+                            <td>int min, int max</td>
+                            <td>生成随机整数</td>
+                        </tr>
+                    </table>
+                </div>
+
+                <div class="subsection-title">插件信息</div>
+                <div class="table-wrapper">
+                    <table>
+                        <tr>
+                            <th>方法</th>
+                            <th>返回值</th>
+                            <th>参数</th>
+                            <th>说明</th>
+                        </tr>
+                        <tr>
+                            <td>getPluginName</td>
+                            <td>String</td>
+                            <td></td>
+                            <td>获取插件名称</td>
+                        </tr>
+                        <tr>
+                            <td>getPluginId</td>
+                            <td>String</td>
+                            <td></td>
+                            <td>获取插件ID</td>
+                        </tr>
+                        <tr>
+                            <td>getPluginPath</td>
+                            <td>String</td>
+                            <td></td>
+                            <td>获取插件目录路径</td>
+                        </tr>
+                        <tr>
+                            <td>isPluginEnabled</td>
+                            <td>boolean</td>
+                            <td></td>
+                            <td>判断插件是否启用</td>
+                        </tr>
+                        <tr>
+                            <td>setPluginEnabled</td>
+                            <td>void</td>
+                            <td>boolean enabled</td>
+                            <td>设置插件启用状态</td>
+                        </tr>
+                    </table>
+                </div>
+                
+            </div>
+
+            <div class="section" id="example">
+                <div class="section-title">示例脚本</div>
+                <div class="code-block">
+                    <pre>log("脚本开始运行...");
+qqToast(2, "Hello World!");
+
+addItem("测试菜单", "onTestClick");
+
+void onTestClick(int chatType, String peerUin, String peerName) {
+    qqToast(2, "点击了菜单");
+    sendMsg(peerUin, "你好!", chatType);
+}
+
+void onMsg(Object msgData) {
+    String msg = msgData.msg;
+    String peerUin = msgData.peerUin;
+    int type = msgData.type;
+    
+    log("收到消息: " + msg);
+    
+    if (msg.contains("ping")) {
+        sendMsg(peerUin, "pong", type);
+    }
+}
+
+void unLoadPlugin() {
+    qqToast(0, "脚本停止运行");
+    log("脚本停止运行");
+}</pre>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            'use strict';
+
+            const menuToggle = document.getElementById('menuToggle');
+            const sideNav = document.getElementById('sideNav');
+            const navOverlay = document.getElementById('navOverlay');
+            let isOpen = false;
+
+            function toggleMenu() {
+                isOpen = !isOpen;
+                sideNav.classList.toggle('open', isOpen);
+                navOverlay.classList.toggle('show', isOpen);
+                menuToggle.textContent = isOpen ? '✕' : '☰';
+            }
+
+            function closeMenu() {
+                if (isOpen) {
+                    isOpen = false;
+                    sideNav.classList.remove('open');
+                    navOverlay.classList.remove('show');
+                    menuToggle.textContent = '☰';
+                }
+            }
+
+            menuToggle.addEventListener('click', toggleMenu);
+            navOverlay.addEventListener('click', closeMenu);
+
+            // 点击导航链接后关闭菜单
+            document.querySelectorAll('.nav-item').forEach(function(item) {
+                item.addEventListener('click', function(e) {
+                    if (window.innerWidth <= 768) {
+                        closeMenu();
+                    }
+                    // 高亮当前活动项
+                    document.querySelectorAll('.nav-item').forEach(function(nav) {
+                        nav.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                });
+            });
+
+            // 窗口大小变化时重置菜单状态
+            window.addEventListener('resize', function() {
+                if (window.innerWidth > 768 && isOpen) {
+                    closeMenu();
+                }
+            });
+
+            // 页面滚动时高亮当前章节
+            var sections = document.querySelectorAll('.section');
+            var navItems = document.querySelectorAll('.nav-item');
+
+            function highlightNav() {
+                var scrollPos = window.scrollY + 100;
+                var currentId = '';
+                
+                sections.forEach(function(section) {
+                    var top = section.offsetTop;
+                    var height = section.offsetHeight;
+                    if (scrollPos >= top && scrollPos < top + height) {
+                        currentId = section.id;
+                    }
+                });
+
+                navItems.forEach(function(item) {
+                    item.classList.remove('active');
+                    if (item.getAttribute('href') === '#' + currentId) {
+                        item.classList.add('active');
+                    }
+                });
+            }
+
+            window.addEventListener('scroll', highlightNav);
+            window.addEventListener('load', highlightNav);
+        })();
+    </script>
+</body>
+</html>

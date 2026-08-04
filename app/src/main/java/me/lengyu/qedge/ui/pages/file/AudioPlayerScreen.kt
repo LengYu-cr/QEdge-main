@@ -19,7 +19,7 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
@@ -263,7 +263,7 @@ fun AudioPlayerScreen(
                         .background(colors.accentBlue)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
-                            indication = rememberRipple(color = Color.White.copy(alpha = 0.3f)),
+                            indication = ripple(color = Color.White.copy(alpha = 0.3f)),
                             onClick = { togglePlay() }
                         ),
                     contentAlignment = Alignment.Center
@@ -311,7 +311,7 @@ private fun PlayControlButton(
             .background(colors.cardBackground)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center

@@ -94,7 +94,7 @@ object AutoLikeBack : BaseApiHookItem<AutoLikeBack.Listener>() {
                 // 对方赞了几次就回几次，走 NT 原生接口
                 FriendTool.sendZan(fromUin.toString(), likeTimes)
                 val ok = true
-                LogUtils.d(TAG, "收到来自【$fromNick($fromUin)】的名片赞 ×$likeTimes → 回赞 $likeTimes 次")
+                // LogUtils.d(TAG, "收到来自【$fromNick($fromUin)】的名片赞 ×$likeTimes → 回赞 $likeTimes 次")
                 for (listener in getListenerSet()) {
                     runCatching { listener.onAutoLikeBack(fromUin, fromNick, ok) }
                 }

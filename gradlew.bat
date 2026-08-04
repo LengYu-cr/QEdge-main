@@ -38,6 +38,18 @@ set DEFAULT_JVM_OPTS="-Xmx64m" "-Xms64m"
 @rem Find java.exe
 if defined JAVA_HOME goto findJavaFromJavaHome
 
+@rem Try to auto-detect JAVA_HOME from common JDK locations
+set "DETECTED_JAVA_HOME="
+if exist "C:\Program Files\Java\jdk-17\bin\java.exe" set "DETECTED_JAVA_HOME=C:\Program Files\Java\jdk-17"
+if not defined DETECTED_JAVA_HOME if exist "C:\Program Files\Java\jdk-11\bin\java.exe" set "DETECTED_JAVA_HOME=C:\Program Files\Java\jdk-11"
+if not defined DETECTED_JAVA_HOME if exist "C:\Program Files\Android\Android Studio\jbr\bin\java.exe" set "DETECTED_JAVA_HOME=C:\Program Files\Android\Android Studio\jbr"
+if not defined DETECTED_JAVA_HOME if exist "C:\Program Files\JetBrains\AndroidStudio\jbr\bin\java.exe" set "DETECTED_JAVA_HOME=C:\Program Files\JetBrains\AndroidStudio\jbr"
+if not defined DETECTED_JAVA_HOME for /f "tokens=2 delims==" %%i in ('findstr /c:"org.gradle.java.home" "%~dp0gradle.properties" 2^>NUL') do if exist "%%i\bin\java.exe" set "DETECTED_JAVA_HOME=%%i"
+if defined DETECTED_JAVA_HOME (
+    set "JAVA_HOME=%DETECTED_JAVA_HOME%"
+    goto findJavaFromJavaHome
+)
+
 set JAVA_EXE=java.exe
 %JAVA_EXE% -version >NUL 2>&1
 if "%ERRORLEVEL%" == "0" goto execute

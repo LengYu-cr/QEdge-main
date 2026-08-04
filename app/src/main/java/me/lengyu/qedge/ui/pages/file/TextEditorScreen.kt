@@ -23,7 +23,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.material.ripple.rememberRipple
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -281,7 +281,7 @@ private fun TopBarActionButton(
             .background(colors.cardBackground)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
-                indication = rememberRipple(color = colors.ripple),
+                indication = ripple(color = colors.ripple),
                 onClick = onClick
             ),
         contentAlignment = Alignment.Center
@@ -332,7 +332,7 @@ private fun EditorBottomBar(
                     .background(colors.accentBlue)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
-                        indication = rememberRipple(color = Color.White.copy(alpha = 0.3f)),
+                        indication = ripple(color = Color.White.copy(alpha = 0.3f)),
                         onClick = onSave
                     )
                     .padding(horizontal = 16.dp, vertical = 8.dp),

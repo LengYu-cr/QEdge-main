@@ -15,7 +15,7 @@ import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.dexkit.DexKitTask
 import org.luckypray.dexkit.query.FindClass
 import org.luckypray.dexkit.query.FindMethod
-import org.luckypray.dexkit.query.base.BaseQuery
+import org.luckypray.dexkit.query.base.BaseFinder
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -36,7 +36,7 @@ object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarLi
 
     private fun isEnabled() = ModuleConfig.getBoolean("transparent_avatar", false)
 
-    override fun getQueryMap(): Map<String, BaseQuery> = mapOf(
+    override fun getQueryMap(): Map<String, BaseFinder> = mapOf(
         KEY_F_METHOD to FindMethod().apply {
             searchPackages("com.tencent.mobileqq.util")
             matcher {
