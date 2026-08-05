@@ -4,6 +4,8 @@ import android.app.Dialog
 import android.content.Context
 import android.graphics.Color
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.view.Gravity
 import android.view.ViewGroup
 import android.view.Window
@@ -55,6 +57,7 @@ abstract class XposedComposeDialog(
 ) : Dialog(context, android.R.style.Theme_Material_Light_NoActionBar) {
 
     private val dialogLifecycleOwner = XposedDialogLifecycleOwner()
+    private val mainHandler = Handler(context.mainLooper)
     protected var isVisible by mutableStateOf(true)
     private var composeView: ComposeView? = null
     @Volatile private var isDismissed = false
@@ -116,7 +119,7 @@ abstract class XposedComposeDialog(
     protected abstract fun DialogContent()
 
     protected fun dismissWithAnimation() {
-        if (isDismissed) return
+        if (isDismissed || dismissRunnable != null) return
         isVisible = false
         val decor = window?.decorView
         val runnable = Runnable { safeDismissNow() }
@@ -141,23 +144,38 @@ abstract class XposedComposeDialog(
     }
 
     override fun onStop() {
+        if (dialogLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            runCatching {
+                dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+            }
+        }
+
         if (isDismissed) {
-            super.onStop()
-            return
-        }
-        runCatching {
-            dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-        }
-        // ON_STOP 也单独调度，避免同一消息内连续转移状态时 LifecycleRegistry 抛非法转移
-        (window?.decorView ?: composeView)?.post {
-            if (!isDismissed) {
-                runCatching { dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP) }
+            if (dialogLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                runCatching {
+                    dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                }
+            }
+        } else {
+            // ON_STOP 单独调度，避免同一消息内连续转移状态时 LifecycleRegistry 抛非法转移
+            (window?.decorView ?: composeView)?.post {
+                if (!isDismissed &&
+                    dialogLifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)
+                ) {
+                    runCatching {
+                        dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+                    }
+                }
             }
         }
         super.onStop()
     }
 
     private fun safeDismissNow() {
+        if (Looper.myLooper() != context.mainLooper) {
+            mainHandler.post { safeDismissNow() }
+            return
+        }
         if (isDismissed) return
         synchronized(this) {
             if (isDismissed) return
@@ -168,12 +186,17 @@ abstract class XposedComposeDialog(
             window?.decorView?.removeCallbacks(r)
         }
         dismissRunnable = null
-        runCatching {
-            dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        runCatching { super@XposedComposeDialog.dismiss() }
+
+        val lifecycleState = dialogLifecycleOwner.lifecycle.currentState
+        if (lifecycleState != Lifecycle.State.INITIALIZED &&
+            lifecycleState != Lifecycle.State.DESTROYED
+        ) {
+            runCatching {
+                dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+            }
         }
         runCatching { composeView = null }
-        // super.dismiss() 必须最后调用，且放在 try 里
-        runCatching { super@XposedComposeDialog.dismiss() }
     }
 
     override fun dismiss() {
