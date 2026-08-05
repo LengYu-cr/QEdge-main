@@ -81,6 +81,7 @@ object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarLi
     }
 
     // ------- 递归搜字段：找存在的文件路径 / content/file URI -------
+    @Suppress("DEPRECATION")
     private fun extractFilePathFromAny(root: Any?): String? {
         if (root == null) return null
         val visited = HashSet<Int>()

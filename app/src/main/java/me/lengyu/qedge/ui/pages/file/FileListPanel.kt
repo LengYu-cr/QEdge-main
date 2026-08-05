@@ -80,7 +80,7 @@ fun FileListPanel(
     }
 
     LaunchedEffect(zipFile, zipInnerPath, refreshKey) {
-        if (isZipMode && zipFile != null) {
+        if (isZipMode) {
             isLoading = true
             zipItemList = FileManagerUtils.listZipEntries(zipFile, zipInnerPath)
             isLoading = false
@@ -110,7 +110,7 @@ fun FileListPanel(
             ) {
                 if (isLoading) {
                     EmptyStateView(message = "加载中...")
-                } else if (isZipMode && zipFile != null) {
+                } else if (isZipMode) {
                     val hasParent = zipInnerPath.isNotEmpty()
                     LazyColumn(
                         state = listState,
@@ -196,7 +196,7 @@ fun FileListPanel(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.spacedBy(4.dp)
                     ) {
-                        if (hasParent && parentFile != null) {
+                        if (hasParent) {
                             item("..") {
                                 FileListItem(
                                     fileItem = FileItem(

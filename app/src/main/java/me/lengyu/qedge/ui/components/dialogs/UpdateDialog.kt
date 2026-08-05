@@ -36,7 +36,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.core.content.ContextCompat.startActivity
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.core.compatibility.XposedComposeDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
@@ -343,7 +342,7 @@ private fun openApk(context: Context, uri: Uri) {
         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     }
     try {
-        startActivity(context, intent, null)
+        context.startActivity(intent)
     } catch (e: Exception) {
         Toast.makeText(context, "无法打开安装包", Toast.LENGTH_SHORT).show()
     }

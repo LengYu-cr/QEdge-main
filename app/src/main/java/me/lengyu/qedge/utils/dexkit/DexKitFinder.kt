@@ -113,10 +113,6 @@ object DexKitFinder {
             }
 
             val bridge = DexKitBridge.create(sourceDir)
-            if (bridge == null) {
-                LogUtils.e(TAG, "DexKitBridge.create returned null")
-                return@launchIO
-            }
 
             bridge.use { b ->
                 tasks.forEach { task ->

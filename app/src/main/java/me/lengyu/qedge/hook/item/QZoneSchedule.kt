@@ -99,8 +99,8 @@ object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
 
     private fun isMainProcess(): Boolean {
         return runCatching {
-            val pn = HostInfo.packageName?.trim().orEmpty()
-            val proc = HostInfo.processName?.trim().orEmpty()
+            val pn = HostInfo.packageName.trim().orEmpty()
+            val proc = HostInfo.processName.trim().orEmpty()
             pn.isNotEmpty() && proc.isNotEmpty() && proc == pn
         }.getOrDefault(false)
     }
@@ -141,7 +141,7 @@ object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
             val now = Date()
             val hm = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
             val today = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(now)
-            val uin = QQCurrentEnv.getCurrentUin()?.toString().orEmpty()
+            val uin = QQCurrentEnv.getCurrentUin().orEmpty()
 
             // =============== 【等级加速：凌晨 00:00 三个任务按顺序串行执行】 ===============
             val triggerTime = hitTime(hm, CHECKIN_TRIGGER_TIME)

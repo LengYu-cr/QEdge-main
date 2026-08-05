@@ -124,22 +124,18 @@ object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
                 null
             } else {
                 val loader = ClassUtils.hostClassLoader
-                if (loader == null) {
-                    null
-                } else {
-                    var found: Class<*>? = null
-                    val simpleNames = listOf("i", "h", "g", "f", "e", "d", "j", "k")
-                    for (name in simpleNames) {
-                        runCatching {
-                            val cls = Class.forName("$pkg.$name", false, loader)
-                            if (baseClass.isAssignableFrom(cls) && isSimpleItemProcessor(cls)) {
-                                found = cls
-                            }
+                var found: Class<*>? = null
+                val simpleNames = listOf("i", "h", "g", "f", "e", "d", "j", "k")
+                for (name in simpleNames) {
+                    runCatching {
+                        val cls = Class.forName("$pkg.$name", false, loader)
+                        if (baseClass.isAssignableFrom(cls) && isSimpleItemProcessor(cls)) {
+                            found = cls
                         }
-                        if (found != null) break
                     }
-                    found
+                    if (found != null) break
                 }
+                found
             }
         }
         return result.getOrNull()
@@ -247,8 +243,8 @@ object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
     }
 
     private fun makeClickLambda(context: Context, activityClass: Class<*>): Any {
-        val function0Class = "kotlin.jvm.functions.Function0".toClass!!
-        val unitClass = "kotlin.Unit".toClass!!
+        val function0Class = "kotlin.jvm.functions.Function0".toClass
+        val unitClass = "kotlin.Unit".toClass
         val unitInstance = unitClass.getField("INSTANCE").get(null)
 
         return Proxy.newProxyInstance(
@@ -274,8 +270,8 @@ object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
     }
 
     private fun makeFunction1Lambda(context: Context, activityClass: Class<*>): Any {
-        val function1Class = "kotlin.jvm.functions.Function1".toClass!!
-        val unitClass = "kotlin.Unit".toClass!!
+        val function1Class = "kotlin.jvm.functions.Function1".toClass
+        val unitClass = "kotlin.Unit".toClass
         val unitInstance = unitClass.getField("INSTANCE").get(null)
 
         return Proxy.newProxyInstance(

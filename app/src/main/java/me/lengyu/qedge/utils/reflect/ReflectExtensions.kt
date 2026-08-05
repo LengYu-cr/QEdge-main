@@ -1,10 +1,5 @@
 package me.lengyu.qedge.utils.reflect
 
-import java.lang.Byte
-import java.lang.Double
-import java.lang.Float
-import java.lang.Long
-import java.lang.Short
 import java.lang.reflect.Member
 import de.robv.android.xposed.XposedBridge
 
@@ -127,14 +122,14 @@ fun Class<*>.newInstanceWithArgs(vararg args: Any?): Any {
 }
 
 private val primitiveWrapperMap = mapOf(
-    Integer.TYPE to Integer::class.java,
-    Long.TYPE to Long::class.java,
-    java.lang.Boolean.TYPE to java.lang.Boolean::class.java,
-    Double.TYPE to Double::class.java,
-    Float.TYPE to Float::class.java,
-    Short.TYPE to Short::class.java,
-    Byte.TYPE to Byte::class.java,
-    Character.TYPE to Character::class.java
+    Int::class.javaPrimitiveType!! to Int::class.javaObjectType,
+    Long::class.javaPrimitiveType!! to Long::class.javaObjectType,
+    Boolean::class.javaPrimitiveType!! to Boolean::class.javaObjectType,
+    Double::class.javaPrimitiveType!! to Double::class.javaObjectType,
+    Float::class.javaPrimitiveType!! to Float::class.javaObjectType,
+    Short::class.javaPrimitiveType!! to Short::class.javaObjectType,
+    Byte::class.javaPrimitiveType!! to Byte::class.javaObjectType,
+    Char::class.javaPrimitiveType!! to Char::class.javaObjectType
 )
 
 fun Class<*>.isCompatibleWith(actualType: Class<*>?): Boolean {

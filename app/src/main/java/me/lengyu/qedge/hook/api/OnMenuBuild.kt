@@ -205,7 +205,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
             val hasItemArg = pts.any {
                 it == itemClass || itemClass.isAssignableFrom(it) || it.isAssignableFrom(itemClass) ||
                 it == itemSuperClass || itemSuperClass.isAssignableFrom(it) ||
-                (it.superclass != null && (it.superclass == itemSuperClass || itemClass.isAssignableFrom(it.superclass)))
+                (it.superclass?.let { sc -> sc == itemSuperClass || itemClass.isAssignableFrom(sc) } == true)
             }
             if (!hasItemArg) continue
             hookTargets.add(m)
@@ -370,7 +370,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
         callback: (MsgData, String) -> Unit
     ) {
         // 先移除同 menuKey 的老 listener，保证幂等
-        getListenerSet().removeIf { l -> (l as? MenuClickListener)?.menuKey == menuKey }
+        getListenerSet().removeIf { l -> l.menuKey == menuKey }
         addListener(object : MenuClickListener {
             override val menuKey = menuKey
             override fun isEnabled(): Boolean = runCatching { enabled() }.getOrDefault(false)
@@ -382,7 +382,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
 
     @JvmStatic
     fun removeMenuListenersForItem(predicate: (String) -> Boolean) {
-        getListenerSet().removeIf { l -> (l as? MenuClickListener)?.let { predicate(it.menuKey) } == true }
+        getListenerSet().removeIf { l -> predicate(l.menuKey) }
     }
 
     override fun getQueryMap(): Map<String, BaseFinder> = mapOf(

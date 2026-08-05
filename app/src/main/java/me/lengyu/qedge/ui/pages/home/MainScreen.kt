@@ -202,7 +202,8 @@ fun MainScreen(
                         features = listOf(
                             "Java脚本",
                             "文件管理器",
-                            "冷雨Java嵌入版"
+                            "冷雨Java嵌入版",
+                            "好玩的模块功能"
                         )
                     )
 
@@ -214,7 +215,8 @@ fun MainScreen(
                         features = listOf(
                             "Java脚本",
                             "文件管理器",
-                            "冷雨Java嵌入版"
+                            "冷雨Java嵌入版",
+                            "不好玩的模块功能"
                         )
                     )
 

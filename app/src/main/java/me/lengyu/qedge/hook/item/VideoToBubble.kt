@@ -48,8 +48,6 @@ object VideoToBubble : BaseApiHookItem<VideoToBubble.VideoToBubbleListener>() {
                         
                         val videoElement = videoMsgEl.videoElement ?: return@runCatching
 
-                        if (videoPath == null) return@runCatching
-                        
                         val removed = elements.remove(videoMsgEl)
                         
                         // if (!removed) {

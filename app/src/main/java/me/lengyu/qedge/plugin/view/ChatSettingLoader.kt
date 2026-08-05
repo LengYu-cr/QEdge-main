@@ -156,7 +156,9 @@ object ChatSettingLoader {
         val matcher = regex.matcher(input)
         val map = mutableMapOf<String, String>()
         while (matcher.find()) {
-            map[matcher.group(1)] = matcher.group(2).trim('\'')
+            val key = matcher.group(1) ?: continue
+            val value = matcher.group(2)?.trim('\'') ?: ""
+            map[key] = value
         }
 
         val chatType = try {
@@ -190,91 +192,122 @@ object ChatSettingLoader {
     }
 
     private fun showMenuDialog(view: View) {
+        // 优先使用真实 Activity Context，避免 view.context 是 ContextThemeWrapper 或已销毁的 Activity
+        // （"显示完闪退"最常见根因：BadTokenException 在动画结束后 relayout 时被 WindowManager 抛出）
+        val hostActivity = (QQCurrentEnv.getActivity() as? Activity)
+            ?: (view.context as? Activity)
+        if (hostActivity == null || hostActivity.isFinishing || hostActivity.isDestroyed) {
+            LogUtils.e("ChatSettingLoader", "skip showMenuDialog: host activity invalid")
+            Toasts.toast("当前页面状态异常，无法打开菜单")
+            return
+        }
+        Parasitics.ensureInitialized(hostActivity)
+        runCatching { Parasitics.injectModuleResources(hostActivity.resources) }
+
         val menuItems = mutableListOf<PluginMenuItem>()
 
         for (plugin in PluginManager.plugins) {
-            if (plugin.isRunning()) {
-                val items = plugin.getCompiler().getMenuItems()
-                if (items.isNotEmpty()) {
-                    menuItems.add(PluginMenuItem.Header(plugin.name, plugin.id))
-                    for ((name, method) in items) {
-                        menuItems.add(
-                            PluginMenuItem.Action(
-                                name,
-                                plugin.id
-                            ) {
-                                invokeMenuItem(plugin, method)
-                            }
-                        )
+            runCatching {
+                if (plugin.isRunning()) {
+                    val items = plugin.getCompiler().getMenuItems()
+                    if (items.isNotEmpty()) {
+                        menuItems.add(PluginMenuItem.Header(plugin.name, plugin.id))
+                        for ((name, method) in items) {
+                            menuItems.add(
+                                PluginMenuItem.Action(
+                                    name,
+                                    plugin.id
+                                ) {
+                                    invokeMenuItem(plugin, method)
+                                }
+                            )
+                        }
                     }
                 }
+            }.onFailure { e ->
+                LogUtils.e("ChatSettingLoader", "build plugin menu failed for ${plugin.name}: ${e.message}")
             }
         }
 
-        val coldRain = ColdRainCore.getInstance()
-        if (coldRain.isInitialized() && coldRain.isMasterEnabled()) {
-            menuItems.add(PluginMenuItem.Header("冷雨Java", "cold_rain"))
-            menuItems.add(
-                PluginMenuItem.Action(
-                    if (coldRain.isGroupMasterEnabled(currentContact.peerUin)) "关机" else "开机",
-                    "cold_rain"
-                ) {
-                    val contact = currentContact
-                    if (contact.peerUin.isEmpty()) {
-                        Toasts.toast("获取聊天信息失败")
-                        return@Action
+        runCatching {
+            val coldRain = ColdRainCore.getInstance()
+            if (coldRain.isInitialized() && coldRain.isMasterEnabled()) {
+                menuItems.add(PluginMenuItem.Header("冷雨Java", "cold_rain"))
+                menuItems.add(
+                    PluginMenuItem.Action(
+                        if (coldRain.isGroupMasterEnabled(currentContact.peerUin)) "关机" else "开机",
+                        "cold_rain"
+                    ) {
+                        val contact = currentContact
+                        if (contact.peerUin.isEmpty()) {
+                            Toasts.toast("获取聊天信息失败")
+                            return@Action
+                        }
+                        val enabled = coldRain.isGroupMasterEnabled(contact.peerUin)
+                        coldRain.setGroupMasterEnabled(contact.peerUin, !enabled)
+                        Toasts.toast(if (enabled) "本群已关机" else "本群已开机")
                     }
-                    val enabled = coldRain.isGroupMasterEnabled(contact.peerUin)
-                    coldRain.setGroupMasterEnabled(contact.peerUin, !enabled)
-                    Toasts.toast(if (enabled) "本群已关机" else "本群已开机")
-                }
-            )
-            menuItems.add(
-                PluginMenuItem.Action(
-                    "开关设置",
-                    "cold_rain"
-                ) {
-                    val contact = currentContact
-                    if (contact.peerUin.isEmpty()) {
-                        Toasts.toast("获取聊天信息失败")
-                        return@Action
+                )
+                menuItems.add(
+                    PluginMenuItem.Action(
+                        "开关设置",
+                        "cold_rain"
+                    ) {
+                        val contact = currentContact
+                        if (contact.peerUin.isEmpty()) {
+                            Toasts.toast("获取聊天信息失败")
+                            return@Action
+                        }
+                        showGroupSwitchDialog(hostActivity, contact.peerUin)
                     }
-                    showGroupSwitchDialog(view.context, contact.peerUin)
-                }
-            )
+                )
+            }
+        }.onFailure { e ->
+            LogUtils.e("ChatSettingLoader", "build coldrain menu failed: ${e.message}")
         }
 
         if (menuItems.isEmpty()) {
-            startPluginActivity(view.context)
+            startPluginActivity(hostActivity)
             return
         }
 
-        QEdgeBottomDialog(view.context) { dismiss ->
-            PluginMenuContent(menuItems, dismiss, {
-                startPluginActivity(view.context)
-                dismiss()
-            }) { pluginId ->
-                val plugin = PluginManager.plugins.find { it.id == pluginId }
-                if (plugin != null) {
-                    Toasts.toast("正在重载: ${plugin.name}...")
+        runCatching {
+            QEdgeBottomDialog(hostActivity) { dismiss ->
+                PluginMenuContent(menuItems, dismiss, {
+                    startPluginActivity(hostActivity)
                     dismiss()
-                    try {
-                        PluginManager.stopPlugin(plugin)
-                        PluginManager.startPlugin(plugin)
-                        Toasts.toast("${plugin.name} 重载成功")
-                    } catch (e: Exception) {
-                        Toasts.toast("重载失败: ${e.message}")
+                }) { pluginId ->
+                    val plugin = PluginManager.plugins.find { it.id == pluginId }
+                    if (plugin != null) {
+                        Toasts.toast("正在重载: ${plugin.name}...")
+                        dismiss()
+                        try {
+                            PluginManager.stopPlugin(plugin)
+                            PluginManager.startPlugin(plugin)
+                            Toasts.toast("${plugin.name} 重载成功")
+                        } catch (e: Exception) {
+                            Toasts.toast("重载失败: ${e.message}")
+                        }
                     }
                 }
-            }
-        }.show()
+            }.show()
+        }.onFailure { e ->
+            LogUtils.e("ChatSettingLoader", "showMenuDialog failed: ${e.message}")
+            Toasts.toast("打开菜单失败: ${e.message}")
+        }
     }
 
     private fun startPluginActivity(context: android.content.Context) {
         try {
-            val activity = QQCurrentEnv.getActivity() ?: (context as? Activity) ?: return
+            val activity = (QQCurrentEnv.getActivity() as? Activity)
+                ?: (context as? Activity)
+            if (activity == null || activity.isFinishing || activity.isDestroyed) {
+                LogUtils.e("ChatSettingLoader", "skip startPluginActivity: host activity invalid")
+                Toasts.toast("当前页面状态异常")
+                return
+            }
             Parasitics.ensureInitialized(activity)
-            Parasitics.injectModuleResources(activity.resources)
+            runCatching { Parasitics.injectModuleResources(activity.resources) }
             val intent = Intent(activity, SettingActivity::class.java)
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
@@ -289,13 +322,20 @@ object ChatSettingLoader {
     private fun invokeMenuItem(plugin: PluginInfo, methodName: String) {
         try {
             val contact = currentContact
-            plugin.getCompiler().getCallback().invokeMenuItem(
+            if (contact.peerUin.isEmpty() || contact.chatType < 0) {
+                Toasts.toast("获取聊天信息失败")
+                return
+            }
+            val callback = plugin.getCompiler().getCallback()
+                ?: error("插件未注册Callback: ${plugin.name}")
+            callback.invokeMenuItem(
                 methodName,
                 contact.chatType,
                 contact.peerUin,
                 contact.peerName
             )
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
+            LogUtils.e("ChatSettingLoader", "invokeMenuItem ${plugin.name}#$methodName failed: ${e.message}")
             Toasts.toast("执行失败: ${e.message}")
         }
     }
@@ -307,9 +347,15 @@ object ChatSettingLoader {
                 Toasts.toast("冷雨Java未初始化")
                 return
             }
-            val activity = QQCurrentEnv.getActivity() ?: (context as? Activity) ?: return
+            val activity = (QQCurrentEnv.getActivity() as? Activity)
+                ?: (context as? Activity)
+            if (activity == null || activity.isFinishing || activity.isDestroyed) {
+                LogUtils.e("ChatSettingLoader", "skip showGroupSwitchDialog: host activity invalid")
+                Toasts.toast("当前页面状态异常")
+                return
+            }
             Parasitics.ensureInitialized(activity)
-            Parasitics.injectModuleResources(activity.resources)
+            runCatching { Parasitics.injectModuleResources(activity.resources) }
             ColdRainConfig.init(activity)
 
             val features = ColdRainConfig.allFeatures.filter {
@@ -317,13 +363,18 @@ object ChatSettingLoader {
                 !ColdRainConfig.isPersonalFeature(it.key)
             }
 
-            QEdgeBottomDialog(context) { dismiss ->
-                GroupSwitchContent(
-                    peerUin = peerUin,
-                    features = features,
-                    onDismiss = dismiss
-                )
-            }.show()
+            runCatching {
+                QEdgeBottomDialog(activity) { dismiss ->
+                    GroupSwitchContent(
+                        peerUin = peerUin,
+                        features = features,
+                        onDismiss = dismiss
+                    )
+                }.show()
+            }.onFailure { e ->
+                LogUtils.e("ChatSettingLoader", "showGroupSwitchDialog dialog show failed: ${e.message}")
+                Toasts.toast("打开失败: ${e.message}")
+            }
         } catch (e: Throwable) {
             LogUtils.e("ChatSettingLoader", "showGroupSwitchDialog failed: ${e.message}")
             Toasts.toast("打开失败: ${e.message}")
@@ -391,15 +442,35 @@ private fun PluginMenuContent(
                 Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(Dimens.PaddingMedium)
             ) {
-                items(menuItems) { item ->
+                // 显式 key：sealed class 混合列表时，自增索引会导致 diff 阶段
+                // IndexOutOfBoundsException（LazyList 在动画结束下一次 recompose 时崩溃）
+                items(
+                    menuItems,
+                    key = { item ->
+                        when (item) {
+                            is ChatSettingLoader.PluginMenuItem.Header ->
+                                "header_${item.pluginId}_${item.name}"
+                            is ChatSettingLoader.PluginMenuItem.Action ->
+                                "action_${item.pluginId}_${item.name}"
+                        }
+                    }
+                ) { item ->
                     when (item) {
                         is ChatSettingLoader.PluginMenuItem.Header -> PluginHeaderItem(item.name) {
-                            onReloadPlugin(item.pluginId)
+                            runCatching { onReloadPlugin(item.pluginId) }.onFailure { e ->
+                                LogUtils.e("ChatSettingLoader", "PluginHeaderItem onClick failed: ${e.message}")
+                                Toasts.toast("重载失败: ${e.message}")
+                            }
                         }
 
-                        is ChatSettingLoader.PluginMenuItem.Action -> PluginActionItem(item.name) { 
-                            item.onClick()
-                            onDismiss()
+                        is ChatSettingLoader.PluginMenuItem.Action -> PluginActionItem(item.name) {
+                            runCatching {
+                                item.onClick()
+                                onDismiss()
+                            }.onFailure { e ->
+                                LogUtils.e("ChatSettingLoader", "PluginActionItem onClick failed: ${e.message}")
+                                Toasts.toast("执行失败: ${e.message}")
+                            }
                         }
                     }
                 }
@@ -522,7 +593,15 @@ private fun GroupSwitchContent(
                             checked = enabled,
                             onCheckedChange = { checked ->
                                 switchStates[feature.key] = checked
-                                coldRain.setGroupFeatureEnabled(feature.key, peerUin, checked)
+                                runCatching {
+                                    coldRain.setGroupFeatureEnabled(feature.key, peerUin, checked)
+                                }.onFailure { e ->
+                                    LogUtils.e(
+                                        "ChatSettingLoader",
+                                        "setGroupFeatureEnabled ${feature.key} failed: ${e.message}"
+                                    )
+                                    Toasts.toast("设置失败: ${e.message}")
+                                }
                             }
                         )
                     }

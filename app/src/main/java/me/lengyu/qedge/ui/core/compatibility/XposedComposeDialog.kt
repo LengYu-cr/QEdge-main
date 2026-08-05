@@ -39,7 +39,10 @@ import androidx.core.graphics.drawable.toDrawable
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.setViewTreeViewModelStoreOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
@@ -54,10 +57,14 @@ abstract class XposedComposeDialog(
     private val dialogLifecycleOwner = XposedDialogLifecycleOwner()
     protected var isVisible by mutableStateOf(true)
     private var composeView: ComposeView? = null
+    @Volatile private var isDismissed = false
+    @Volatile private var dismissRunnable: Runnable? = null
 
     init {
         requestWindowFeature(Window.FEATURE_NO_TITLE)
         setCanceledOnTouchOutside(true)
+        setOnDismissListener { safeDismissNow() }
+        setOnCancelListener { safeDismissNow() }
         configureWindow()
     }
 
@@ -69,6 +76,7 @@ abstract class XposedComposeDialog(
             addFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
             setDimAmount(0.5f)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
+            clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
         }
     }
 
@@ -79,13 +87,20 @@ abstract class XposedComposeDialog(
         composeView = ComposeView(context).apply {
             setViewTreeLifecycleOwner(dialogLifecycleOwner)
             setViewTreeSavedStateRegistryOwner(dialogLifecycleOwner)
+            setViewTreeViewModelStoreOwner(dialogLifecycleOwner)
         }
 
-        setContentView(composeView!!)
+        try {
+            setContentView(composeView!!)
+        } catch (e: Throwable) {
+            me.lengyu.qedge.utils.LogUtils.e("XposedComposeDialog", "setContentView failed: ${e.message}")
+            return
+        }
 
         window?.decorView?.let { decorView ->
             decorView.setViewTreeLifecycleOwner(dialogLifecycleOwner)
             decorView.setViewTreeSavedStateRegistryOwner(dialogLifecycleOwner)
+            decorView.setViewTreeViewModelStoreOwner(dialogLifecycleOwner)
         }
 
         composeView?.setContent(
@@ -101,38 +116,98 @@ abstract class XposedComposeDialog(
     protected abstract fun DialogContent()
 
     protected fun dismissWithAnimation() {
+        if (isDismissed) return
         isVisible = false
-        window?.decorView?.postDelayed({
-            dismiss()
-        }, 200)
+        val decor = window?.decorView
+        val runnable = Runnable { safeDismissNow() }
+        dismissRunnable = runnable
+        if (decor != null) {
+            decor.postDelayed(runnable, 200)
+        } else {
+            runnable.run()
+        }
     }
 
     override fun onStart() {
         super.onStart()
+        // ON_RESUME 单独调度到下一个消息循环，避免 SavedStateRegistry performRestore
+        // 还未完成就在同一消息里 consumeRestoredStateForKey 导致崩溃
         dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_START)
-        dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
+        (window?.decorView ?: composeView)?.post {
+            if (!isDismissed) {
+                runCatching { dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_RESUME) }
+            }
+        }
     }
 
     override fun onStop() {
-        dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-        dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
+        if (isDismissed) {
+            super.onStop()
+            return
+        }
+        runCatching {
+            dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
+        }
+        // ON_STOP 也单独调度，避免同一消息内连续转移状态时 LifecycleRegistry 抛非法转移
+        (window?.decorView ?: composeView)?.post {
+            if (!isDismissed) {
+                runCatching { dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_STOP) }
+            }
+        }
         super.onStop()
     }
 
-    override fun dismiss() {
-        try {
-            dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-            composeView = null
-        } catch (_: Exception) {
+    private fun safeDismissNow() {
+        if (isDismissed) return
+        synchronized(this) {
+            if (isDismissed) return
+            isDismissed = true
         }
-        super.dismiss()
+        // 取消未执行的 dismiss postDelayed，避免双重 dismiss 导致 Window 已分离后再次操作
+        dismissRunnable?.let { r ->
+            window?.decorView?.removeCallbacks(r)
+        }
+        dismissRunnable = null
+        runCatching {
+            dialogLifecycleOwner.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        }
+        runCatching { composeView = null }
+        // super.dismiss() 必须最后调用，且放在 try 里
+        runCatching { super@XposedComposeDialog.dismiss() }
+    }
+
+    override fun dismiss() {
+        safeDismissNow()
+    }
+
+    override fun show() {
+        if (isDismissed) return
+        runCatching {
+            // show 前校验 window token：如果 host Activity 已经 finish / window 分离，就不要强弹
+            val ctx = context
+            if (ctx is android.app.Activity && (ctx.isFinishing || ctx.isDestroyed)) {
+                me.lengyu.qedge.utils.LogUtils.e(
+                    "XposedComposeDialog",
+                    "skip show: host activity already finished/destroyed"
+                )
+                return
+            }
+            super.show()
+        }.onFailure { e ->
+            me.lengyu.qedge.utils.LogUtils.e(
+                "XposedComposeDialog",
+                "show failed: ${e.message}"
+            )
+            isDismissed = true
+        }
     }
 }
 
-class XposedDialogLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner {
+class XposedDialogLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner, ViewModelStoreOwner {
 
     private val lifecycleRegistry = LifecycleRegistry(this)
     private val savedStateRegistryController = SavedStateRegistryController.create(this)
+    private val _viewModelStore = ViewModelStore()
 
     init {
         savedStateRegistryController.performRestore(null)
@@ -143,6 +218,9 @@ class XposedDialogLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner {
 
     override val savedStateRegistry: SavedStateRegistry
         get() = savedStateRegistryController.savedStateRegistry
+
+    override val viewModelStore: ViewModelStore
+        get() = _viewModelStore
 
     fun handleLifecycleEvent(event: Lifecycle.Event) {
         lifecycleRegistry.handleLifecycleEvent(event)

@@ -265,7 +265,7 @@ object Parasitics {
 
     fun injectModuleResources(res: Resources?) {
         if (res == null || runCatching { res.getString(R.string.app_name) }.isSuccess) return
-        val path = getModulePath()
+        val path = getModulePath() ?: return
 
         if (Build.VERSION.SDK_INT >= 30) {
             val loader = ResourcesLoaderHolderApi30.sResourcesLoader ?: run {
@@ -283,13 +283,13 @@ object Parasitics {
                 } catch (e: IllegalArgumentException) {
                     if (e.message?.contains("Cannot modify resource loaders") == true) injectResourcesBelowApi30(
                         res,
-                        path!!
+                        path
                     )
                 }
             }
             if (Looper.myLooper() == Looper.getMainLooper()) task.run() else mainHandler.post(task)
         } else {
-            injectResourcesBelowApi30(res, path!!)
+            injectResourcesBelowApi30(res, path)
         }
     }
 

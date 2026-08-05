@@ -75,7 +75,6 @@ object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListe
             if (sourceDir != null) {
                 try { System.loadLibrary("dexkit") } catch (_: Throwable) { }
                 val bridge = DexKitBridge.create(sourceDir)
-                if (bridge != null) {
                     try {
                         val hits = bridge.findClass(FindClass().apply {
                             searchPackages(ARK_PACKAGE_PREFIX)
@@ -91,7 +90,6 @@ object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListe
                     } finally {
                         runCatching { bridge.close() }
                     }
-                }
             }
         } catch (t: Throwable) {
             LogUtils.e(TAG, "findArkConfigModelClass: DexKit 实时扫异常: ${t.message}")
@@ -127,6 +125,7 @@ object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListe
     /**
      * 通过反射遍历 ClassLoader.dexElements,枚举 ark 包下所有类(兜底用).
      */
+    @Suppress("DEPRECATION")
     private fun scanArkPackageClassesByReflection(classLoader: ClassLoader): List<Class<*>> {
         val result = mutableListOf<Class<*>>()
         val seen = hashSetOf<String>()
