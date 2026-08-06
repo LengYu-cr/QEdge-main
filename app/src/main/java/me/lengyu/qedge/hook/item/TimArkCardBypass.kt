@@ -32,6 +32,8 @@ object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListe
         return ModuleConfig.getBoolean(CONFIG_KEY, true)
     }
 
+    override fun isApplicable(): Boolean = HostInfo.isTIM
+
     override fun getQueryMap(): Map<String, BaseFinder> = mapOf(
         KEY_ARK_CONFIG_MODEL to FindClass().apply {
             searchPackages(ARK_PACKAGE_PREFIX)

@@ -6,11 +6,14 @@ import android.os.Process
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -23,7 +26,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tencent.mobileqq.activity.SplashActivity
-import kotlinx.coroutines.delay
 import me.lengyu.qedge.common.ModuleScope
 import me.lengyu.qedge.hook.base.HookRegistry
 import me.lengyu.qedge.ui.components.dialogs.CenterDialogContainerNoButton
@@ -43,6 +45,7 @@ import org.luckypray.dexkit.query.base.BaseFinder
 object DexKitFinder {
 
     private var progressText by mutableStateOf("QEdge准备开始查找...")
+    private var isFindComplete by mutableStateOf(false)
 
     @JvmStatic
     fun doFind() {
@@ -76,7 +79,9 @@ object DexKitFinder {
                                     .background(Color(0x80000000)),
                                 contentAlignment = Alignment.Center
                             ) {
-                                CenterDialogContainerNoButton(title = "QEdge查找方法中") {
+                                CenterDialogContainerNoButton(
+                                    title = if (isFindComplete) "QEdge查找完成" else "QEdge查找方法中"
+                                ) {
                                     val colors = QEdgeTheme.colors
                                     Text(
                                         text = progressText,
@@ -85,6 +90,20 @@ object DexKitFinder {
                                         lineHeight = 22.sp,
                                         modifier = Modifier.fillMaxWidth()
                                     )
+                                    if (isFindComplete) {
+                                        Spacer(modifier = Modifier.height(20.dp))
+                                        TextButton(
+                                            onClick = { Process.killProcess(Process.myPid()) },
+                                            modifier = Modifier.fillMaxWidth()
+                                        ) {
+                                            Text(
+                                                "确定",
+                                                fontSize = 16.sp,
+                                                fontWeight = FontWeight.Medium,
+                                                color = colors.textPrimary
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -104,7 +123,7 @@ object DexKitFinder {
             val tasks = HookRegistry.getHookItems().filterIsInstance<DexKitTask>().toMutableList().apply {
                 add(TroopTool)
                 add(QZoneLikeTool)
-            }
+            }.filter { it.isApplicable() }
 
             val sourceDir = HostInfo.getHostContext()?.applicationInfo?.sourceDir
             if (sourceDir == null) {
@@ -159,10 +178,9 @@ object DexKitFinder {
                     }.onFailure { LogUtils.e(task.TAG, it) }
                 }
             }
-            progressText = "查找完成，保存并关闭应用"
+            progressText = "查找完成，点击确定退出QQ"
             DexKitCache.saveCache()
-            delay(500)
-            Process.killProcess(Process.myPid())
+            isFindComplete = true
         }
     }
 }

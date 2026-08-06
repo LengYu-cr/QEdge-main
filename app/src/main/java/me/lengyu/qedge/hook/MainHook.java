@@ -9,6 +9,7 @@ import me.lengyu.qedge.hook.item.TransparentAvatar;
 import me.lengyu.qedge.hook.item.VideoToBubble;
 import me.lengyu.qedge.hook.item.AntiPokeDelay;
 import me.lengyu.qedge.hook.item.AutoLikeBack;
+import me.lengyu.qedge.hook.item.KeepAliveHook;
 import me.lengyu.qedge.hook.item.QZoneSchedule;
 import me.lengyu.qedge.hook.item.TimArkCardBypass;
 import me.lengyu.qedge.hook.api.OnMenuBuild;
@@ -60,6 +61,7 @@ public class MainHook {
         HookRegistry.register(VideoToBubble.INSTANCE);
         HookRegistry.register(TimArkCardBypass.INSTANCE);
         HookRegistry.register(AutoLikeBack.INSTANCE);
+        HookRegistry.register(KeepAliveHook.INSTANCE);
         HookRegistry.register(QZoneSchedule.INSTANCE);
         HookRegistry.register(QQPlusInject.getInstance());
         HookRegistry.register(QQSettingInject.INSTANCE);

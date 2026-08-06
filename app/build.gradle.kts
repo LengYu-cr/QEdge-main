@@ -45,6 +45,7 @@ android {
         debug {
             isDebuggable = true
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
@@ -75,12 +76,10 @@ dependencies {
     compileOnly(libs.androidx.savedstate)
     // compose
     implementation(libs.androidx.activity.compose)
-    implementation(libs.coil.compose)
     implementation(platform(libs.androidx.compose.bom))
     // ui
     implementation(libs.androidx.ui)
     implementation(libs.androidx.ui.graphics)
-    implementation(libs.androidx.ui.tooling.preview)
     // material3
     implementation(libs.androidx.material3)
     // lifecycle
@@ -94,15 +93,11 @@ dependencies {
     // dexkit
     implementation(libs.dexkit)
     // protobuf
-    implementation(libs.protobuf.java)
+    implementation(libs.protobuf.javalite)
     // legacy xposed api
     compileOnly(libs.xposed)
     // dx
     implementation(libs.dalvik.dx)
-    // kavaref
-    implementation(libs.kavaref.core)
-    implementation(libs.kavaref.extension)
-    implementation(libs.kavaref.android)
     // qq stub
     compileOnly(project(":qqinterface"))
 }

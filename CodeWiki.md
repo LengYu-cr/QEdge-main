@@ -39,10 +39,10 @@ QEdge 是一个面向 **NT QQ / NT TIM** 的 Xposed 增强模块，同时附带�
 | 客户端 | Kotlin + Java（JDK 17），Android 9 ~ 16，Jetpack Compose |
 | Hook 框架 | Xposed API 82（LSPosed / LSPatch / FPA / 原子 / 无极 等） |
 | 动态查找 | DexKit 2.2.0（运行时按特征扫描 DEX） |
-| 反射 DSL | Kavaref 1.1.0 |
+| 反射 | java.lang.reflect + 自研 ReflectDSL（类型安全反射） |
 | 脚本引擎 | 内嵌 BeanShell 3.0.0-SNAPSHOT（Android/Dalvik 适配） |
 | 动态类生成 | dalvik-dx 16.0.1 |
-| 协议解析 | protobuf-java 4.35.1 + 自研 ProtoData wire-format 解析器 |
+| 协议解析 | protobuf-javalite 4.35.1 + 自研 ProtoData wire-format 解析器 |
 | 后台 | PHP 7.3 + MySQL 5.7+ / MariaDB（InnoDB + utf8mb4） |
 | 构建 | AGP 9.1.1 + Kotlin 2.4.10 + Gradle（Kotlin DSL） |
 
@@ -291,10 +291,11 @@ BaseHookItem (abstract)                         # 根基类
 | [AntiPokeDelay.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/AntiPokeDelay.java) | 取消拍一拍时间限制：Hook `PaiYiPaiHandler` 返回 boolean 的方法，强制 `setResult(true)` | `anti_poke_delay` |
 | [TransparentAvatar.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/TransparentAvatar.kt) | 透明头像：四路 Hook（PhotoCropActivity 路径捕获 / `BitmapFactory.decodeFile` / `ProfileCardUtil.F` 绕过尺寸校验 / `Bitmap.compress` 改 PNG 保留透明通道） | `transparent_avatar` |
 | [VideoToBubble.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/VideoToBubble.kt) | 视频转泡泡消息：订阅 `OnSendMsg`，发送前替换视频元素为 `MsgTool.createBubbleVideoElement` | `video_to_bubble`（仅 QQ） |
-| [TimArkCardBypass.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/TimArkCardBypass.kt) | TIM Ark 卡片白名单绕过：DexKit 找 `ArkConfigModel`，Hook `(String,String)→boolean` 强制返回 true | `tim_ark_card_bypass`（默认 true，仅 TIM） |
+| [TimArkCardBypass.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/TimArkCardBypass.kt) | TIM Ark 卡片白名单绕过：DexKit 找 `ArkConfigModel`，Hook `(String,String)→boolean` 强制返回 true。覆写 `isApplicable()` 仅 TIM 生效 | `tim_ark_card_bypass`（默认 true，仅 TIM） |
 | [AutoLikeBack.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/AutoLikeBack.kt) | 名片自动回赞：识别 `type==203` 名片被赞推送，LRU 去重（上限 500），延迟 600+random(400)ms 调 `FriendTool.sendZan` | `profile_auto_like_back` |
 | [QZoneLikeTool.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/QZoneLikeTool.kt) | QZone HTTP 工具集：`doLike / doComment / publishMood / qzoneClockIn / dailySign / bigVipClockIn`，依赖 `CookieTool`（skey/pskey/bkn） | （工具类，无开关） |
 | [QZoneSchedule.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/QZoneSchedule.kt) | 定时任务调度器：凌晨 00:00 跑三签到，自定义 HH:mm 跑定时说说；三重去重（主进程 + AtomicBoolean + SP 日期标记） | `qzone_daily_checkin_enabled` 等 |
+| [KeepAliveHook.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/KeepAliveHook.kt) | QQ 进程保活：三机制独立开关 — ①1x1像素透明悬浮窗（右上角）②前台通知（ongoing 高优先级）③后台通知（普通优先级） | `keep_alive_pixel` / `keep_alive_foreground` / `keep_alive_background` |
 
 #### 4.1.7 第三方 APP Hook
 
@@ -390,7 +391,7 @@ public interface ColdRainFeature {
 | [HourlyChimeFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/HourlyChimeFeature.java) | `feature_hourly` | "整点报时"/"切换文字报时" | 唯一基于定时器触发，每 60s 检查 `mm:ss==00:00` 时遍历所有启用群发送 |
 | [TitleFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/TitleFeature.java) | `feature_title` | "我要头衔 <内容>"/"上头衔<QQ>" | 调 `ExtraTool.setMemberTitle`，自助申请检查违禁词 |
 | [LikeFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/LikeFeature.java) | `feature_like` | "赞我点赞"/"点赞<QQ>" | 调 `FriendTool.sendZan(uin, 20)` |
-| [AutoAdminFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/AutoAdminFeature.java) | `feature_autoadmin` | "自助上管"/"我要管理" | 自动 `TroopTool.setGroupAdmin` |
+| [AutoAdminFeature.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/AutoAdminFeature.java) | `feature_autoadmin` | "自助上管"/"我要管理"/"取消上管" | 群收款支付上管：发起→轮询支付状态（60s）→支付成功设管/过期失败/主动取消；`PendingPayment` 并发追踪 |
 | [AtFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/AtFeature.java) | `feature_at` | "艾特处理"/"设置艾特回复" | 个人功能，4 种艾特行为：回复/禁言/提醒/管家禁言 |
 | [AvatarMenuFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/AvatarMenuFeature.java) | `feature_avatar_menu` | "头像菜单"/"上传头像" | 需先发图片再回复指令，调 `ExtraTool.uploadAvatar/Cover` |
 
@@ -574,8 +575,8 @@ author=Developer
 | 类 | 职责 |
 |----|------|
 | [DexKitCache.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitCache.kt) | 持久化 DexKit 缓存。`cacheFile` 路径含 `hostVersionCode` + `moduleVersionCode`，宿主或模块升级时自动失效重查。`initCache()` / `saveCache()` JSON 序列化。`validateAllTasks()` 反射 HookRegistry 检查每个 DexKitTask 的 `${TAG}->${key}` 是否齐全 |
-| [DexKitTask.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitTask.kt) | 任务接口：`getQueryMap(): Map<String, BaseFinder>` + `requireClass(name)/requireMethod(name)` 反查缓存 |
-| [DexKitFinder.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitFinder.kt) | 查找调度器。Hook `SplashActivity.doOnCreate` 弹 Compose 进度对话框 → IO 协程遍历所有 DexKitTask 的 queryMap → `DexKitBridge.findClass/findMethod` → `DexKitCache.saveCache()` → `Process.killProcess` 重启 QQ |
+| [DexKitTask.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitTask.kt) | 任务接口：`getQueryMap(): Map<String, BaseFinder>` + `requireClass(name)/requireMethod(name)` 反查缓存 + `isApplicable()` 宿主适配过滤（默认 true） |
+| [DexKitFinder.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitFinder.kt) | 查找调度器。Hook `SplashActivity.doOnCreate` 弹 Compose 进度对话框 → IO 协程遍历所有 `isApplicable()` 通过的 DexKitTask → `DexKitBridge.findClass/findMethod` → `DexKitCache.saveCache()` → 用户点击"确定"后 `Process.killProcess` 重启 QQ |
 
 **DexKit 完整生命周期**：
 
@@ -1041,10 +1042,8 @@ settings.gradle.kts: rootProject.name = "QRoutine", include(":app", ":qqinterfac
   ├─ compileOnly(libs.xposed)               # Xposed API 82
   ├─ compileOnly(libs.androidx.savedstate / lifecycle.* / common.java8)
   ├─ implementation(libs.dexkit)            # DexKit 2.2.0
-  ├─ implementation(libs.protobuf.java)     # protobuf 4.35.1
+  ├─ implementation(libs.protobuf.javalite) # protobuf-javalite 4.35.1（轻量版）
   ├─ implementation(libs.dalvik.dx)         # dalvik-dx 16.0.1
-  ├─ implementation(libs.kavaref.core/extension/android)  # Kavaref 1.1.0
-  ├─ implementation(libs.coil.compose)      # Coil 2.7.0
   ├─ implementation(platform(libs.androidx.compose.bom))  # Compose BOM 2026.06.01
   └─ implementation(libs.androidx.material3 / ui / activity.compose / core.ktx)
 
@@ -1189,6 +1188,8 @@ signingConfigs {
         keyPassword = "lengyu520."
     }
 }
+// Debug 也使用 release 签名，确保 debug/release 包可互相覆盖安装
+getByName("debug") { signingConfig = signingConfigs.getByName("release") }
 ```
 
 #### ADB 便捷任务

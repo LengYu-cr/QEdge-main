@@ -66,6 +66,7 @@ import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.hook.item.QZoneSchedule
+import me.lengyu.qedge.hook.item.KeepAliveHook
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box as ComposeBox
 
@@ -113,6 +114,10 @@ fun HomeScreen(
     var moodText by remember { mutableStateOf(QZoneSchedule.getMoodText()) }
     var showCommentDialog by remember { mutableStateOf(false) }
     var showMoodConfigDialog by remember { mutableStateOf(false) }
+    var showUpdateLogDialog by remember { mutableStateOf(false) }
+    var keepAlivePixel by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_PIXEL, false)) }
+    var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
+    var keepAliveBackground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_BACKGROUND, false)) }
 
     fun loadOnlinePlugins() {
         isLoading = true
@@ -205,7 +210,7 @@ fun HomeScreen(
                 showDocButton = selectedTab == 1,
                 onDocClick = onDocClick,
                 showUpdateLogButton = true,
-                onUpdateLogClick = onFileManagerClick,
+                onUpdateLogClick = { showUpdateLogDialog = true },
                 actions = {}
             )
 
@@ -315,7 +320,31 @@ fun HomeScreen(
                             moodEnabled = it
                             Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_MOOD_ENABLED, it) }.start()
                         },
-                        onMoodConfigClick = { showMoodConfigDialog = true }
+                        onMoodConfigClick = { showMoodConfigDialog = true },
+                        keepAlivePixel = keepAlivePixel,
+                        keepAliveForeground = keepAliveForeground,
+                        keepAliveBackground = keepAliveBackground,
+                        onKeepAlivePixelToggle = {
+                            keepAlivePixel = it
+                            Thread {
+                                ModuleConfig.putBoolean(KeepAliveHook.SP_PIXEL, it)
+                                KeepAliveHook.refresh()
+                            }.start()
+                        },
+                        onKeepAliveForegroundToggle = {
+                            keepAliveForeground = it
+                            Thread {
+                                ModuleConfig.putBoolean(KeepAliveHook.SP_FOREGROUND, it)
+                                KeepAliveHook.refresh()
+                            }.start()
+                        },
+                        onKeepAliveBackgroundToggle = {
+                            keepAliveBackground = it
+                            Thread {
+                                ModuleConfig.putBoolean(KeepAliveHook.SP_BACKGROUND, it)
+                                KeepAliveHook.refresh()
+                            }.start()
+                        }
                     )
                     1 -> JavaPluginsPage(
                         plugins = plugins,
@@ -363,6 +392,11 @@ fun HomeScreen(
                     ModuleConfig.putString(QZoneSchedule.SP_MOOD_TEXT, txt)
                 }.start()
             }
+        )
+
+        UpdateLogDialog(
+            show = showUpdateLogDialog,
+            onDismiss = { showUpdateLogDialog = false }
         )
     }
 }
@@ -425,7 +459,13 @@ private fun HomePage(
     onDailySignToggle: (Boolean) -> Unit,
     onBigVipCheckinToggle: (Boolean) -> Unit,
     onMoodToggle: (Boolean) -> Unit,
-    onMoodConfigClick: () -> Unit
+    onMoodConfigClick: () -> Unit,
+    keepAlivePixel: Boolean,
+    keepAliveForeground: Boolean,
+    keepAliveBackground: Boolean,
+    onKeepAlivePixelToggle: (Boolean) -> Unit,
+    onKeepAliveForegroundToggle: (Boolean) -> Unit,
+    onKeepAliveBackgroundToggle: (Boolean) -> Unit
 ) {
     val colors = QEdgeTheme.colors
 
@@ -719,6 +759,80 @@ private fun HomePage(
                     checked = bigVipCheckinEnabled,
                     onCheckedChange = onBigVipCheckinToggle
                 )
+            }
+        }
+
+        QEdgeCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Image(
+                        painter = androidx.compose.ui.res.painterResource(R.drawable.eye_on),
+                        contentDescription = null,
+                        modifier = Modifier.size(40.dp)
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            "应用保活",
+                            fontSize = 18.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = colors.textPrimary
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            "应用保活，保持进程可见",
+                            fontSize = 13.sp,
+                            color = colors.textSecondary
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("透明悬浮窗", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("1x1透明悬浮窗，保持进程可见", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                    QEdgeSwitch(checked = keepAlivePixel, onCheckedChange = onKeepAlivePixelToggle)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("前台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("高优先级常驻通知，最高保活优先级", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                    QEdgeSwitch(checked = keepAliveForeground, onCheckedChange = onKeepAliveForegroundToggle)
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("后台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text("低优先级通知，轻量保活", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                    QEdgeSwitch(checked = keepAliveBackground, onCheckedChange = onKeepAliveBackgroundToggle)
+                }
             }
         }
     }
@@ -1097,6 +1211,112 @@ private fun MoodScheduleDialog(
                         fontWeight = FontWeight.Medium,
                         color = if (canConfirm) androidx.compose.ui.graphics.Color.White else colors.textSecondary
                     )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateLogDialog(
+    show: Boolean,
+    onDismiss: () -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var logText by remember { mutableStateOf("加载中...") }
+
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        Thread {
+            try {
+                val url = java.net.URL("https://v.yuafeng.cn/QEdge/update/changelog.php")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                connection.requestMethod = "GET"
+
+                val reader = java.io.BufferedReader(
+                    java.io.InputStreamReader(connection.inputStream, "UTF-8")
+                )
+                val response = java.lang.StringBuilder()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    response.append(line)
+                }
+                reader.close()
+
+                val json = org.json.JSONObject(response.toString())
+                if (json.getInt("code") == 200) {
+                    val data = json.getJSONObject("data")
+                    val changelog = data.getJSONArray("changelog")
+                    val sb = StringBuilder()
+                    for (i in 0 until changelog.length()) {
+                        val entry = changelog.getJSONObject(i)
+                        sb.append("v${entry.getString("version")} (${entry.getString("date")})\n")
+                        val items = entry.getJSONArray("items")
+                        for (j in 0 until items.length()) {
+                            sb.append("• ${items.getString(j)}\n")
+                        }
+                        if (i < changelog.length() - 1) {
+                            sb.append("\n")
+                        }
+                    }
+                    logText = sb.toString()
+                } else {
+                    logText = "获取失败"
+                }
+            } catch (e: Exception) {
+                logText = "获取失败: ${e.message}"
+            }
+        }.start()
+    }
+
+    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.88f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+        ) {
+            Text(
+                "更新日志",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            ComposeBox(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(300.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    logText,
+                    fontSize = 14.sp,
+                    color = colors.textSecondary,
+                    lineHeight = 20.sp
+                )
+            }
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                ComposeBox(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("关闭", fontSize = 14.sp, color = colors.textPrimary)
                 }
             }
         }

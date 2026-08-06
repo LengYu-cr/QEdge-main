@@ -42,7 +42,7 @@ object QZoneLikeTool : DexKitTask {
             val cookie = "uin=$cookieUin; skey=$skey; p_uin=$cookieUin; p_skey=$pSkey"
 
             val result = httpPostForm(urlStr, postData, cookie)
-            // LogUtils.e(TAG, "doLike result: $result")
+            LogUtils.d(TAG, "doLike result: $result")
             result.contains("\"ret\":0") || result.contains("\"code\":0")
         }.onFailure {
             LogUtils.e(TAG, "doLike error: ${it.message}")
@@ -90,7 +90,7 @@ object QZoneLikeTool : DexKitTask {
                 "}"
 
             val result = httpPostJson(urlStr, jsonBody, cookie)
-            // LogUtils.e(TAG, "doComment result: $result")
+            LogUtils.d(TAG, "doComment result: $result")
             result.contains("\"ret\":0") || result.contains("\"code\":0")
         }.onFailure {
             LogUtils.e(TAG, "doComment error: ${it.message}")
@@ -192,7 +192,7 @@ object QZoneLikeTool : DexKitTask {
      * @param content 签到自定义文字，默认 "123" 可改
      * @return 是否成功
      */
-    fun qzoneClockIn(content: String = "123"): Boolean {
+    fun qzoneClockIn(content: String = "QEdge每日空间签到"): Boolean {
         return runCatching {
             val cookieUin = QQCurrentEnv.getCookieUin() ?: return@runCatching false
             val uin = QQCurrentEnv.getCurrentUin() ?: return@runCatching false

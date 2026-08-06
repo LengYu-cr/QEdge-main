@@ -24,9 +24,9 @@ import java.lang.reflect.Proxy
 @HookItemAnnotation(category = "entry", process = "All", value = "QQ设置入口")
 object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
 
-    private const val TOP_TITLE = "模块"
-    private const val BOTTOM_TITLE = "嘿壳模式"
-    private const val MODULE_ORDER = 10
+    private const val TOP_TITLE = "QEdge"
+    private const val BOTTOM_TITLE = "送君茉莉，愿君莫离。"
+    private const val MODULE_ORDER = 6
 
     @Suppress("UNCHECKED_CAST")
     override fun loadHook() {

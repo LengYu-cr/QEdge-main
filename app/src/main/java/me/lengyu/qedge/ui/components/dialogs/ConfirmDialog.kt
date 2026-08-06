@@ -39,6 +39,7 @@ fun ConfirmDialog(
     Dialog(onDismissRequest = onDismiss) {
         Column(
             modifier = Modifier
+                .fillMaxWidth(0.85f)
                 .clip(RoundedCornerShape(16.dp))
                 .background(colors.cardBackground)
                 .padding(24.dp)

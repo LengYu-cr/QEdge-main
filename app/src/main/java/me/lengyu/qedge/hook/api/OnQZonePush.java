@@ -270,9 +270,10 @@ public class OnQZonePush extends BaseApiHookItem<OnQZonePush.QZonePushListener> 
                 final String commentText = ModuleConfig.INSTANCE.getString("qzone_comment_text", "我来暖说说啦！");
 
                 if (autoLike || autoComment) {
+                    LogUtils.d(TAG, "auto action or comment, uin=" + uinStr + ", cellid=" + finalCellid);
                     new Thread(() -> {
                         try {
-                            Thread.sleep(1000);
+                            // Thread.sleep(1000);
                             if (autoLike) {
                                 boolean likeResult = QZoneLikeTool.INSTANCE.doLikeByUinAndCellid(uinStr, finalCellid, 1);
                                 // LogUtils.e(TAG, "auto like result: " + likeResult + ", uin=" + uinStr + ", cellid=" + finalCellid);

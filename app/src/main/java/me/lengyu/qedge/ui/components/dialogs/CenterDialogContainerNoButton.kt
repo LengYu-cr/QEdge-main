@@ -21,6 +21,7 @@ fun CenterDialogContainerNoButton(title: String, content: @Composable () -> Unit
     
     Column(
         modifier = Modifier
+            .fillMaxWidth(0.85f)
             .clip(RoundedCornerShape(16.dp))
             .background(colors.cardBackground)
             .padding(24.dp),

@@ -246,6 +246,7 @@ class XposedDialogLifecycleOwner : LifecycleOwner, SavedStateRegistryOwner, View
         get() = _viewModelStore
 
     fun handleLifecycleEvent(event: Lifecycle.Event) {
+        if (lifecycleRegistry.currentState == Lifecycle.State.DESTROYED) return
         lifecycleRegistry.handleLifecycleEvent(event)
     }
 }
