@@ -187,7 +187,7 @@ public class MainHook {
                 // 只有获取到有效的 UIN 时才写入缓存，防止 null 覆盖
                 if (currentUin != null && !currentUin.isEmpty()) {
                     SharedPreferences prefs = context.getSharedPreferences(
-                            "QEdge_Config_" + currentUin, Context.MODE_MULTI_PROCESS);
+                            "QEdge_Config_" + currentUin, Context.MODE_PRIVATE);
                     prefs.edit().putString("currentUin", currentUin).apply();
                     
                     SharedPreferences heartbeatPrefs = context.getSharedPreferences("QEdge_Heartbeat", Context.MODE_PRIVATE);

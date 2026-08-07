@@ -133,6 +133,29 @@ public class VideoParseFeature implements ColdRainFeature {
                     for (int i = 0; i < ttp.length(); i++) {
                         sendVideo(msgData, ttp.getString(i));
                     }
+                } else if ("视频集合 and 图集".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    JSONArray videos = data1.optJSONArray("video");
+                    JSONArray images = data1.optJSONArray("images");
+                    int vCount = videos != null ? videos.length() : 0;
+                    int iCount = images != null ? images.length() : 0;
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                        "\n视频+图集发送中...(共" + vCount + "个视频," + iCount + "张图片)");
+                    if (videos != null) {
+                        for (int i = 0; i < videos.length(); i++) {
+                            sendVideo(msgData, videos.getString(i));
+                        }
+                    }
+                    if (images != null) {
+                        for (int i = 0; i < images.length(); i++) {
+                            sendImg(msgData, images.getString(i));
+                        }
+                    }
                 }
             } else {
                 sendMsg(msgData, sj);

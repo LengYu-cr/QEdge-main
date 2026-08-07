@@ -194,7 +194,7 @@ object ChatSettingLoader {
     private fun showMenuDialog(view: View) {
         // 优先使用真实 Activity Context，避免 view.context 是 ContextThemeWrapper 或已销毁的 Activity
         // （"显示完闪退"最常见根因：BadTokenException 在动画结束后 relayout 时被 WindowManager 抛出）
-        val hostActivity = (QQCurrentEnv.getActivity() as? Activity)
+        val hostActivity = QQCurrentEnv.getActivity()
             ?: (view.context as? Activity)
         if (hostActivity == null || hostActivity.isFinishing || hostActivity.isDestroyed) {
             LogUtils.e("ChatSettingLoader", "skip showMenuDialog: host activity invalid")
@@ -299,7 +299,7 @@ object ChatSettingLoader {
 
     private fun startPluginActivity(context: android.content.Context) {
         try {
-            val activity = (QQCurrentEnv.getActivity() as? Activity)
+            val activity = QQCurrentEnv.getActivity()
                 ?: (context as? Activity)
             if (activity == null || activity.isFinishing || activity.isDestroyed) {
                 LogUtils.e("ChatSettingLoader", "skip startPluginActivity: host activity invalid")
@@ -347,7 +347,7 @@ object ChatSettingLoader {
                 Toasts.toast("冷雨Java未初始化")
                 return
             }
-            val activity = (QQCurrentEnv.getActivity() as? Activity)
+            val activity = QQCurrentEnv.getActivity()
                 ?: (context as? Activity)
             if (activity == null || activity.isFinishing || activity.isDestroyed) {
                 LogUtils.e("ChatSettingLoader", "skip showGroupSwitchDialog: host activity invalid")

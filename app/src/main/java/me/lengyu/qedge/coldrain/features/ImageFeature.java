@@ -263,7 +263,7 @@ public class ImageFeature implements ColdRainFeature {
             if (baseDir.endsWith("/")) {
                 baseDir = baseDir.substring(0, baseDir.length() - 1);
             }
-            String cacheDir = baseDir + "/image_cache";
+            String cacheDir = baseDir + "/cache/images";
             File cf = new File(cacheDir);
             if (!cf.exists()) cf.mkdirs();
 

@@ -377,6 +377,9 @@ public class ColdRainCore {
 
             String menuName = getMenuName();
             if (text.equals(menuName)) {
+                if (isMenuRestricted() && !isAdminOrSelf(msgData)) {
+                    return;
+                }
                 boolean isMasterOn = isMasterEnabled();
                 boolean isGroupOn = msgData.type == 2 ? getBoolean("group_master_enabled_" + msgData.peerUin, false) : true;
                 
@@ -419,7 +422,12 @@ public class ColdRainCore {
         if (!isMasterEnabled()) {
             return false;
         }
-        
+
+        // 菜单限制：只有主人/管理员/自己可以触发
+        if (isMenuRestricted() && !isAdminOrSelf(msgData)) {
+            return false;
+        }
+
         // 菜单命令不受功能开关和群功能开关限制
         if (isMenuCommand(msgData.msg)) {
             if (msgData.type == 2 && msgData.peerUin != null && !msgData.peerUin.isEmpty()) {
