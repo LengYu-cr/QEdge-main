@@ -5,10 +5,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 import com.tencent.mobileqq.app.CardHandler;
+import com.tencent.mobileqq.addfriend.api.IDelFriendService;
 import com.tencent.common.app.BaseApplicationImpl;
 import com.tencent.qqnt.ntrelation.friendsinfo.api.IFriendsInfoService;
 import com.tencent.relation.common.api.IRelationNTUinAndUidApi;
 import me.lengyu.qedge.plugin.bean.FriendInfo;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 
@@ -49,6 +51,20 @@ public class FriendTool {
             }
         } catch (Throwable e) {
             e.printStackTrace();
+        }
+        return false;
+    }
+
+
+    public static boolean deleteFriend(String uin){
+        try {
+            IDelFriendService service = QQServiceHelper.getRuntimeService(IDelFriendService.class);
+            if (service == null) return false;
+            service.delFriend("FriendsManager_deleteFriend", uin, (byte) 0, 0);
+            LogUtils.i("FriendTool", "deleteFriend: delFriend(" + uin + ") called");
+            return !isFriend(uin);
+        } catch (Throwable e) {
+            LogUtils.e("FriendTool", "deleteFriend error: " + e.getMessage());
         }
         return false;
     }

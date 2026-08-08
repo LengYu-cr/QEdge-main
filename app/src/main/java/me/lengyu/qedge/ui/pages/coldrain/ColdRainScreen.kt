@@ -159,6 +159,7 @@ fun ColdRainScreen(
                             "image" -> "图片模式"
                             "forward" -> "转发模式"
                             "markdown" -> "MarkDown"
+                            "guanjia" -> "管家模式"
                             else -> "文字模式"
                         },
                         onClick = { showReplyModeDialog = true }
@@ -306,7 +307,8 @@ fun ColdRainScreen(
             "card" to "卡片模式",
             "image" to "图片模式",
             "forward" to "转发模式",
-            "markdown" to "MarkDown"
+            "markdown" to "MarkDown",
+            "guanjia" to "管家模式"
         )
         AlertDialog(
             onDismissRequest = { showReplyModeDialog = false },

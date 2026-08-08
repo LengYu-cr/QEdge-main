@@ -7,4 +7,12 @@ public class TroopInfo {
     public long dwGagTimeStamp;
     public long dwGagTimeStamp_me;
 
+    public boolean isTroopOwner(String uin) {
+        return true;
+    }
+
+    public boolean isTroopAdmin(String uin) {
+        return true;
+    }
+
 }

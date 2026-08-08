@@ -45,4 +45,8 @@ public class Toasts {
         }
         return hostContext;
     }
+
+    public static void showToast(String message) {
+        toast(message);
+    }
 }

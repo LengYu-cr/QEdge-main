@@ -240,7 +240,7 @@ public class MusicMenuFeature implements ColdRainFeature {
                 core.reply(msgData, "无法获取QQ音乐cookie");
                 return;
             }
-            String cookie = "uin=o0" + myUin + "; skey=" + skey + "; p_uin=o0" + myUin + "; p_skey=" + pskey;
+            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + pskey;
             String dataJson = "{\"comm\":{\"format\":\"json\",\"inCharset\":\"utf-8\",\"outCharset\":\"utf-8\",\"notice\":0,\"platform\":\"h5\",\"needNewCode\":1,\"ct\":23,\"cv\":0},\"req_0\":{\"method\":\"DoSearchForQQMusicDesktop\",\"module\":\"music.search.SearchCgiService\",\"param\":{\"remoteplace\":\"txt.mqq.all\",\"search_type\":0,\"query\":\"" + keyword + "\",\"page_num\":1,\"num_per_page\":20}}}";
             String url = HttpUtils.postWithCookie("https://u.y.qq.com/cgi-bin/musicu.fcg?_webcgikey=DoSearchForQQMusicDesktop", dataJson, cookie);
             if (url == null || url.isEmpty()) {

@@ -14,7 +14,7 @@ import org.json.JSONObject;
 
 import com.tencent.qqnt.kernel.nativeinterface.MsgElement;
 import com.tencent.qqnt.kernelpublic.nativeinterface.Contact;
-
+import com.tencent.mobileqq.data.troop.TroopInfo;
 import me.lengyu.qedge.coldrain.features.BanDetectionFeature;
 import me.lengyu.qedge.coldrain.features.GroupManagerFeature;
 import me.lengyu.qedge.coldrain.features.MenuFeature;
@@ -42,6 +42,7 @@ import me.lengyu.qedge.plugin.bean.MemberInfo;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
+import me.lengyu.qedge.utils.Toasts;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.qq.CookieTool;
@@ -332,6 +333,13 @@ public class ColdRainCore {
 
             String text = msgData.msg.trim();
             if (text.isEmpty()) return;
+
+            // Q群管家 token 捕获：监听 Q群管家(2854196310)发送的 JSON 卡片
+            if (msgData.type == 2 && "2854196310".equals(msgData.userUin) &&
+                msgData.msgType == 11 && text.contains("\"token\"")) {
+                handleGuanjiaTokenMessage(msgData);
+                return;
+            }
 
             if (text.equals("开机")) {
                 if (!isAdminOrSelf(msgData)) {
@@ -803,6 +811,7 @@ public class ColdRainCore {
         } catch (Throwable e) {
             LogUtils.e(TAG, "sendCardReply error: " + e.getMessage());
             MsgTool.sendMsg(qun, text, mtype);
+            Toasts.showToast("发送卡片失败");
         }
     }
 
@@ -833,6 +842,7 @@ public class ColdRainCore {
         } catch (Throwable e) {
             LogUtils.e(TAG, "sendImageReply error: " + e.getMessage());
             MsgTool.sendMsg(qun, text, mtype);
+            Toasts.showToast("发送图片失败");
         }
     }
 
@@ -869,6 +879,7 @@ public class ColdRainCore {
         } catch (Throwable e) {
             LogUtils.e(TAG, "sendForwardReply error: " + e.getMessage());
             MsgTool.sendMsg(msgData.peerUin, text, msgData.type);
+            Toasts.showToast("发送聊天记录失败");
         }
     }
 
@@ -890,6 +901,7 @@ public class ColdRainCore {
         } catch (Throwable e) {
             LogUtils.e(TAG, "sendMarkdownReply error: " + e.getMessage());
             MsgTool.sendMsg(qun, text, mtype);
+            Toasts.showToast("发送Markdown失败");
         }
     }
 
@@ -899,31 +911,221 @@ public class ColdRainCore {
                 MsgTool.sendMsg(qun, text, mtype);
                 return;
             }
+
+            String myUin = QQCurrentEnv.getCurrentUin();
+
+            // 检查机器人是否是群主或管理员
+            TroopInfo troopInfo = me.lengyu.qedge.utils.qq.TroopTool.INSTANCE.getGroupInfo(qun);
+            if (troopInfo == null) {
+                MsgTool.sendMsg(qun, text, mtype);
+                return;
+            }
+            boolean isOwner = troopInfo.isTroopOwner(myUin);
+            boolean isAdmin = troopInfo.isTroopAdmin(myUin);
+            if (!isOwner && !isAdmin) {
+                MsgTool.sendMsg(qun, text, mtype);
+                return;
+            }
+
             String pskey = CookieTool.getPskey("qun.qq.com");
             String skey = CookieTool.getSkey();
             if (pskey == null || skey == null) {
                 MsgTool.sendMsg(qun, text, mtype);
                 return;
             }
-            String myUin = QQCurrentEnv.getCurrentUin();
-            String content = "\n" + text.replace("$", "").replace("&lt;", "<").replace("&gt;", ">");
-            if (content.length() > 20000 || content.contains(".cn") || content.contains(".net") ||
-                content.contains(".vip") || content.contains(".com") || content.contains(".中国") ||
-                content.contains(".edu") || content.contains(".tv") || content.contains("[pic=")) {
+            long bkn = CookieTool.getBkn(skey);
+            String cookie = "p_uin=" + QQCurrentEnv.getCookieUin() + ";uin=" + QQCurrentEnv.getCookieUin() +
+                ";skey=" + skey + ";p_skey=" + pskey;
+
+            // 获取已保存的 token
+            String token = getString("guanjia_token_" + qun, "");
+
+            // 生成随机短字符串作为问题和关键词，answer 为实际要发送的内容
+            String randomQ = generateRandomQuestion();
+
+            // 添加问答
+            String addResult = guanjiaAddQna(qun, bkn, cookie, randomQ, text);
+            if (addResult.startsWith("添加失败") || addResult.equals("你不是管理") || addResult.equals("访问频率过快，稍后再试")) {
                 MsgTool.sendMsg(qun, text, mtype);
                 return;
             }
-            String url = "https://qun.qq.com/cgi-bin/qun_mgr/send_group_msg";
-            String data = "groupid=" + qun + "&msgtype=0&msg=" +
-                java.net.URLEncoder.encode(content.replaceAll("\\r\\n|\\n|\\r", "\\\\n").replace("\"", "\\\""), "UTF-8");
-            String cookie = "p_uin=o0" + myUin + ";skey=" + skey + ";p_skey=" + pskey;
-            String result = HttpUtils.postWithCookie(url, data, cookie);
-            if (result == null || !result.contains("ok")) {
-                MsgTool.sendMsg(qun, text, mtype);
+
+            if (token.isEmpty()) {
+                // 无 token：艾特 Q群管家获取 token
+                MsgTool.sendMsg(qun, "Come on![atUin=2854196310]", mtype);
+                setString("guanjia_trigger_question_" + qun, randomQ);
+                setString("guanjia_trigger_uin_" + qun, myUin);
+            } else {
+                // 有 token：触发问答
+                String triggerResult = guanjiaTriggerQna(qun, bkn, cookie, randomQ, token);
+                if (triggerResult.equals("会话过期")) {
+                    // token 过期，重新艾特 Q群管家
+                    MsgTool.sendMsg(qun, "Come on![atUin=2854196310]", mtype);
+                    setString("guanjia_trigger_question_" + qun, randomQ);
+                    setString("guanjia_trigger_uin_" + qun, myUin);
+                } else if (triggerResult.equals("成功")) {
+                    guanjiaDeleteQna(qun, bkn, cookie, "1");
+                    guanjiaDeleteQna(qun, bkn, cookie, "2");
+                } else {
+                    MsgTool.sendMsg(qun, text, mtype);
+                }
             }
         } catch (Throwable e) {
             LogUtils.e(TAG, "sendGuanjiaReply error: " + e.getMessage());
             MsgTool.sendMsg(qun, text, mtype);
+            Toasts.showToast("发送管家问答失败");
+        }
+    }
+
+    private void handleGuanjiaTokenMessage(MsgData msgData) {
+        try {
+            String qun = msgData.peerUin;
+            String triggerUin = getString("guanjia_trigger_uin_" + qun, "");
+            String triggerQuestion = getString("guanjia_trigger_question_" + qun, "");
+            if (triggerUin.isEmpty() || triggerQuestion.isEmpty()) return;
+
+            // 解析 JSON 卡片提取 token
+            String jsonStr = msgData.msg.replace("}\n", "}");
+            JSONObject json = new JSONObject(jsonStr);
+            String token = json.getJSONObject("meta").getJSONObject("metadata").getString("token");
+            setString("guanjia_token_" + qun, token);
+
+            // 用新 token 触发问答
+            String pskey = CookieTool.getPskey("qun.qq.com");
+            String skey = CookieTool.getSkey();
+            if (pskey == null || skey == null) return;
+            long bkn = CookieTool.getBkn(skey);
+            String cookie = "p_uin=" + QQCurrentEnv.getCookieUin() + ";uin=" + QQCurrentEnv.getCookieUin() +
+                ";skey=" + skey + ";p_skey=" + pskey;
+
+            String result = guanjiaTriggerQna(qun, bkn, cookie, triggerQuestion, token);
+            if (result.equals("成功")) {
+                // 撤回 Q群管家的卡片消息
+                if (msgData.msgId > 0) {
+                    MsgTool.recallMsg(2, qun, msgData.msgId);
+                }
+                guanjiaDeleteQna(qun, bkn, cookie, "1");
+                guanjiaDeleteQna(qun, bkn, cookie, "2");
+            } else {
+                MsgTool.sendMsg(qun, result, 2);
+                Toasts.showToast("触发管家问答失败：" + result);
+            }
+
+            // 清理触发状态
+            setString("guanjia_trigger_uin_" + qun, "");
+            setString("guanjia_trigger_question_" + qun, "");
+        } catch (Throwable e) {
+            LogUtils.e(TAG, "handleGuanjiaTokenMessage error: " + e.getMessage());
+            Toasts.showToast("处理管家问答失败");
+        }
+    }
+
+    private String escapeJson(String s) {
+        if (s == null) return "";
+        StringBuilder sb = new StringBuilder(s.length() + 16);
+        for (int i = 0; i < s.length(); i++) {
+            char c = s.charAt(i);
+            switch (c) {
+                case '"': sb.append("\\\""); break;
+                case '\\': sb.append("\\\\"); break;
+                case '\n': sb.append("\\n"); break;
+                case '\r': sb.append("\\r"); break;
+                case '\t': sb.append("\\t"); break;
+                case '\b': sb.append("\\b"); break;
+                case '\f': sb.append("\\f"); break;
+                default:
+                    if (c < 0x20) {
+                        sb.append(String.format("\\u%04x", (int) c));
+                    } else {
+                        sb.append(c);
+                    }
+            }
+        }
+        return sb.toString();
+    }
+
+    private String generateRandomQuestion() {
+        String chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+        java.util.Random rnd = new java.util.Random();
+        StringBuilder sb = new StringBuilder(6);
+        for (int i = 0; i < 6; i++) {
+            sb.append(chars.charAt(rnd.nextInt(chars.length())));
+        }
+        return sb.toString();
+    }
+
+    private String guanjiaAddQna(String qun, long bkn, String cookie, String question, String answer) {
+        try {
+            String url = "https://web.qun.qq.com/qunrobot/proxy/domain/app.qun.qq.com/cgi-bin/guanjia_robot/qna_setting/set_qna?bkn=" + bkn;
+            String q = escapeJson(question);
+            String a = escapeJson("\n" + answer);
+            String body = "{\"bkn\":" + bkn + ",\"group_id\":" + qun +
+                ",\"qna_item\":{\"slot\":0,\"question\":\"" + q + "\",\"answer\":\"" + a +
+                "\",\"keyword\":[\"" + q + "\"]}}";
+            HashMap<String, String> headers = new HashMap<>();
+            headers.put("Content-Type", "application/json");
+            headers.put("Cookie", cookie);
+            headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            headers.put("qname-service", "976321:131072");
+            headers.put("qname-space", "Production");
+            String result = HttpUtils.post(url, body, headers);
+            if (result == null) return "添加失败";
+            JSONObject json = new JSONObject(result);
+            int retcode = json.optInt("retcode", -1);
+            if (retcode == 0) return "成功";
+            if (retcode == 100106) return "添加失败，问答已存在";
+            if (retcode == 100302) return "你不是管理";
+            if (retcode == 1009) return "访问频率过快，稍后再试";
+            return "添加失败，原因:" + json.optString("msg", "未知");
+        } catch (Throwable e) {
+            return "添加失败，原因:" + e.getMessage();
+        }
+    }
+
+    private String guanjiaDeleteQna(String qun, long bkn, String cookie, String slot) {
+        try {
+            String url = "https://web.qun.qq.com/qunrobot/proxy/domain/app.qun.qq.com/cgi-bin/guanjia_robot/qna_setting/set_qna?bkn=" + bkn;
+            String body = "{\"bkn\":" + bkn + ",\"group_id\":" + qun +
+                ",\"qna_item\":{\"slot\":" + slot + ",\"question\":\"\",\"answer\":\"\",\"keyword\":[]}}";
+            HashMap<String, String> headers = new HashMap<>();
+            headers.put("Content-Type", "application/json");
+            headers.put("Cookie", cookie);
+            headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            headers.put("qname-service", "976321:131072");
+            headers.put("qname-space", "Production");
+            String result = HttpUtils.post(url, body, headers);
+            if (result == null) return "删除失败";
+            JSONObject json = new JSONObject(result);
+            int retcode = json.optInt("retcode", -1);
+            if (retcode == 0) return "成功";
+            return "删除失败";
+        } catch (Throwable e) {
+            return "删除失败";
+        }
+    }
+
+    private String guanjiaTriggerQna(String qun, long bkn, String cookie, String question, String token) {
+        try {
+            String url = "https://app.qun.qq.com/cgi-bin/guanjia_robot/qna_callback/get_answer?bkn=" + bkn;
+            String q = escapeJson(question);
+            String t = escapeJson(token);
+            String body = "{\"anonymous\":1,\"question\":\"" + q + "\",\"token\":\"" + t + "\"}";
+            HashMap<String, String> headers = new HashMap<>();
+            headers.put("Content-Type", "application/json");
+            headers.put("Cookie", cookie);
+            headers.put("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            headers.put("qname-service", "976321:131072");
+            headers.put("qname-space", "Production");
+            String result = HttpUtils.post(url, body, headers);
+            if (result == null) return "触发失败";
+            JSONObject json = new JSONObject(result);
+            int ec = json.optInt("ec", -1);
+            if (ec == 0) return "成功";
+            if (ec == 70000) return "会话过期";
+            if (ec == 70003) return "访问频率过快，稍后再试";
+            return "触发失败，原因:" + json.optString("em", "未知");
+        } catch (Throwable e) {
+            return "触发失败，原因:" + e.getMessage();
         }
     }
 

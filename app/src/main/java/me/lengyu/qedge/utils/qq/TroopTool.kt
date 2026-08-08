@@ -17,6 +17,8 @@ import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Proxy
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
+import com.tencent.mobileqq.data.troop.TroopInfo
+import com.tencent.mobileqq.troop.api.ITroopInfoService
 
 @Suppress("DEPRECATION")
 object TroopTool : DexKitTask {
@@ -127,16 +129,18 @@ object TroopTool : DexKitTask {
         return groupInfoList
     }
 
-    fun getGroupInfo(troopUin: String): Any? {
+    fun getGroupInfo(troopUin: String): TroopInfo? {
         try {
-            val service = QQServiceHelper.getRuntime(Class.forName("com.tencent.mobileqq.troop.api.ITroopInfoService"))
+            val app = QQServiceHelper.getRuntime()
+            if (app == null) return TroopInfo()
+            val service = app.getRuntimeService(ITroopInfoService::class.java, "")
             if (service != null) {
-                return me.lengyu.qedge.utils.ReflectUtils.callMethod(service, "getTroopInfo", troopUin)
+                return service.getTroopInfo(troopUin) as TroopInfo?
             }
         } catch (e: Throwable) {
             e.printStackTrace()
         }
-        return null
+        return TroopInfo()
     }
 
     fun shutUpAll(troopUin: String, enable: Boolean) {
@@ -187,27 +191,6 @@ object TroopTool : DexKitTask {
         })
     }
 
-    fun setGroupMemberTitle(troopUin: String, uin: String, title: String) {
-        val edit = Class.forName("com.tencent.biz.troop.EditUniqueTitleActivity").newInstance()
-        runCatching {
-            setGroupMemberTitle.invoke(
-                edit,
-                QQCurrentEnv.getQQAppInterface(),
-                troopUin,
-                uin,
-                title,
-                null
-            )
-        }.onFailure {
-            me.lengyu.qedge.utils.ReflectUtils.setFieldValue(edit, "app", QQCurrentEnv.getQQAppInterface())
-            me.lengyu.qedge.utils.ReflectUtils.setFieldValue(edit, "intent", android.content.Intent())
-            Class.forName("android.content.ContextWrapper")
-                .getDeclaredMethod("attachBaseContext", android.content.Context::class.java)
-                .apply { isAccessible = true }
-                .invoke(edit, me.lengyu.qedge.utils.HostInfo.getContext())
-            setGroupMemberTitle.invoke(edit, troopUin, uin, title)
-        }
-    }
 
     fun changeMemberName(troopUin: String, uin: String, name: String) {
         val cardInfoClass = Class.forName("com.tencent.mobileqq.data.troop.TroopMemberCardInfo")

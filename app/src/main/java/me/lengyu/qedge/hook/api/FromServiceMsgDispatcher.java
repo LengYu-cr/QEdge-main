@@ -20,9 +20,14 @@ public class FromServiceMsgDispatcher {
 
     private static boolean hooked = false;
     private static final CopyOnWriteArrayList<DispatcherListener> listeners = new CopyOnWriteArrayList<>();
+    private static final CopyOnWriteArrayList<FeedsListener> feedsListeners = new CopyOnWriteArrayList<>();
 
     public interface DispatcherListener {
         void onDispatch(String serviceCmd, JSONObject json, FromServiceMsg msg);
+    }
+
+    public interface FeedsListener {
+        void onFeedsResponse(JSONObject json, FromServiceMsg msg);
     }
 
     public static void registerListener(DispatcherListener listener) {
@@ -34,6 +39,18 @@ public class FromServiceMsgDispatcher {
     public static void unregisterListener(DispatcherListener listener) {
         if (listener != null) {
             listeners.remove(listener);
+        }
+    }
+
+    public static void registerFeedsListener(FeedsListener listener) {
+        if (listener != null) {
+            feedsListeners.add(listener);
+        }
+    }
+
+    public static void unregisterFeedsListener(FeedsListener listener) {
+        if (listener != null) {
+            feedsListeners.remove(listener);
         }
     }
 
@@ -54,19 +71,43 @@ public class FromServiceMsgDispatcher {
                     if (fromServiceMsg == null) return;
 
                     String cmd = fromServiceMsg.getServiceCmd();
-                    if (!SERVICE_CMD.equals(cmd)) return;
-                    if (listeners.isEmpty()) return;
+                    if (cmd == null) return;
 
                     byte[] wupBuffer = fromServiceMsg.getWupBuffer();
-                    ProtoData data = new ProtoData();
-                    data.fromBytes(wupBuffer);
-                    JSONObject json = data.toJSON();
+                    if (wupBuffer == null || wupBuffer.length == 0) return;
 
-                    for (DispatcherListener listener : listeners) {
-                        try {
-                            listener.onDispatch(cmd, json, fromServiceMsg);
-                        } catch (Throwable e) {
-                            LogUtils.e(TAG, "dispatch error: " + e.getMessage());
+                    JSONObject json = null;
+
+                    // OlPush 消息（原有的 DispatcherListener）
+                    if (SERVICE_CMD.equals(cmd) && !listeners.isEmpty()) {
+                        if (json == null) {
+                            ProtoData data = new ProtoData();
+                            data.fromBytes(wupBuffer);
+                            json = data.toJSON();
+                        }
+                        for (DispatcherListener listener : listeners) {
+                            try {
+                                listener.onDispatch(cmd, json, fromServiceMsg);
+                            } catch (Throwable e) {
+                                LogUtils.e(TAG, "dispatch error: " + e.getMessage());
+                            }
+                        }
+                    }
+
+                    // 好友说说列表响应（FeedsListener）
+                    if ((cmd.contains("GetFriendFeeds") || cmd.contains("feeds_reader.FeedsReader"))
+                        && !feedsListeners.isEmpty()) {
+                        if (json == null) {
+                            ProtoData data = new ProtoData();
+                            data.fromBytes(wupBuffer);
+                            json = data.toJSON();
+                        }
+                        for (FeedsListener listener : feedsListeners) {
+                            try {
+                                listener.onFeedsResponse(json, fromServiceMsg);
+                            } catch (Throwable e) {
+                                LogUtils.e(TAG, "feeds dispatch error: " + e.getMessage());
+                            }
                         }
                     }
                 } catch (Throwable e) {

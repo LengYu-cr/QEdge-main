@@ -1,11 +1,13 @@
 package me.lengyu.qedge.utils.qq;
 
 import java.lang.reflect.Method;
-
+import mqq.app.AppRuntime;
+import mqq.app.api.IRuntimeService;
 import com.tencent.mobileqq.qroute.QRoute;
 import com.tencent.mobileqq.app.QQAppInterface;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.QQCurrentEnv;
+import com.tencent.common.app.BaseApplicationImpl;
 
 public class QQServiceHelper {
 
@@ -74,5 +76,20 @@ public class QQServiceHelper {
             e.printStackTrace();
         }
         return null;
+    }
+
+    public static AppRuntime getRuntime(){
+        BaseApplicationImpl impl = BaseApplicationImpl.getApplication();
+        return impl.getRuntime();
+    }
+
+    public static <T extends IRuntimeService> T getRuntimeService(Class<T> serviceClass){
+        return getRuntimeService(serviceClass, "");
+    }
+
+    public static <T extends IRuntimeService> T getRuntimeService(Class<T> serviceClass, String serviceId){
+        AppRuntime runtime = getRuntime();
+        if (runtime == null) return null;
+        return runtime.getRuntimeService(serviceClass, serviceId);
     }
 }

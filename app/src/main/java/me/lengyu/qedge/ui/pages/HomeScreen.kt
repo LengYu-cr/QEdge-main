@@ -109,6 +109,8 @@ fun HomeScreen(
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, false)) }
     var dailySignEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_DAILY_SIGN_ENABLED, false)) }
     var bigVipCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, false)) }
+    var levelBoostEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_LEVEL_BOOST_ENABLED, false)) }
+    var spaceBrowseEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_SPACE_BROWSE_ENABLED, false)) }
     var moodEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_MOOD_ENABLED, false)) }
     var moodTime by remember { mutableStateOf(QZoneSchedule.getMoodTime()) }
     var moodText by remember { mutableStateOf(QZoneSchedule.getMoodText()) }
@@ -264,6 +266,8 @@ fun HomeScreen(
                         qzoneCheckinEnabled = qzoneCheckinEnabled,
                         dailySignEnabled = dailySignEnabled,
                         bigVipCheckinEnabled = bigVipCheckinEnabled,
+                        levelBoostEnabled = levelBoostEnabled,
+                        spaceBrowseEnabled = spaceBrowseEnabled,
                         moodEnabled = moodEnabled,
                         moodTime = moodTime,
                         moodText = moodText,
@@ -315,6 +319,14 @@ fun HomeScreen(
                         onBigVipCheckinToggle = {
                             bigVipCheckinEnabled = it
                             Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, it) }.start()
+                        },
+                        onLevelBoostToggle = {
+                            levelBoostEnabled = it
+                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_LEVEL_BOOST_ENABLED, it) }.start()
+                        },
+                        onSpaceBrowseToggle = {
+                            spaceBrowseEnabled = it
+                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_SPACE_BROWSE_ENABLED, it) }.start()
                         },
                         onMoodToggle = {
                             moodEnabled = it
@@ -442,6 +454,8 @@ private fun HomePage(
     qzoneCheckinEnabled: Boolean,
     dailySignEnabled: Boolean,
     bigVipCheckinEnabled: Boolean,
+    levelBoostEnabled: Boolean,
+    spaceBrowseEnabled: Boolean,
     moodEnabled: Boolean,
     moodTime: String,
     moodText: String,
@@ -458,6 +472,8 @@ private fun HomePage(
     onCheckinToggle: (Boolean) -> Unit,
     onDailySignToggle: (Boolean) -> Unit,
     onBigVipCheckinToggle: (Boolean) -> Unit,
+    onLevelBoostToggle: (Boolean) -> Unit,
+    onSpaceBrowseToggle: (Boolean) -> Unit,
     onMoodToggle: (Boolean) -> Unit,
     onMoodConfigClick: () -> Unit,
     keepAlivePixel: Boolean,
@@ -533,7 +549,7 @@ private fun HomePage(
 
                 SettingSwitchItem(
                     icon = R.drawable.mood,
-                    title = "定时发说说",
+                    title = "定时发说说 +0.5天",
                     subtitle = run {
                         val preview = if (moodText.length > 18) moodText.take(18) + "…" else moodText
                         "$moodTime · $preview"
@@ -721,7 +737,7 @@ private fun HomePage(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            "00:00时自动空间打卡，qq日签打卡，大会员签到",
+                            "00:00时自动空间打卡，qq日签打卡，大会员签到，自动加好友",
                             fontSize = 13.sp,
                             color = colors.textSecondary
                         )
@@ -735,7 +751,7 @@ private fun HomePage(
                 SettingSwitchItemPlainIcon(
                     icon = R.drawable.mood,
                     title = "空间等级签到",
-                    subtitle = "每日 00:00 自动执行",
+                    subtitle = "自动执行空间打卡 +0.5天",
                     checked = qzoneCheckinEnabled,
                     onCheckedChange = onCheckinToggle
                 )
@@ -745,7 +761,7 @@ private fun HomePage(
                 SettingSwitchItemPlainIcon(
                     icon = R.drawable.signin,
                     title = "QQ 日签打卡",
-                    subtitle = "每日 00:00 自动执行",
+                    subtitle = "自动执行日签打卡 +0.5天",
                     checked = dailySignEnabled,
                     onCheckedChange = onDailySignToggle
                 )
@@ -755,9 +771,29 @@ private fun HomePage(
                 SettingSwitchItemPlainIcon(
                     icon = R.drawable.bigvip,
                     title = "大会员签到",
-                    subtitle = "每日 00:00 自动执行（无需开通大会员）",
+                    subtitle = "自动执行（无需开通大会员） +0.5天",
                     checked = bigVipCheckinEnabled,
                     onCheckedChange = onBigVipCheckinToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItemPlainIcon(
+                    icon = R.drawable.add,
+                    title = "自动加好友",
+                    subtitle = "自动添加3个好友 +1.5天",
+                    checked = levelBoostEnabled,
+                    onCheckedChange = onLevelBoostToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItemPlainIcon(
+                    icon = R.drawable.eye_on,
+                    title = "空间浏览",
+                    subtitle = "浏览好友说说10条 +0.5天",
+                    checked = spaceBrowseEnabled,
+                    onCheckedChange = onSpaceBrowseToggle
                 )
             }
         }

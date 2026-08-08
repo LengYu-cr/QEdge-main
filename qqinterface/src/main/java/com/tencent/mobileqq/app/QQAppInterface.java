@@ -40,4 +40,5 @@ public class QQAppInterface extends AppInterface {
     public Object getGlobalPreference() {
         return null;
     }
+
 }

@@ -182,7 +182,7 @@ public class QueryFeature implements ColdRainFeature {
             long gtk = CookieTool.getGtk(vippskey);
             String url = "https://club.vip.qq.com/api/trpc/qid_server/GetQid?g_tk=" + gtk;
             String dataJson = "{\"uin\":" + uin + "}";
-            String cookie = "uin=o" + myUin + "; skey=" + skey + "; p_uin=o" + myUin + "; p_skey=" + vippskey;
+            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + vippskey;
             String post = httppost5(url, cookie, dataJson);
             if (post.isEmpty()) {
                 core.reply(msgData, "查询失败");
@@ -221,7 +221,7 @@ public class QueryFeature implements ColdRainFeature {
             }
             long gtk = CookieTool.getGtk(vippskey);
             String url = "https://cgi.vip.qq.com/card/getExpertInfo?ps_tk=" + gtk + "&fuin=" + uin + "&g_tk=" + gtk;
-            String cookie = "uin=o" + myUin + "; skey=" + skey + "; p_uin=o" + myUin + "; p_skey=" + vippskey;
+            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + vippskey;
             String post = cookieGetWithRefer(url, cookie, "https://club.vip.qq.com/");
             if (post.isEmpty()) {
                 core.reply(msgData, "查询失败");
@@ -358,7 +358,7 @@ public class QueryFeature implements ColdRainFeature {
             String skey = CookieTool.getSkey();
             if (skey == null) return "";
             long gtk = CookieTool.getGtk(pskey);
-            String cookie = "uin=o" + myUin + "; skey=" + skey + "; p_uin=o" + myUin + "; p_skey=" + pskey;
+            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + pskey;
             String url = "https://club.vip.qq.com/api/vip/getQQLevelInfo?g_tk=" + gtk +
                 "&requestBody={\"sClientIp\":\"\",\"sSessionKey\":\"" + skey + "\",\"iKeyType\":1,\"iAppId\":0,\"iUin\":\"" + uin + "\"}";
             String result = httpget(url, cookie);
@@ -401,7 +401,7 @@ public class QueryFeature implements ColdRainFeature {
             String skey = CookieTool.getSkey();
             if (skey == null) return "";
             long gtk = CookieTool.getGtk(pskey);
-            String cookie = "uin=o" + myUin + "; skey=" + skey + "; p_uin=o" + myUin + "; p_skey=" + pskey;
+            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + pskey;
             String url = "https://h5.vip.qq.com/proxy/domain/club.vip.qq.com/api/aggregation?from=hippy-vipAggregation&g_tk=" + gtk;
             String result = httppost1(url, cookie, "{\"commonInfo__getQQLevelInfo\":{\"args\":[\"" + uin + "\"],\"needCtx\":false}}");
             if (result.isEmpty()) return "";
@@ -448,7 +448,7 @@ public class QueryFeature implements ColdRainFeature {
             String skey = CookieTool.getSkey();
             if (skey == null) return "";
             long gtk = CookieTool.getGtk(pskey);
-            String cookie = "uin=o" + myUin + "; skey=" + skey + "; p_uin=o" + myUin + "; p_skey=" + pskey;
+            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + pskey;
             String url = "https://h5.qzone.qq.com/webapp/json/vpageCover_v2/getMainPage?g_tk=" + gtk +
                 "&uin=" + uin + "&visituin=" + myUin + "&force=1&format=json";
             String result = httpget(url, cookie);
@@ -493,7 +493,7 @@ public class QueryFeature implements ColdRainFeature {
             String skey = CookieTool.getSkey();
             if (skey == null) return "";
             long gtk = CookieTool.getGtk(pskey);
-            String cookie = "uin=o" + myUin + "; skey=" + skey + "; p_uin=o" + myUin + "; p_skey=" + pskey;
+            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + pskey;
             String url = "https://h5.qzone.qq.com/webapp/json/vpageCover_v2/getMainPage?g_tk=" + gtk +
                 "&uin=" + uin + "&visituin=" + myUin + "&force=1&format=json";
             String result = httpget(url, cookie);

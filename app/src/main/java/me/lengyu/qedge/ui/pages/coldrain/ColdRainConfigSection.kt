@@ -132,6 +132,7 @@ fun ColdRainConfigSection(
                         "image" -> "图片"
                         "forward" -> "转发"
                         "markdown" -> "MD"
+                        "guanjia" -> "管家"
                         else -> "文字"
                     },
                     onClick = { showReplyModeDialog = true }
@@ -192,7 +193,8 @@ fun ColdRainConfigSection(
             "card" to "卡片模式",
             "image" to "图片模式",
             "forward" to "转发模式",
-            "markdown" to "MarkDown"
+            "markdown" to "MarkDown",
+            "guanjia" to "管家模式"
         )
         AlertDialog(
             onDismissRequest = { showReplyModeDialog = false },

@@ -77,7 +77,7 @@ public class StatusFeature implements ColdRainFeature {
 
         sb.append("手机型号:").append(Build.MANUFACTURER).append(" ").append(Build.MODEL).append("\n");
         sb.append("屏幕分辨率:").append(getScreenInfo(context)).append("\n");
-        sb.append("CPU架构:").append(Build.CPU_ABI).append("(运行:").append(Runtime.getRuntime().availableProcessors()).append("个)\n");
+        sb.append("CPU架构:").append(Build.SUPPORTED_ABIS.length > 0 ? Build.SUPPORTED_ABIS[0] : "未知").append("(运行:").append(Runtime.getRuntime().availableProcessors()).append("个)\n");
 
         sb.append("模块版本:").append(getModuleVersion(context)).append("\n");
         sb.append("安卓版本:").append(Build.VERSION.RELEASE).append("(SDK:").append(Build.VERSION.SDK_INT).append(")\n");
