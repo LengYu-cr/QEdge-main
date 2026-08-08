@@ -61,7 +61,6 @@ public class FriendTool {
             IDelFriendService service = QQServiceHelper.getRuntimeService(IDelFriendService.class);
             if (service == null) return false;
             service.delFriend("FriendsManager_deleteFriend", uin, (byte) 0, 0);
-            LogUtils.i("FriendTool", "deleteFriend: delFriend(" + uin + ") called");
             return !isFriend(uin);
         } catch (Throwable e) {
             LogUtils.e("FriendTool", "deleteFriend error: " + e.getMessage());

@@ -1,7 +1,6 @@
 package me.lengyu.qedge.coldrain;
 
 import android.content.Context;
-import android.os.Environment;
 
 import java.io.File;
 import java.io.FileReader;
@@ -99,8 +98,8 @@ public class ColdRainCore {
     private File dataDir;
 
     private void initConfigFile() {
-        String basePath = Environment.getExternalStorageDirectory().getPath() 
-            + "/Android/media/" + context.getPackageName() + "/冷雨Java";
+        String basePath = QQCurrentEnv.getLocalPath()
+            + "Android/media/" + context.getPackageName() + "/冷雨Java";
         File baseDir = new File(basePath);
         if (!baseDir.exists()) {
             baseDir.mkdirs();

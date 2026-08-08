@@ -3,6 +3,7 @@ package me.lengyu.qedge.utils
 import android.annotation.SuppressLint
 import android.content.Context
 import android.os.Build
+import android.os.Environment
 
 @Suppress("DEPRECATION")
 @SuppressLint("StaticFieldLeak")
@@ -68,7 +69,7 @@ object HostInfo {
 
         val externalDir = context.getExternalFilesDir(null)?.parentFile
         _moduleDataPath = externalDir?.let { "${it.absolutePath}/QEdge/" }
-            ?: "/storage/emulated/0/Android/data/${context.packageName}/QEdge/"
+            ?: "${Environment.getExternalStorageDirectory().absolutePath}/Android/data/${context.packageName}/QEdge/"
         
         //android.util.Log.i("QEdge", "HostInfo.init: moduleDataPath = $_moduleDataPath")
     }

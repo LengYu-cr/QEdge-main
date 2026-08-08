@@ -135,7 +135,7 @@ object TroopTool : DexKitTask {
             if (app == null) return TroopInfo()
             val service = app.getRuntimeService(ITroopInfoService::class.java, "")
             if (service != null) {
-                return service.getTroopInfo(troopUin) as TroopInfo?
+                return service.getTroopInfo(troopUin)
             }
         } catch (e: Throwable) {
             e.printStackTrace()

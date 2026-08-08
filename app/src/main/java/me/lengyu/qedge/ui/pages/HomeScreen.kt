@@ -34,7 +34,6 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.foundation.Image
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -60,7 +59,6 @@ import me.lengyu.qedge.ui.components.molecules.TabItem
 import me.lengyu.qedge.ui.pages.coldrain.ColdRainScreen
 import me.lengyu.qedge.ui.core.theme.AccentBlue
 import me.lengyu.qedge.ui.core.theme.AccentGreen
-import me.lengyu.qedge.ui.core.theme.AccentOrange
 import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.HostInfo
@@ -495,38 +493,24 @@ private fun HomePage(
     ) {
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = androidx.compose.ui.res.painterResource(R.drawable.qzone),
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "QQ空间",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "自动点赞、自动评论",
-                            fontSize = 13.sp,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
+                Text(
+                    "QQ空间",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "自动点赞、自动评论",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = colors.textSecondary.copy(0.08f))
                 Spacer(modifier = Modifier.height(16.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.ic_favorite,
                     title = "空间秒赞",
                     subtitle = "收到好友动态自动点赞(确保在前台运行)",
                     checked = qzoneAutoLike,
@@ -536,19 +520,16 @@ private fun HomePage(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.ic_comment,
                     title = "空间秒评",
                     subtitle = commentText,
                     checked = qzoneAutoComment,
                     onCheckedChange = onCommentToggle,
-                    onClick = onCommentTextClick,
-                    showArrow = true
+                    onClick = onCommentTextClick
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.mood,
                     title = "定时发说说 +0.5天",
                     subtitle = run {
                         val preview = if (moodText.length > 18) moodText.take(18) + "…" else moodText
@@ -556,8 +537,7 @@ private fun HomePage(
                     },
                     checked = moodEnabled,
                     onCheckedChange = onMoodToggle,
-                    onClick = onMoodConfigClick,
-                    showArrow = true
+                    onClick = onMoodConfigClick
                 )
 
             }
@@ -565,46 +545,24 @@ private fun HomePage(
 
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ComposeBox(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(AccentBlue.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                        painter = androidx.compose.ui.res.painterResource(R.drawable.chat),
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                "聊天功能",
-                                fontSize = 18.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = colors.textPrimary
-                            )
-                            Spacer(modifier = Modifier.height(4.dp))
-                            Text(
-                                "闪照破解、视频转泡泡等",
-                                fontSize = 13.sp,
-                                color = colors.textSecondary
-                            )
-                        }
-                }
+                Text(
+                    "聊天功能",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "闪照破解、视频转泡泡等",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = colors.textSecondary.copy(0.08f))
                 Spacer(modifier = Modifier.height(16.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.eye_on,
                     title = "闪照破解",
                     subtitle = "闪照直接查看，无需长按",
                     checked = flashPicBypass,
@@ -614,7 +572,6 @@ private fun HomePage(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.emotion,
                     title = "表情/泡泡/视频/语音下载",
                     subtitle = "长按消息保存到相册",
                     checked = downloadEmotion,
@@ -625,7 +582,6 @@ private fun HomePage(
                     Spacer(modifier = Modifier.height(12.dp))
 
                     SettingSwitchItem(
-                        icon = R.drawable.bubble,
                         title = "视频转泡泡消息",
                         subtitle = "发送视频时，自动替换为泡泡",
                         checked = videoToBubble,
@@ -636,7 +592,6 @@ private fun HomePage(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.poke,
                     title = "取消拍一拍时间限制",
                     subtitle = "解除拍一拍时间限制",
                     checked = antiPokeDelay,
@@ -646,7 +601,6 @@ private fun HomePage(
                 if (HostInfo.isTIM) {
                     Spacer(modifier = Modifier.height(12.dp))
                     SettingSwitchItem(
-                        icon = R.drawable.card,
                         title = "TIM卡片阻断绕过",
                         subtitle = "解除低版本TIM对Ark卡片跳转的限制",
                         checked = timArkCardBypass,
@@ -658,48 +612,26 @@ private fun HomePage(
 
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    ComposeBox(
-                        modifier = Modifier
-                            .size(40.dp)
-                            .clip(RoundedCornerShape(12.dp))
-                            .background(AccentOrange.copy(alpha = 0.12f)),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Image(
-                        painter = androidx.compose.ui.res.painterResource(R.drawable.profile),
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    }
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "资料卡",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "上传透明头像等",
-                            fontSize = 13.sp,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
+                Text(
+                    "资料卡",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "上传透明头像等，名片回赞",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = colors.textSecondary.copy(0.08f))
                 Spacer(modifier = Modifier.height(16.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.ic_image,
                     title = "半透明头像上传",
-                    subtitle = "可上传(群)头像、(群)名片等，不用时请关闭",
+                    subtitle = "可上传(群)头像、名片等，不用则关",
                     checked = transparentAvatar,
                     onCheckedChange = onTransparentAvatarToggle
                 )
@@ -707,7 +639,6 @@ private fun HomePage(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingSwitchItem(
-                    icon = R.drawable.like,
                     title = "名片自动回赞",
                     subtitle = "收到名片点赞自动回赞",
                     checked = profileAutoLikeBack,
@@ -718,38 +649,24 @@ private fun HomePage(
 
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = androidx.compose.ui.res.painterResource(R.drawable.svip),
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "等级加速",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "00:00时自动空间打卡，qq日签打卡，大会员签到，自动加好友",
-                            fontSize = 13.sp,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
+                Text(
+                    "等级加速",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "00:00时自动空间打卡，qq日签打卡，大会员签到，自动加好友",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = colors.textSecondary.copy(0.08f))
                 Spacer(modifier = Modifier.height(16.dp))
 
-                SettingSwitchItemPlainIcon(
-                    icon = R.drawable.mood,
+                SettingSwitchItem(
                     title = "空间等级签到",
                     subtitle = "自动执行空间打卡 +0.5天",
                     checked = qzoneCheckinEnabled,
@@ -758,8 +675,7 @@ private fun HomePage(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItemPlainIcon(
-                    icon = R.drawable.signin,
+                SettingSwitchItem(
                     title = "QQ 日签打卡",
                     subtitle = "自动执行日签打卡 +0.5天",
                     checked = dailySignEnabled,
@@ -768,8 +684,7 @@ private fun HomePage(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItemPlainIcon(
-                    icon = R.drawable.bigvip,
+                SettingSwitchItem(
                     title = "大会员签到",
                     subtitle = "自动执行（无需开通大会员） +0.5天",
                     checked = bigVipCheckinEnabled,
@@ -778,8 +693,7 @@ private fun HomePage(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItemPlainIcon(
-                    icon = R.drawable.add,
+                SettingSwitchItem(
                     title = "自动加好友",
                     subtitle = "自动添加3个好友 +1.5天",
                     checked = levelBoostEnabled,
@@ -788,8 +702,7 @@ private fun HomePage(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItemPlainIcon(
-                    icon = R.drawable.eye_on,
+                SettingSwitchItem(
                     title = "空间浏览",
                     subtitle = "浏览好友说说10条 +0.5天",
                     checked = spaceBrowseEnabled,
@@ -800,31 +713,18 @@ private fun HomePage(
 
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Image(
-                        painter = androidx.compose.ui.res.painterResource(R.drawable.eye_on),
-                        contentDescription = null,
-                        modifier = Modifier.size(40.dp)
-                    )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            "应用保活",
-                            fontSize = 18.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            "应用保活，保持进程可见",
-                            fontSize = 13.sp,
-                            color = colors.textSecondary
-                        )
-                    }
-                }
+                Text(
+                    "应用保活",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "应用保活，保持进程可见，可能会高耗电",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
                 HorizontalDivider(color = colors.textSecondary.copy(0.08f))
@@ -876,13 +776,11 @@ private fun HomePage(
 
 @Composable
 private fun SettingSwitchItem(
-    icon: Int,
     title: String,
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    onClick: (() -> Unit)? = null,
-    showArrow: Boolean = false
+    onClick: (() -> Unit)? = null
 ) {
     val colors = QEdgeTheme.colors
 
@@ -898,24 +796,6 @@ private fun SettingSwitchItem(
             ),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        ComposeBox(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(
-                    if (checked) AccentGreen.copy(alpha = 0.12f)
-                    else colors.textSecondary.copy(alpha = 0.08f)
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                painter = androidx.compose.ui.res.painterResource(icon),
-                contentDescription = null,
-                modifier = Modifier.size(22.dp),
-                tint = if (checked) AccentGreen else colors.textSecondary
-            )
-        }
-        Spacer(modifier = Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 title,
@@ -931,80 +811,6 @@ private fun SettingSwitchItem(
                 maxLines = 1,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
             )
-        }
-        if (showArrow) {
-            Icon(
-                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_chevron_right),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = colors.textSecondary.copy(alpha = 0.4f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
-        }
-        QEdgeSwitch(checked = checked, onCheckedChange = onCheckedChange)
-    }
-}
-
-/**
- * 带开关的设置项（原生彩色图标版本）
- * 不套 AccentGreen 背景圆角、不做 tint 变色，直接按 drawable 原图（彩色/png 原色）绘制。
- * 其他布局/行为与 SettingSwitchItem 完全一致：可点击整行、showArrow 箭头、右侧 QEdgeSwitch。
- */
-@Composable
-private fun SettingSwitchItemPlainIcon(
-    icon: Int,
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit,
-    onClick: (() -> Unit)? = null,
-    showArrow: Boolean = false
-) {
-    val colors = QEdgeTheme.colors
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .then(
-                if (onClick != null) Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onClick
-                ) else Modifier
-            ),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        // 直接画原 drawable，不做背景、不做 tint，保留原始颜色/形状
-        Image(
-            painter = androidx.compose.ui.res.painterResource(icon),
-            contentDescription = null,
-            modifier = Modifier.size(40.dp)
-        )
-        Spacer(modifier = Modifier.width(14.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                title,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = colors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                subtitle,
-                fontSize = 12.sp,
-                color = colors.textSecondary,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-            )
-        }
-        if (showArrow) {
-            Icon(
-                painter = androidx.compose.ui.res.painterResource(R.drawable.ic_chevron_right),
-                contentDescription = null,
-                modifier = Modifier.size(18.dp),
-                tint = colors.textSecondary.copy(alpha = 0.4f)
-            )
-            Spacer(modifier = Modifier.width(8.dp))
         }
         QEdgeSwitch(checked = checked, onCheckedChange = onCheckedChange)
     }

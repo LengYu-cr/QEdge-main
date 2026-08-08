@@ -1,8 +1,8 @@
 package me.lengyu.qedge.ui.pages.coldrain
 
 import android.content.Context
-import android.os.Environment
 import java.io.File
+import me.lengyu.qedge.utils.QQCurrentEnv
 
 object ColdRainConfig {
     private const val TAG = "ColdRainConfig"
@@ -10,7 +10,7 @@ object ColdRainConfig {
     private var isInitialized = false
 
     fun getLocalPath(): String {
-        return Environment.getExternalStorageDirectory().path + "/"
+        return QQCurrentEnv.getLocalPath()
     }
 
     fun init(context: Context): Boolean {

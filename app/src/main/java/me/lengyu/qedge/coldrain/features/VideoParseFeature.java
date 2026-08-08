@@ -22,6 +22,7 @@ public class VideoParseFeature implements ColdRainFeature {
             return true;
         }
         if (text.contains("https://v.douyin.com/")) return true;
+        if (text.contains("https://www.douyin.com/user/")) return true;
         if (text.contains("https://v.kuaishou.com/")) return true;
         if (text.contains("https://b23.tv/")) return true;
         if (text.contains("http://xhslink.com/")) return true;
@@ -48,7 +49,8 @@ public class VideoParseFeature implements ColdRainFeature {
                 String menu = "解析菜单:\nTips:1.开启后直接发链接(可加文字)\n" +
                     "仅支持快手，抖音，小红书，哔哩哔哩，皮皮虾，西瓜视频的视频/图集解析\n" +
                     "2.支持QQ小世界解析(转发卡片)\n" +
-                    "3.支持微信公众号/QQ频道图集/视频解析";
+                    "3.支持微信公众号/QQ频道图集/视频解析\n" +
+                    "4.支持抖音用户主页解析";
                 sendMsg(msgData, menu);
                 return;
             } else {
@@ -83,7 +85,7 @@ public class VideoParseFeature implements ColdRainFeature {
         String peerUin = msgData.peerUin;
         int mtype = msgData.type;
 
-        if (text.contains("https://v.douyin.com/")) {
+        if (text.contains("https://v.douyin.com/") || text.contains("https://www.douyin.com/user/")) {
             String sl = findRealUrl(text);
             String url = MY_API + "API/ly/dyjx.php?url=" + urlEncode(sl);
             String sj = HttpUtils.get(url);
@@ -156,6 +158,31 @@ public class VideoParseFeature implements ColdRainFeature {
                             sendImg(msgData, images.getString(i));
                         }
                     }
+                } else if ("主页".equals(type)) {
+                    JSONObject author = data1.getJSONObject("author");
+                    JSONObject stats = data1.getJSONObject("statistics");
+                    String avatar = author.optString("avatar", "");
+                    String name = author.optString("name", "未知");
+                    String gender = author.optString("gender", "未知");
+                    String signature = author.optString("signature", "");
+                    long following = stats.optLong("following_count", 0);
+                    long follower = stats.optLong("follower_count", 0);
+                    long totalFavorited = stats.optLong("total_favorited", 0);
+                    long awemeCount = stats.optLong("aweme_count", 0);
+                    StringBuilder sb = new StringBuilder();
+                    if (!avatar.isEmpty()) {
+                        sb.append("[pic=").append(avatar).append("]\n");
+                    }
+                    sb.append("昵称:").append(name).append("\n");
+                    sb.append("性别:").append(gender).append("\n");
+                    sb.append("关注:").append(following).append("\n");
+                    sb.append("粉丝:").append(follower).append("\n");
+                    sb.append("获赞:").append(totalFavorited).append("\n");
+                    sb.append("作品:").append(awemeCount);
+                    if (!signature.isEmpty()) {
+                        sb.append("\n签名:").append(signature);
+                    }
+                    sendMsg(msgData, sb.toString());
                 }
             } else {
                 sendMsg(msgData, sj);
@@ -219,16 +246,44 @@ public class VideoParseFeature implements ColdRainFeature {
                 String msg = json.getString("msg");
                 if ("获取成功".equals(msg)) {
                     JSONObject data1 = json.getJSONObject("data");
-                    String cover = data1.getString("cover");
-                    String video = data1.getString("video");
-                    String title = data1.getString("title");
-                    String duration = data1.getJSONObject("origin").getString("duration_format");
-                    String author = json.getJSONObject("author").getString("name");
-                    String desc = data1.getString("desc");
-                    String publish_time = data1.getString("publish_time");
-                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n时长:" + duration + "\n发布时间:" + publish_time + "\n视频发送中...");
-                    sendVideo(msgData, video);
+                    String type = json.optString("type", "");
+                    String cover = data1.optString("cover", "");
+                    String title = data1.optString("title", "");
+                    String author = json.optJSONObject("author") != null
+                        ? json.getJSONObject("author").optString("name", "未知") : "未知";
+                    String publishTime = data1.optString("publish_time", "");
+                    if ("图集".equals(type)) {
+                        JSONArray images = data1.optJSONArray("images");
+                        int imgCount = images != null ? images.length() : 0;
+                        StringBuilder sb = new StringBuilder();
+                        if (!cover.isEmpty()) sb.append("[pic=").append(cover).append("]\n");
+                        sb.append("标题:").append(title).append("\n作者:").append(author);
+                        if (!publishTime.isEmpty()) sb.append("\n发布时间:").append(publishTime);
+                        sb.append("\n图集发送中...(").append(imgCount).append("张图片)");
+                        sendMsg(msgData, sb.toString());
+                        if (images != null) {
+                            for (int i = 0; i < images.length(); i++) {
+                                sendImg(msgData, images.getString(i));
+                            }
+                        }
+                    } else if ("视频".equals(type)) {
+                        String video = data1.optString("video", "");
+                        JSONArray pages = data1.optJSONArray("pages");
+                        String duration = "";
+                        if (pages != null && pages.length() > 0) {
+                            duration = pages.getJSONObject(0).optString("duration_format", "");
+                        }
+                        StringBuilder sb = new StringBuilder();
+                        if (!cover.isEmpty()) sb.append("[pic=").append(cover).append("]\n");
+                        sb.append("标题:").append(title).append("\n作者:").append(author);
+                        if (!duration.isEmpty()) sb.append("\n时长:").append(duration);
+                        if (!publishTime.isEmpty()) sb.append("\n发布时间:").append(publishTime);
+                        sb.append("\n视频发送中...");
+                        sendMsg(msgData, sb.toString());
+                        if (!video.isEmpty()) {
+                            sendVideo(msgData, video);
+                        }
+                    }
                 } else {
                     sendMsg(msgData, "出现错误:" + json.optString("msg"));
                 }
@@ -241,7 +296,7 @@ public class VideoParseFeature implements ColdRainFeature {
         if (text.contains("http://xhslink.com/") ||
             text.contains("https://h5.pipix.com/s/")) {
             String sl = findRealUrl(text);
-            String url = MY_API + "API/spjx/api.php?url=" + urlEncode(sl);
+            String url = MY_API + "API/ly/spjx.php?url=" + urlEncode(sl);
             String sj = HttpUtils.get(url);
             if (sj == null || sj.isEmpty()) {
                 sendMsg(msgData, "请求服务器出错");

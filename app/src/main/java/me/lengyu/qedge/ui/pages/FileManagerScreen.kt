@@ -68,7 +68,7 @@ fun FileManagerScreen(
 ) {
     val colors = QEdgeTheme.colors
     val context = androidx.compose.ui.platform.LocalContext.current
-    val defaultPath = "/storage/emulated/0/Android/data/" + HostInfo.packageName + "/"
+    val defaultPath = me.lengyu.qedge.utils.QQCurrentEnv.getHostPath()
 
     var leftPath by remember { mutableStateOf(defaultPath) }
     var rightPath by remember { mutableStateOf(defaultPath) }
@@ -129,7 +129,7 @@ fun FileManagerScreen(
 
     fun navigateUp() {
         val parent = File(currentPath).parent
-        if (parent != null && currentPath != "/" && currentPath != "/storage/emulated/0") {
+        if (parent != null && currentPath != "/" && currentPath != android.os.Environment.getExternalStorageDirectory().absolutePath) {
             if (activePanel == PanelSide.LEFT) {
                 leftPath = parent
                 leftSelectedFiles = emptySet()

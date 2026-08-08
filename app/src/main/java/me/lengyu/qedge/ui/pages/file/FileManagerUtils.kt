@@ -9,12 +9,13 @@ import java.io.IOException
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import me.lengyu.qedge.utils.HostInfo
+import me.lengyu.qedge.utils.QQCurrentEnv
 
 object FileManagerUtils {
 
     private const val PREFS_NAME = "file_manager_prefs"
     private const val KEY_HOME_PATH = "home_path"
-    private val DEFAULT_QQ_PATH = "/storage/emulated/0/Android/data/" + HostInfo.packageName + "/"
+    private val DEFAULT_QQ_PATH = QQCurrentEnv.getLocalPath() + "Android/data/" + HostInfo.packageName + "/"
 
     fun getHomePath(context: Context): String {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)

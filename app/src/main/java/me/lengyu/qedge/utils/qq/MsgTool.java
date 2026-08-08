@@ -298,7 +298,12 @@ public class MsgTool {
                         LogUtils.e("MsgTool", "file not exists: " + videoPath);
                         return;
                     }
-                    msgElement = msgUtilApiImpl.createVideoElement(videoPath);
+                    if (videoFile.length() >= 200L * 1024 * 1024) {
+                        LogUtils.d("MsgTool", "视频体积" + (videoFile.length() / 1024 / 1024) + "MB>=200MB，转为文件发送");
+                        msgElement = msgUtilApiImpl.createFileElement(videoPath);
+                    } else {
+                        msgElement = msgUtilApiImpl.createVideoElement(videoPath);
+                    }
                     break;
                 case "file":
                     String filePath = handleFilePath(value);
@@ -680,7 +685,22 @@ public class MsgTool {
 
     public static void sendBubbleVideo(Contact contact, String videoPath) {
         try {
-            MsgElement bubbleElement = createBubbleVideoElement(videoPath);
+            String localPath = handleVideoPath(videoPath);
+            if (localPath == null) {
+                LogUtils.e("MsgTool", "泡泡视频路径无效: " + videoPath);
+                return;
+            }
+            File videoFile = new File(localPath);
+            if (!videoFile.exists()) {
+                LogUtils.e("MsgTool", "泡泡视频文件不存在: " + videoPath);
+                return;
+            }
+            if (videoFile.length() >= 200L * 1024 * 1024) {
+                LogUtils.d("MsgTool", "泡泡视频体积" + (videoFile.length() / 1024 / 1024) + "MB>=200MB，转为文件发送");
+                sendFile(contact, localPath);
+                return;
+            }
+            MsgElement bubbleElement = createBubbleVideoElement(localPath);
             if (bubbleElement == null) {
                 return;
             }

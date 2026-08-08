@@ -190,7 +190,7 @@ fun FileListPanel(
                     }
                 } else {
                     val parentFile = File(path).parentFile
-                    val hasParent = parentFile != null && path != "/" && path != "/storage/emulated/0"
+                    val hasParent = parentFile != null && path != "/" && path != android.os.Environment.getExternalStorageDirectory().absolutePath
                     LazyColumn(
                         state = listState,
                         modifier = Modifier.fillMaxSize(),
