@@ -23,6 +23,7 @@ public class AvatarMenuFeature implements ColdRainFeature {
 
     @Override
     public void handle(MsgData msgData, ColdRainCore core) {
+        if (!core.isAdminOrSelf(msgData)) return;
         final String text = msgData.msg.trim();
 
         if (text.equals("头像菜单")) {

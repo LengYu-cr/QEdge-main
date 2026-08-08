@@ -183,6 +183,33 @@ public class VideoParseFeature implements ColdRainFeature {
                         sb.append("\n签名:").append(signature);
                     }
                     sendMsg(msgData, sb.toString());
+                } else if ("音乐".equals(type)) {
+                    JSONObject music = data1.optJSONObject("music");
+                    String cover = data1.optString("cover", "");
+                    String title = music != null ? music.optString("title", data1.optString("desc", "")) : data1.optString("desc", "");
+                    String musicAuthor = music != null ? music.optString("author", "") : "";
+                    int duration = music != null ? music.optInt("duration", 0) : 0;
+                    String musicUrl = data1.optString("url", "");
+                    if (musicUrl.isEmpty() && music != null) {
+                        musicUrl = music.optString("url", "");
+                    }
+                    JSONObject count = data1.optJSONObject("count");
+                    StringBuilder sb = new StringBuilder();
+                    if (!cover.isEmpty()) sb.append("[pic=").append(cover).append("]\n");
+                    sb.append("歌名:").append(title);
+                    if (!musicAuthor.isEmpty()) sb.append("\n歌手:").append(musicAuthor);
+                    if (duration > 0) sb.append("\n时长:").append(String.format("%02d:%02d", duration / 60, duration % 60));
+                    if (count != null) {
+                        sb.append("\n喜欢:").append(count.optLong("like", 0));
+                        sb.append("\n评论:").append(count.optLong("comment", 0));
+                        sb.append("\n分享:").append(count.optLong("share", 0));
+                        sb.append("\n收藏:").append(count.optLong("collect", 0));
+                    }
+                    sb.append("\n音乐发送中...");
+                    sendMsg(msgData, sb.toString());
+                    if (!musicUrl.isEmpty()) {
+                        sendPtt(msgData, musicUrl);
+                    }
                 }
             } else {
                 sendMsg(msgData, sj);
@@ -499,6 +526,15 @@ public class VideoParseFeature implements ColdRainFeature {
         try {
             if (videoUrl == null || videoUrl.isEmpty()) return;
             MsgTool.sendVideo(msgData.peerUin, videoUrl, msgData.type);
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+    }
+
+    private static void sendPtt(MsgData msgData, String pttUrl) {
+        try {
+            if (pttUrl == null || pttUrl.isEmpty()) return;
+            MsgTool.sendPtt(msgData.peerUin, pttUrl, msgData.type);
         } catch (Throwable e) {
             e.printStackTrace();
         }
