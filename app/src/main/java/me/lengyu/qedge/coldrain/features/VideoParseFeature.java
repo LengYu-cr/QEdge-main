@@ -22,6 +22,7 @@ public class VideoParseFeature implements ColdRainFeature {
             return true;
         }
         if (text.contains("https://v.douyin.com/")) return true;
+        if (text.contains("https://qishui.douyin.com/s/")) return true;
         if (text.contains("https://www.douyin.com/user/")) return true;
         if (text.contains("https://v.kuaishou.com/")) return true;
         if (text.contains("https://b23.tv/")) return true;
@@ -29,6 +30,7 @@ public class VideoParseFeature implements ColdRainFeature {
         if (text.contains("https://h5.pipix.com/s/")) return true;
         if (text.contains("https://pd.qq.com/s/")) return true;
         if (text.contains("https://mp.weixin.qq.com/s/")) return true;
+        if (text.contains("https://s.viviv.com/")) return true;
         return false;
     }
 
@@ -396,6 +398,58 @@ public class VideoParseFeature implements ColdRainFeature {
                     for (int i = 0; i < ttp.length(); i++) {
                         sendImg(msgData, ttp.getString(i));
                     }
+                }
+            } else {
+                sendMsg(msgData, sj);
+            }
+            return;
+        }
+
+        if (text.contains("https://s.viviv.com/")) {
+            String sl = findRealUrl(text);
+            String url = MY_WEB + "hsjx.php?url=" + urlEncode(sl);
+            String sj = HttpUtils.get(url);
+            if (sj == null || sj.isEmpty()) {
+                sendMsg(msgData, "请求服务器出错");
+                return;
+            }
+            JSONObject json = new JSONObject(sj);
+            String msg = json.optString("msg");
+            if ("获取成功".equals(msg)) {
+                String type = json.getString("type");
+                JSONObject data1 = json.getJSONObject("data");
+                if ("视频".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String video = data1.getString("video");
+                    String title = data1.getString("desc");
+                    String lyric = data1.getJSONObject("origin_music").optString("lyric");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                        "\n歌词:" + lyric + "\n视频发送中...");
+                    sendVideo(msgData, video);
+                } else if ("语音".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String audio = data1.getString("audio");
+                    String title = data1.getString("desc");
+                    String lyric = data1.optString("lyric");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                        "\n歌词:" + lyric + "\n语音发送中...");
+                    sendPtt(msgData, audio);
+                } else if ("文字".equals(type)) {
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "标题:" + title + "\n作者:" + author +
+                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                        "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view")
+                    );
                 }
             } else {
                 sendMsg(msgData, sj);
