@@ -22,6 +22,7 @@ public class VideoParseFeature implements ColdRainFeature {
             return true;
         }
         if (text.contains("https://v.douyin.com/")) return true;
+        if (text.contains("https://qishui.douyin.com/s/")) return true;
         if (text.contains("https://www.douyin.com/user/")) return true;
         if (text.contains("https://v.kuaishou.com/")) return true;
         if (text.contains("https://b23.tv/")) return true;
@@ -29,6 +30,7 @@ public class VideoParseFeature implements ColdRainFeature {
         if (text.contains("https://h5.pipix.com/s/")) return true;
         if (text.contains("https://pd.qq.com/s/")) return true;
         if (text.contains("https://mp.weixin.qq.com/s/")) return true;
+        if (text.contains("https://s.viviv.com/")) return true;
         return false;
     }
 
@@ -47,10 +49,10 @@ public class VideoParseFeature implements ColdRainFeature {
             }
             if (enabled) {
                 String menu = "解析菜单:\nTips:1.开启后直接发链接(可加文字)\n" +
-                    "仅支持快手，抖音，小红书，哔哩哔哩，皮皮虾，西瓜视频的视频/图集解析\n" +
-                    "2.支持QQ小世界解析(转发卡片)\n" +
-                    "3.支持微信公众号/QQ频道图集/视频解析\n" +
-                    "4.支持抖音用户主页解析";
+                        "仅支持快手，抖音，小红书，哔哩哔哩，皮皮虾，西瓜视频的视频/图集解析\n" +
+                        "2.支持QQ小世界解析(转发卡片)\n" +
+                        "3.支持微信公众号/QQ频道图集/视频解析\n" +
+                        "4.支持抖音用户主页解析";
                 sendMsg(msgData, menu);
                 return;
             } else {
@@ -105,9 +107,9 @@ public class VideoParseFeature implements ColdRainFeature {
                     JSONObject count = data1.getJSONObject("count");
                     String author = data1.getJSONObject("author").getString("name");
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
-                        "\n视频发送中...");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                            "\n视频发送中...");
                     sendVideo(msgData, video);
                 } else if ("图集".equals(type)) {
                     String cover = data1.getString("cover");
@@ -116,9 +118,9 @@ public class VideoParseFeature implements ColdRainFeature {
                     JSONObject count = data1.getJSONObject("count");
                     String author = data1.getJSONObject("author").getString("name");
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
-                        "\n图集发送中...");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                            "\n图集发送中...");
                     for (int i = 0; i < ttp.length(); i++) {
                         sendImg(msgData, ttp.getString(i));
                     }
@@ -129,9 +131,9 @@ public class VideoParseFeature implements ColdRainFeature {
                     String author = data1.getJSONObject("author").getString("name");
                     JSONArray ttp = data1.getJSONArray("videos");
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
-                        "\n视频集合发送中...(共" + ttp.length() + "个视频)");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                            "\n视频集合发送中...(共" + ttp.length() + "个视频)");
                     for (int i = 0; i < ttp.length(); i++) {
                         sendVideo(msgData, ttp.getString(i));
                     }
@@ -145,9 +147,9 @@ public class VideoParseFeature implements ColdRainFeature {
                     int vCount = videos != null ? videos.length() : 0;
                     int iCount = images != null ? images.length() : 0;
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
-                        "\n视频+图集发送中...(共" + vCount + "个视频," + iCount + "张图片)");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                            "\n视频+图集发送中...(共" + vCount + "个视频," + iCount + "张图片)");
                     if (videos != null) {
                         for (int i = 0; i < videos.length(); i++) {
                             sendVideo(msgData, videos.getString(i));
@@ -237,9 +239,9 @@ public class VideoParseFeature implements ColdRainFeature {
                     JSONObject count = data1.getJSONObject("count");
                     String author = data1.getJSONObject("author").getString("name");
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
-                        "\n视频发送中...");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                            "\n视频发送中...");
                     sendVideo(msgData, video);
                 } else if ("图集".equals(type)) {
                     String cover = data1.getString("cover");
@@ -248,9 +250,9 @@ public class VideoParseFeature implements ColdRainFeature {
                     JSONObject count = data1.getJSONObject("count");
                     String author = data1.getJSONObject("author").getString("name");
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
-                        "\n图集发送中...");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n收藏数:" + count.getLong("collect") +
+                            "\n图集发送中...");
                     for (int i = 0; i < ttp.length(); i++) {
                         sendImg(msgData, ttp.getString(i));
                     }
@@ -277,7 +279,7 @@ public class VideoParseFeature implements ColdRainFeature {
                     String cover = data1.optString("cover", "");
                     String title = data1.optString("title", "");
                     String author = json.optJSONObject("author") != null
-                        ? json.getJSONObject("author").optString("name", "未知") : "未知";
+                            ? json.getJSONObject("author").optString("name", "未知") : "未知";
                     String publishTime = data1.optString("publish_time", "");
                     if ("图集".equals(type)) {
                         JSONArray images = data1.optJSONArray("images");
@@ -321,7 +323,7 @@ public class VideoParseFeature implements ColdRainFeature {
         }
 
         if (text.contains("http://xhslink.com/") ||
-            text.contains("https://h5.pipix.com/s/")) {
+                text.contains("https://h5.pipix.com/s/")) {
             String sl = findRealUrl(text);
             String url = MY_API + "API/ly/spjx.php?url=" + urlEncode(sl);
             String sj = HttpUtils.get(url);
@@ -379,9 +381,9 @@ public class VideoParseFeature implements ColdRainFeature {
                     JSONObject count = data1.getJSONObject("count");
                     String author = data1.getJSONObject("author").getString("name");
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
-                        "\n视频发送中...");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                            "\n视频发送中...");
                     sendVideo(msgData, video);
                 } else if ("图集".equals(type)) {
                     String cover = data1.getString("cover");
@@ -390,12 +392,64 @@ public class VideoParseFeature implements ColdRainFeature {
                     JSONObject count = data1.getJSONObject("count");
                     String author = data1.getJSONObject("author").getString("name");
                     sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
-                        "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
-                        "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
-                        "\n图集发送中...");
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                            "\n图集发送中...");
                     for (int i = 0; i < ttp.length(); i++) {
                         sendImg(msgData, ttp.getString(i));
                     }
+                }
+            } else {
+                sendMsg(msgData, sj);
+            }
+            return;
+        }
+
+        if (text.contains("https://s.viviv.com/")) {
+            String sl = findRealUrl(text);
+            String url = MY_WEB + "hsjx.php?url=" + urlEncode(sl);
+            String sj = HttpUtils.get(url);
+            if (sj == null || sj.isEmpty()) {
+                sendMsg(msgData, "请求服务器出错");
+                return;
+            }
+            JSONObject json = new JSONObject(sj);
+            String msg = json.optString("msg");
+            if ("获取成功".equals(msg)) {
+                String type = json.getString("type");
+                JSONObject data1 = json.getJSONObject("data");
+                if ("视频".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String video = data1.getString("video");
+                    String title = data1.getString("desc");
+                    String lyric = data1.getJSONObject("origin_music").optString("lyric");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                            "\n歌词:" + lyric + "\n视频发送中...");
+                    sendVideo(msgData, video);
+                } else if ("语音".equals(type)) {
+                    String cover = data1.getString("cover");
+                    String audio = data1.getString("audio");
+                    String title = data1.getString("desc");
+                    String lyric = data1.optString("lyric");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "[pic=" + cover + "]\n标题:" + title + "\n作者:" + author +
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view") +
+                            "\n歌词:" + lyric + "\n语音发送中...");
+                    sendPtt(msgData, audio);
+                } else if ("文字".equals(type)) {
+                    String title = data1.getString("desc");
+                    JSONObject count = data1.getJSONObject("count");
+                    String author = data1.getJSONObject("author").getString("name");
+                    sendMsg(msgData, "标题:" + title + "\n作者:" + author +
+                            "\n喜欢数:" + count.getLong("like") + "\n评论数:" + count.getLong("comment") +
+                            "\n分享数:" + count.getLong("share") + "\n浏览数:" + count.getLong("view")
+                    );
                 }
             } else {
                 sendMsg(msgData, sj);
@@ -467,8 +521,8 @@ public class VideoParseFeature implements ColdRainFeature {
     private static String findRealUrl(String text) {
         try {
             java.util.regex.Matcher matcher = java.util.regex.Pattern
-                .compile("(https?://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|])")
-                .matcher(text);
+                    .compile("(https?://[-A-Za-z0-9+&@#/%?=~_|!:,.;]+[-A-Za-z0-9+&@#/%=~_|])")
+                    .matcher(text);
             if (matcher.find()) {
                 return matcher.group(1);
             }
@@ -486,9 +540,9 @@ public class VideoParseFeature implements ColdRainFeature {
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             conn.setRequestProperty("User-Agent",
-                "Mozilla/5.0 (Linux; Android 10; MI 9 Build/QKQ1.190825.002; wv) " +
-                "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/87.0.4280.101 " +
-                "Mobile Safari/537.36");
+                    "Mozilla/5.0 (Linux; Android 10; MI 9 Build/QKQ1.190825.002; wv) " +
+                            "AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/87.0.4280.101 " +
+                            "Mobile Safari/537.36");
             conn.connect();
             String redirect = conn.getHeaderField("Location");
             conn.disconnect();
