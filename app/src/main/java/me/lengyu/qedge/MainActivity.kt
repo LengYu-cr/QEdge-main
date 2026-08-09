@@ -8,16 +8,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -32,21 +23,30 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import me.lengyu.qedge.ui.pages.home.MainScreen
-import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import me.lengyu.qedge.ui.components.dialogs.UpdateDialog
 import me.lengyu.qedge.ui.core.compatibility.QEdgeCenterDialog
-
+import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.ui.pages.home.HomeUpdateStatus
+import me.lengyu.qedge.ui.pages.home.MainScreen
 import org.json.JSONObject
+import java.lang.Runnable
 
 class MainActivity : ComponentActivity() {
 
-    private var isLatestVersion by mutableStateOf(true)
-    private var isCheckingUpdate by mutableStateOf(false)
+    private var updateStatus by mutableStateOf(HomeUpdateStatus.IDLE)
     private var latestVersionName = ""
     private var latestUpdateLog = ""
     private var latestDownloadUrl = ""
-    private var updateLogText = ""
+    private var updateLogText by mutableStateOf("")
+    private var updateJob: Job? = null
+    private var changelogJob: Job? = null
+    private var changelogDialog: QEdgeCenterDialog? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,31 +58,13 @@ class MainActivity : ComponentActivity() {
             QEdgeTheme {
                 MainScreen(
                     versionName = BuildConfig.VERSION_NAME,
-                    versionCode = BuildConfig.VERSION_CODE,
-                    isLatestVersion = isLatestVersion,
-                    isCheckingUpdate = isCheckingUpdate,
-                    onQQGroupClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://qm.qq.com/q/ElvGZvBrZC"))
-                        startActivity(intent)
-                    },
-                    onTGClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://t.me/+St91SS8CLNUyMDY1"))
-                        startActivity(intent)
-                    },
-                    onUserBackendClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://v.yuafeng.cn/QEdge/user/index.php"))
-                        startActivity(intent)
-                    },
-                    onQFunClick = {
-                        val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/oneQAQone/QFun"))
-                        startActivity(intent)
-                    },
-                    onUpdateLogClick = {
-                        showUpdateLogDialog()
-                    },
-                    onCheckUpdateClick = {
-                        checkUpdate(showToast = true)
-                    }
+                    updateStatus = updateStatus,
+                    onQQGroupClick = { openUrl(QQ_GROUP_URL) },
+                    onTGClick = { openUrl(TELEGRAM_URL) },
+                    onUserBackendClick = { openUrl(USER_BACKEND_URL) },
+                    onUpdateLogClick = ::showUpdateLogDialog,
+                    onCheckUpdateClick = { checkUpdate(showToast = true) },
+                    onLaunchQQClick = ::launchQQ
                 )
             }
         }
@@ -91,60 +73,59 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun checkUpdate(showToast: Boolean) {
-        if (isCheckingUpdate) return
-        isCheckingUpdate = true
+        if (updateJob?.isActive == true) return
+        updateStatus = HomeUpdateStatus.CHECKING
 
-        Thread {
+        updateJob = lifecycleScope.launch {
             try {
-                val url = java.net.URL(
-                    "https://v.yuafeng.cn/QEdge/update/check.php?version_code=${BuildConfig.VERSION_CODE}"
-                )
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.connectTimeout = 10000
-                connection.readTimeout = 10000
-                connection.requestMethod = "GET"
-
-                val reader = java.io.BufferedReader(
-                    java.io.InputStreamReader(connection.inputStream, "UTF-8")
-                )
-                val response = java.lang.StringBuilder()
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    response.append(line)
+                val json = withContext(Dispatchers.IO) {
+                    requestJson(
+                        url = "$UPDATE_CHECK_URL?version_code=${BuildConfig.VERSION_CODE}",
+                        timeoutMillis = 10_000
+                    )
                 }
-                reader.close()
-
-                val json = JSONObject(response.toString())
-                if (json.getInt("code") == 200) {
-                    val data = json.getJSONObject("data")
-                    val hasUpdate = data.getBoolean("has_update")
-                    latestVersionName = data.getString("latest_version")
-                    latestUpdateLog = data.getString("update_log")
-                    latestDownloadUrl = data.getString("download_url")
-
-                    isLatestVersion = !hasUpdate
-
-                    if (hasUpdate) {
-                        runOnUiThread {
-                            showUpdateDialog()
-                        }
-                    } else if (showToast) {
-                        runOnUiThread {
-                            Toast.makeText(this, "已是最新版本", Toast.LENGTH_SHORT).show()
-                        }
+                if (json.getInt("code") != 200) {
+                    updateStatus = HomeUpdateStatus.ERROR
+                    if (showToast) {
+                        Toast.makeText(
+                            this@MainActivity,
+                            json.optString("message", "检查更新失败"),
+                            Toast.LENGTH_SHORT
+                        ).show()
                     }
+                    return@launch
                 }
+
+                val data = json.getJSONObject("data")
+                val hasUpdate = data.getBoolean("has_update")
+                latestVersionName = data.getString("latest_version")
+                latestUpdateLog = data.getString("update_log")
+                latestDownloadUrl = data.getString("download_url")
+                updateStatus = if (hasUpdate) {
+                    HomeUpdateStatus.AVAILABLE
+                } else {
+                    HomeUpdateStatus.LATEST
+                }
+
+                if (hasUpdate) {
+                    showUpdateDialog()
+                } else if (showToast) {
+                    Toast.makeText(this@MainActivity, "已是最新版本", Toast.LENGTH_SHORT).show()
+                }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (e: Exception) {
                 e.printStackTrace()
+                updateStatus = HomeUpdateStatus.ERROR
                 if (showToast) {
-                    runOnUiThread {
-                        Toast.makeText(this, "检查更新失败: ${e.message}", Toast.LENGTH_SHORT).show()
-                    }
+                    Toast.makeText(
+                        this@MainActivity,
+                        "检查更新失败: ${e.message}",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
-            } finally {
-                isCheckingUpdate = false
             }
-        }.start()
+        }
     }
 
     private fun showUpdateDialog() {
@@ -159,26 +140,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun showUpdateLogDialog() {
+        if (changelogDialog?.isShowing == true) return
+
         updateLogText = "加载中..."
-        Thread {
+        changelogDialog = createUpdateLogDialog().also { it.show() }
+
+        changelogJob?.cancel()
+        changelogJob = lifecycleScope.launch {
             try {
-                val url = java.net.URL("https://v.yuafeng.cn/QEdge/update/changelog.php")
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                connection.requestMethod = "GET"
-
-                val reader = java.io.BufferedReader(
-                    java.io.InputStreamReader(connection.inputStream, "UTF-8")
-                )
-                val response = java.lang.StringBuilder()
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    response.append(line)
+                val json = withContext(Dispatchers.IO) {
+                    requestJson(CHANGELOG_URL, timeoutMillis = 5_000)
                 }
-                reader.close()
-
-                val json = JSONObject(response.toString())
                 if (json.getInt("code") == 200) {
                     val data = json.getJSONObject("data")
                     val changelog = data.getJSONArray("changelog")
@@ -201,52 +173,100 @@ class MainActivity : ComponentActivity() {
                 } else {
                     updateLogText = "获取失败"
                 }
+            } catch (cancellation: CancellationException) {
+                throw cancellation
             } catch (e: Exception) {
                 updateLogText = "获取失败: ${e.message}"
             }
+        }
+    }
 
-            runOnUiThread {
-                QEdgeCenterDialog(this) { onDismiss ->
-                    val colors = QEdgeTheme.colors
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth(0.88f)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(colors.cardBackground)
-                            .padding(20.dp)
-                    ) {
-                        Text(
-                            "更新日志",
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.textPrimary
-                        )
-                        Spacer(modifier = Modifier.height(12.dp))
-                        Box(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(300.dp)
-                                .verticalScroll(rememberScrollState())
-                        ) {
-                            Text(
-                                updateLogText,
-                                fontSize = 14.sp,
-                                color = colors.textSecondary,
-                                lineHeight = 20.sp
-                            )
-                        }
-                        Spacer(modifier = Modifier.height(20.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            TextButton(onClick = onDismiss) {
-                                Text("关闭", color = colors.textPrimary)
-                            }
-                        }
+    private fun createUpdateLogDialog(): QEdgeCenterDialog {
+        return QEdgeCenterDialog(this) { onDismiss ->
+            val colors = QEdgeTheme.colors
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth(0.88f)
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(colors.cardBackground)
+                    .padding(20.dp)
+            ) {
+                Text(
+                    "更新日志",
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(300.dp)
+                        .verticalScroll(rememberScrollState())
+                ) {
+                    Text(
+                        updateLogText,
+                        fontSize = 14.sp,
+                        color = colors.textSecondary,
+                        lineHeight = 20.sp
+                    )
+                }
+                Spacer(modifier = Modifier.height(20.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(onClick = onDismiss) {
+                        Text("关闭", color = colors.textPrimary)
                     }
-                }.show()
+                }
             }
-        }.start()
+        }
+    }
+
+    private fun openUrl(url: String) {
+        runCatching {
+            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
+        }.onFailure { error ->
+            Toast.makeText(this, "打开链接失败: ${error.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun launchQQ() {
+        val launchIntent = packageManager.getLaunchIntentForPackage(QQ_PACKAGE_NAME)
+        if (launchIntent == null) {
+            Toast.makeText(this, "未检测到 QQ", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        runCatching { startActivity(launchIntent) }
+            .onFailure { error ->
+                Toast.makeText(this, "启动 QQ 失败: ${error.message}", Toast.LENGTH_SHORT).show()
+            }
+    }
+
+    private fun requestJson(url: String, timeoutMillis: Int): JSONObject {
+        val connection = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+        connection.connectTimeout = timeoutMillis
+        connection.readTimeout = timeoutMillis
+        connection.requestMethod = "GET"
+
+        return try {
+            val response = connection.inputStream
+                .bufferedReader(Charsets.UTF_8)
+                .use { it.readText() }
+            JSONObject(response)
+        } finally {
+            connection.disconnect()
+        }
+    }
+
+    private companion object {
+        const val QQ_GROUP_URL = "https://qm.qq.com/q/ElvGZvBrZC"
+        const val TELEGRAM_URL = "https://t.me/+St91SS8CLNUyMDY1"
+        const val USER_BACKEND_URL = "https://v.yuafeng.cn/QEdge/user/index.php"
+        const val QQ_PACKAGE_NAME = "com.tencent.mobileqq"
+        const val UPDATE_CHECK_URL = "https://v.yuafeng.cn/QEdge/update/check.php"
+        const val CHANGELOG_URL = "https://v.yuafeng.cn/QEdge/update/changelog.php"
     }
 }
