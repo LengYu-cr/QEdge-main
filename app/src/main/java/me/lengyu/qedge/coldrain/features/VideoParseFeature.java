@@ -85,7 +85,7 @@ public class VideoParseFeature implements ColdRainFeature {
         String peerUin = msgData.peerUin;
         int mtype = msgData.type;
 
-        if (text.contains("https://v.douyin.com/") || text.contains("https://www.douyin.com/user/")) {
+        if (text.contains("https://v.douyin.com/") || text.contains("https://qishui.douyin.com/s/") || text.contains("https://www.douyin.com/user/")) {
             String sl = findRealUrl(text);
             String url = MY_API + "API/ly/dyjx.php?url=" + urlEncode(sl);
             String sj = HttpUtils.get(url);
