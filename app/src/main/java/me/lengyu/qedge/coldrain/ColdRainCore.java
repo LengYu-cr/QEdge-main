@@ -65,6 +65,21 @@ public class ColdRainCore {
         "feature_at"
     };
 
+    /** 仅群聊可用的功能，好友聊天不适用 */
+    private static final String[] GROUP_ONLY_FEATURES = {
+        "feature_welcome_join",
+        "feature_welcome_quit",
+        "feature_hourly",
+        "feature_black_white_list",
+        "feature_ban",
+        "feature_autoadmin",
+        "feature_at",
+        "feature_title",
+        "feature_signin",
+        "feature_question",
+        "feature_group_manager"
+    };
+
     public static ColdRainCore getInstance() {
         if (instance == null) {
             synchronized (ColdRainCore.class) {
@@ -344,18 +359,9 @@ public class ColdRainCore {
                 if (!isAdminOrSelf(msgData)) {
                     return;
                 }
-                if (msgData.type == 2) {
-                    String groupUin = msgData.peerUin;
-                    setBoolean("group_master_enabled_" + groupUin, true);
-                    reply(msgData, "本群已开机！\n发送【" + getMenuName() + "】查看菜单");
-                } else {
-                    if (!isMasterEnabled()) {
-                        setBoolean("master_enabled", true);
-                        reply(msgData, "冷雨Java 已启动！\n发送【" + getMenuName() + "】查看菜单");
-                    } else {
-                        reply(msgData, "冷雨Java 已经在运行中啦~");
-                    }
-                }
+                String effectiveKey = (msgData.type == 2) ? msgData.peerUin : "friend_global";
+                setBoolean("group_master_enabled_" + effectiveKey, true);
+                reply(msgData, (msgData.type == 2 ? "本群已开机" : "好友聊天已开机") + "！\n发送【" + getMenuName() + "】查看菜单");
                 return;
             }
 
@@ -363,18 +369,13 @@ public class ColdRainCore {
                 if (!isAdminOrSelf(msgData)) {
                     return;
                 }
-                if (msgData.type == 2) {
-                    String groupUin = msgData.peerUin;
-                    setBoolean("group_master_enabled_" + groupUin, false);
-                    reply(msgData, "本群已关机");
-                } else {
-                    setBoolean("master_enabled", false);
-                    reply(msgData, "冷雨Java 已关闭");
-                }
+                String effectiveKey = (msgData.type == 2) ? msgData.peerUin : "friend_global";
+                setBoolean("group_master_enabled_" + effectiveKey, false);
+                reply(msgData, msgData.type == 2 ? "本群已关机" : "好友聊天已关机");
                 return;
             }
 
-            if (msgData.type == 2 && isAdminOrSelf(msgData)) {
+            if (isAdminOrSelf(msgData)) {
                 String groupFeature = matchGroupFeatureCommand(text);
                 if (groupFeature != null) {
                     handleGroupFeatureToggle(msgData, groupFeature, text.startsWith("开启"));
@@ -388,8 +389,9 @@ public class ColdRainCore {
                     return;
                 }
                 boolean isMasterOn = isMasterEnabled();
-                boolean isGroupOn = msgData.type == 2 ? getBoolean("group_master_enabled_" + msgData.peerUin, false) : true;
-                
+                String effectiveKey = (msgData.type == 2) ? msgData.peerUin : "friend_global";
+                boolean isGroupOn = getBoolean("group_master_enabled_" + effectiveKey, false);
+
                 if (!isMasterOn || !isGroupOn) {
                     if (!isAdminOrSelf(msgData)) {
                         return;
@@ -397,8 +399,8 @@ public class ColdRainCore {
                     if (!isMasterOn) {
                         return;
                     }
-                    if (msgData.type == 2 && !isGroupOn) {
-                        reply(msgData, "本群未开机");
+                    if (!isGroupOn) {
+                        reply(msgData, msgData.type == 2 ? "本群未开机" : "好友聊天未开机");
                         return;
                     }
                 }
@@ -435,27 +437,30 @@ public class ColdRainCore {
             return false;
         }
 
+        // 群聊专属功能在好友聊天中不可用
+        if (msgData.type != 2 && isGroupOnlyFeature(featureKey)) {
+            return false;
+        }
+
+        // 好友聊天使用全局key，群聊使用群号
+        String effectiveKey = (msgData.type == 2 && msgData.peerUin != null && !msgData.peerUin.isEmpty())
+            ? msgData.peerUin : "friend_global";
+
         // 菜单命令不受功能开关和群功能开关限制
         if (isMenuCommand(msgData.msg)) {
-            if (msgData.type == 2 && msgData.peerUin != null && !msgData.peerUin.isEmpty()) {
-                return getBoolean("group_master_enabled_" + msgData.peerUin, false);
-            }
-            return true;
+            return getBoolean("group_master_enabled_" + effectiveKey, false);
         }
-        
+
         if (!isFeatureEnabled(featureKey) && !featureKey.equals("feature_status")) {
             return false;
         }
         if (isPersonalFeature(featureKey)) {
             return true;
         }
-        if (msgData.type == 2 && msgData.peerUin != null && !msgData.peerUin.isEmpty()) {
-            if (!getBoolean("group_master_enabled_" + msgData.peerUin, false)) {
-                return false;
-            }
-            return isGroupFeatureEnabled(featureKey, msgData.peerUin);
+        if (!getBoolean("group_master_enabled_" + effectiveKey, false)) {
+            return false;
         }
-        return true;
+        return isGroupFeatureEnabled(featureKey, effectiveKey);
     }
     
     private boolean isMenuCommand(String text) {
@@ -483,6 +488,13 @@ public class ColdRainCore {
 
     public boolean isPersonalFeature(String featureKey) {
         for (String f : PERSONAL_FEATURES) {
+            if (f.equals(featureKey)) return true;
+        }
+        return false;
+    }
+
+    public boolean isGroupOnlyFeature(String featureKey) {
+        for (String f : GROUP_ONLY_FEATURES) {
             if (f.equals(featureKey)) return true;
         }
         return false;
@@ -535,8 +547,14 @@ public class ColdRainCore {
     }
 
     private void handleGroupFeatureToggle(MsgData msgData, String featureKey, boolean enable) {
-        String groupUin = msgData.peerUin;
-        setGroupFeatureEnabled(featureKey, groupUin, enable);
+        if (msgData.type != 2 && isGroupOnlyFeature(featureKey)) {
+            if (isMenuCommand(msgData.msg)) {
+                reply(msgData, "此功能仅支持群聊");
+            }
+            return;
+        }
+        String effectiveKey = (msgData.type == 2) ? msgData.peerUin : "friend_global";
+        setGroupFeatureEnabled(featureKey, effectiveKey, enable);
         String featureName = "";
         for (String[] mapping : FEATURE_NAME_MAP) {
             if (mapping[1].equals(featureKey)) {
@@ -544,7 +562,7 @@ public class ColdRainCore {
                 break;
             }
         }
-        reply(msgData, (enable ? "已开启" : "已关闭") + "本群" + featureName);
+        reply(msgData, (enable ? "已开启" : "已关闭") + (msgData.type == 2 ? "本群" : "好友") + featureName);
     }
 
     public boolean isInitialized() {

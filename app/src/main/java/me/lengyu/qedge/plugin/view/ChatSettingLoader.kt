@@ -232,20 +232,22 @@ object ChatSettingLoader {
         runCatching {
             val coldRain = ColdRainCore.getInstance()
             if (coldRain.isInitialized() && coldRain.isMasterEnabled()) {
+                val contact = currentContact
+                val isGroup = contact.chatType == 2
+                val effectiveKey = if (isGroup) contact.peerUin else "friend_global"
                 menuItems.add(PluginMenuItem.Header("冷雨Java", "cold_rain"))
                 menuItems.add(
                     PluginMenuItem.Action(
-                        if (coldRain.isGroupMasterEnabled(currentContact.peerUin)) "关机" else "开机",
+                        if (coldRain.isGroupMasterEnabled(effectiveKey)) "关机" else "开机",
                         "cold_rain"
                     ) {
-                        val contact = currentContact
                         if (contact.peerUin.isEmpty()) {
                             Toasts.toast("获取聊天信息失败")
                             return@Action
                         }
-                        val enabled = coldRain.isGroupMasterEnabled(contact.peerUin)
-                        coldRain.setGroupMasterEnabled(contact.peerUin, !enabled)
-                        Toasts.toast(if (enabled) "本群已关机" else "本群已开机")
+                        val enabled = coldRain.isGroupMasterEnabled(effectiveKey)
+                        coldRain.setGroupMasterEnabled(effectiveKey, !enabled)
+                        Toasts.toast(if (enabled) (if (isGroup) "本群已关机" else "好友聊天已关机") else (if (isGroup) "本群已开机" else "好友聊天已开机"))
                     }
                 )
                 menuItems.add(
@@ -253,12 +255,11 @@ object ChatSettingLoader {
                         "开关设置",
                         "cold_rain"
                     ) {
-                        val contact = currentContact
                         if (contact.peerUin.isEmpty()) {
                             Toasts.toast("获取聊天信息失败")
                             return@Action
                         }
-                        showGroupSwitchDialog(hostActivity, contact.peerUin)
+                        showGroupSwitchDialog(hostActivity, effectiveKey, isGroup)
                     }
                 )
             }
@@ -340,7 +341,7 @@ object ChatSettingLoader {
         }
     }
 
-    private fun showGroupSwitchDialog(context: android.content.Context, peerUin: String) {
+    private fun showGroupSwitchDialog(context: android.content.Context, peerUin: String, isGroup: Boolean) {
         try {
             val coldRain = ColdRainCore.getInstance()
             if (!coldRain.isInitialized()) {
@@ -360,13 +361,15 @@ object ChatSettingLoader {
 
             val features = ColdRainConfig.allFeatures.filter {
                 coldRain.isFeatureEnabled(it.key) &&
-                !ColdRainConfig.isPersonalFeature(it.key)
+                !ColdRainConfig.isPersonalFeature(it.key) &&
+                !(isGroup && false || !isGroup && coldRain.isGroupOnlyFeature(it.key))
             }
 
             runCatching {
                 QEdgeBottomDialog(activity) { dismiss ->
                     GroupSwitchContent(
                         peerUin = peerUin,
+                        isGroup = isGroup,
                         features = features,
                         onDismiss = dismiss
                     )
@@ -512,11 +515,13 @@ private fun PluginActionItem(name: String, onClick: () -> Unit) {
 @Composable
 private fun GroupSwitchContent(
     peerUin: String,
+    isGroup: Boolean,
     features: List<ColdRainConfig.FeatureItem>,
     onDismiss: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
     val coldRain = ColdRainCore.getInstance()
+    val label = if (isGroup) "本群" else "好友"
 
     val switchStates = remember {
         mutableStateMapOf<String, Boolean>().also { map ->

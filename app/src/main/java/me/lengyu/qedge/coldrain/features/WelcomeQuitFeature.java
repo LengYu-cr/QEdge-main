@@ -53,7 +53,7 @@ public class WelcomeQuitFeature implements ColdRainFeature {
                 try {
                     if (!core.isMasterEnabled()) return;
                     if (!core.isFeatureEnabled("feature_welcome_quit")) return;
-                    if (!core.getConfigBoolean("group_master_enabled_" + troopUin, false)) return;
+                    if (!core.isGroupMasterEnabled(troopUin)) return;
                     if (!core.isGroupFeatureEnabled("feature_welcome_quit", troopUin)) return;
 
                     String quitMsg = getQuitMsg(core, troopUin);
