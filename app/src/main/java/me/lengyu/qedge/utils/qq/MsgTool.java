@@ -18,7 +18,7 @@ import com.tencent.mobileqq.paiyipai.PaiYiPaiHandler;
 import com.tencent.mobileqq.app.CardHandler;
 import com.tencent.mobileqq.qroute.QRoute;
 import com.tencent.qqnt.aio.adapter.api.IAIOPttApi;
-import me.lengyu.qedge.utils.DexKitHelper;
+
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
@@ -51,7 +51,7 @@ public class MsgTool {
                         new Class[]{int.class, int.class, String.class, String.class});
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -199,7 +199,7 @@ public class MsgTool {
             elements.addAll(processMessageContent(contact, msg));
             sendMsgInternal(contact, elements);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -340,8 +340,7 @@ public class MsgTool {
             elements.add(msgElement);
             sendMsgInternal(contact, elements);
         } catch (Throwable e) {
-            e.printStackTrace();
-            LogUtils.e("MsgTool", "发送消息失败: " + value);
+            LogUtils.e(e);
         }
     }
 
@@ -481,7 +480,7 @@ public class MsgTool {
                 sendPaiMethod.invoke(handler, chatType, 1, toUin, peerUin);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -498,7 +497,7 @@ public class MsgTool {
                 ReflectUtils.callMethod(service, "recallMsg", contact, msgIds, null);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

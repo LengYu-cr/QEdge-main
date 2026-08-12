@@ -24,8 +24,10 @@ import java.util.zip.ZipFile;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 import me.lengyu.qedge.utils.qq.MsgTool;
 
@@ -160,7 +162,7 @@ public class ImageFeature implements ColdRainFeature {
             fs.flush();
             fs.close();
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
 
         zmp.recycle();
@@ -193,16 +195,13 @@ public class ImageFeature implements ColdRainFeature {
             return;
         }
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("ImageFeature", () -> {
                 try {
                     handleCommand(fMsg, text);
                 } catch (Throwable e) {
                     sendMsg(fMsg, "出错: " + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private void handleCommand(MsgData msgData, String text) throws Exception {
@@ -436,7 +435,7 @@ public class ImageFeature implements ColdRainFeature {
             if (url == null || url.isEmpty()) return;
             MsgTool.sendPic(msgData.peerUin, url, msgData.type);
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -507,7 +506,7 @@ public class ImageFeature implements ColdRainFeature {
             result.recycle();
             input.recycle();
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 }

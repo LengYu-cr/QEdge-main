@@ -34,6 +34,7 @@ import me.lengyu.qedge.ui.core.compatibility.QEdgeCenterDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.pages.home.HomeUpdateStatus
 import me.lengyu.qedge.ui.pages.home.MainScreen
+import me.lengyu.qedge.utils.LogUtils
 import org.json.JSONObject
 import java.lang.Runnable
 
@@ -115,7 +116,7 @@ class MainActivity : ComponentActivity() {
             } catch (cancellation: CancellationException) {
                 throw cancellation
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
                 updateStatus = HomeUpdateStatus.ERROR
                 if (showToast) {
                     Toast.makeText(

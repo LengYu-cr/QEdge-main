@@ -45,6 +45,7 @@ import me.lengyu.qedge.ui.core.theme.AccentGreen
 import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.LogUtils
+import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.QQCurrentEnv
 import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.utils.qq.FriendTool
@@ -54,6 +55,17 @@ object ChatSettingLoader {
 
     private var hooked = false
     private var aioDelegate: AIODelegate? = null
+
+    // 所有可选的聊天页入口匹配点
+    val ENTRY_OPTIONS = mapOf(
+        "more_features" to "更多功能",
+        "chat_settings" to "聊天设置",
+        "bubble" to "泡泡",
+        "emoji" to "表情",
+        "camera" to "相机",
+        "album" to "相册",
+        "voice" to "语音"
+    )
 
     data class PluginContact(
         val chatType: Int = 0,
@@ -80,9 +92,13 @@ object ChatSettingLoader {
                 object : XC_MethodHook() {
                     override fun afterHookedMethod(param: MethodHookParam) {
                         try {
+                            // 根据配置选择入口匹配点，避免与其他模块冲突
+                            val entryMode = ModuleConfig.getString("chat_setting_entry", "more_features")
+                            val targetText = ENTRY_OPTIONS[entryMode] ?: "更多功能"
+
                             val view = param.thisObject as android.widget.ImageView
                             val desc = view.contentDescription
-                            if (desc != null && (desc.toString().contains("聊天设置") || desc.toString().contains("更多功能"))) {
+                            if (desc != null && desc.toString().contains(targetText)) {
                                 view.post {
                                     try {
                                         view.setOnLongClickListener {

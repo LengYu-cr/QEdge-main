@@ -53,6 +53,7 @@ import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.molecules.QEdgeTopBar
 import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.LogUtils
 import java.io.File
 
 @Composable
@@ -86,7 +87,7 @@ fun TextEditorScreen(
                     isLoading = false
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     content = TextFieldValue("读取失败: ${e.message}")
                     isLoading = false
@@ -104,7 +105,7 @@ fun TextEditorScreen(
                     android.widget.Toast.makeText(context, "${fileName} 已保存", android.widget.Toast.LENGTH_SHORT).show()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     android.widget.Toast.makeText(context, "保存失败: ${e.message}", android.widget.Toast.LENGTH_SHORT).show()
                 }

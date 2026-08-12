@@ -3,10 +3,12 @@ package me.lengyu.qedge.coldrain.features;
 import org.json.JSONArray;
 import org.json.JSONObject;
 
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
 
 public class VideoParseFeature implements ColdRainFeature {
@@ -71,16 +73,13 @@ public class VideoParseFeature implements ColdRainFeature {
             }
         }
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    parseVideo(msgData, text);
-                } catch (Throwable e) {
-                    sendMsg(msgData, "解析出错: " + e.getMessage());
-                }
+        ModuleScope.launchIOJava("VideoParse", () -> {
+            try {
+                parseVideo(msgData, text);
+            } catch (Throwable e) {
+                sendMsg(msgData, "解析出错: " + e.getMessage());
             }
-        }).start();
+        });
     }
 
     private void parseVideo(MsgData msgData, String text) throws Exception {
@@ -527,7 +526,7 @@ public class VideoParseFeature implements ColdRainFeature {
                 return matcher.group(1);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return text;
     }
@@ -550,7 +549,7 @@ public class VideoParseFeature implements ColdRainFeature {
                 return redirect;
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return urlStr;
     }
@@ -572,7 +571,7 @@ public class VideoParseFeature implements ColdRainFeature {
             if (imgUrl == null || imgUrl.isEmpty()) return;
             MsgTool.sendPic(msgData.peerUin, imgUrl, msgData.type);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -581,7 +580,7 @@ public class VideoParseFeature implements ColdRainFeature {
             if (videoUrl == null || videoUrl.isEmpty()) return;
             MsgTool.sendVideo(msgData.peerUin, videoUrl, msgData.type);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -590,7 +589,7 @@ public class VideoParseFeature implements ColdRainFeature {
             if (pttUrl == null || pttUrl.isEmpty()) return;
             MsgTool.sendPtt(msgData.peerUin, pttUrl, msgData.type);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 }

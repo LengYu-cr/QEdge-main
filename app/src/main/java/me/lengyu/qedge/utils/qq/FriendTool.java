@@ -34,11 +34,11 @@ public class FriendTool {
                         friendInfoList.add(new FriendInfo(info[2], uid, nick, remark));
                     }
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    LogUtils.e(e);
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return friendInfoList;
     }
@@ -50,7 +50,7 @@ public class FriendTool {
                 return service.isFriend(getUidFromUin(uin), "");
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return false;
     }
@@ -76,7 +76,7 @@ public class FriendTool {
                 return service.getUidFromUin(uin);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return uin;
     }
@@ -89,7 +89,7 @@ public class FriendTool {
                 return service.getUinFromUid(uid);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return uid;
     }
@@ -143,7 +143,7 @@ public class FriendTool {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

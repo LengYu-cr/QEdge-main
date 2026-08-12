@@ -44,6 +44,7 @@ import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.molecules.QEdgeTopBar
 import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.LogUtils
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -84,7 +85,7 @@ fun AudioPlayerScreen(
                 false
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             errorMessage = "加载失败: ${e.message}"
         }
     }
@@ -97,7 +98,7 @@ fun AudioPlayerScreen(
                     try {
                         currentPosition = mediaPlayer.currentPosition
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        LogUtils.e(e)
                     }
                 }
                 handler.postDelayed(this, 500)
@@ -110,7 +111,7 @@ fun AudioPlayerScreen(
             try {
                 mediaPlayer.release()
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
             }
         }
     }
@@ -125,7 +126,7 @@ fun AudioPlayerScreen(
             }
             isPlaying = !isPlaying
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
     }
 
@@ -135,7 +136,7 @@ fun AudioPlayerScreen(
             mediaPlayer.seekTo(position)
             currentPosition = position
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
     }
 

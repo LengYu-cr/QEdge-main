@@ -1,1300 +1,1112 @@
 # QEdge Code Wiki
 
-> 基于 NT QQ / NT TIM 的 Xposed 增强模块 + 在线脚本平台。
-> 模块化设计，所有功能开关独立可控；零卡顿设计原则：Hook 全部 O(1)，无遍历 / 无循环反射 / 无深度拷贝；配套 PHP 后台支持脚本上传、下载、反馈、赞助墙、用户中心。
+> 基于 **NT QQ / NT TIM** 的 Xposed 增强模块 + 在线脚本平台。模块化设计，所有功能开关独立可控；零卡顿设计原则：Hook 全部 O(1)，无遍历/无循环反射/无深度拷贝；配套 PHP 后台支持脚本上传、下载、反馈、赞助墙、用户中心。
 
 ---
 
 ## 目录
 
-- [1. 项目概览](#1-项目概览)
-- [2. 整体架构](#2-整体架构)
-- [3. 工程结构与模块划分](#3-工程结构与模块划分)
-- [4. 核心模块详解](#4-核心模块详解)
-  - [4.1 Hook 系统](#41-hook-系统)
-  - [4.2 ColdRain 功能系统](#42-coldrain-功能系统)
-  - [4.3 Plugin 脚本系统](#43-plugin-脚本系统)
-  - [4.4 Utils 工具层](#44-utils-工具层)
-  - [4.5 UI 层与生命周期注入](#45-ui-层与生命周期注入)
-  - [4.6 BeanShell 脚本引擎](#46-beanshell-脚本引擎)
-  - [4.7 qqinterface 桩模块](#47-qqinterface-桩模块)
-  - [4.8 PHP 后台](#48-php-后台)
-- [5. 关键类与函数索引](#5-关键类与函数索引)
-- [6. 依赖关系](#6-依赖关系)
-- [7. 项目运行方式](#7-项目运行方式)
-- [8. 构建与部署](#8-构建与部署)
+1. [项目整体架构](#1-项目整体架构)
+2. [技术栈与依赖](#2-技术栈与依赖)
+3. [模块职责详解](#3-模块职责详解)
+4. [核心流程与初始化](#4-核心流程与初始化)
+5. [关键类与函数说明](#5-关键类与函数说明)
+6. [Hook 系统](#6-hook-系统)
+7. [DexKit 动态查找机制](#7-dexkit-动态查找机制)
+8. [冷雨功能核心](#8-冷雨功能核心)
+9. [在线脚本插件系统](#9-在线脚本插件系统)
+10. [UI 层架构（Jetpack Compose）](#10-ui-层架构jetpack-compose)
+11. [基础设施层](#11-基础设施层)
+12. [QQ 服务接口封装](#12-qq-服务接口封装)
+13. [项目构建与运行](#13-项目构建与运行)
+14. [第三方 APP Hook](#14-第三方-app-hook)
+15. [PHP 后台架构](#15-php-后台架构)
 
 ---
 
-## 1. 项目概览
+## 1. 项目整体架构
 
-### 1.1 项目定位
+### 1.1 分层架构图
 
-QEdge 是一个面向 **NT QQ / NT TIM** 的 Xposed 增强模块，同时附带一个完整的在线脚本平台。它通过 Xposed 框架注入 QQ / TIM 进程，在不修改宿主 APK 的前提下扩展聊天增强、QQ 空间自动化、等级加速、群机器人等功能。除 QQ / TIM 外，模块还支持注入 KK 键盘、酷狗音乐、傲软抠图等第三方 APP 的 VIP 解锁 / 去广告。
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        UI 层 (Compose)                       │
+│  MainActivity / HomeScreen / ColdRainScreen / FileManager   │
+├─────────────────────────────────────────────────────────────┤
+│                     功能业务层                                │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐   │
+│  │ ColdRainCore │  │ PluginManager│  │ QQ/TIM 功能Hook  │   │
+│  └──────────────┘  └──────────────┘  └──────────────────┘   │
+├─────────────────────────────────────────────────────────────┤
+│                     Hook 框架层                              │
+│  XposedEntry → MainHook → HookRegistry → BaseHookItem       │
+├─────────────────────────────────────────────────────────────┤
+│                   DexKit 动态查找层                          │
+│  DexKitFinder / DexKitTask / DexKitCache                    │
+├─────────────────────────────────────────────────────────────┤
+│                    基础设施层                                 │
+│  ModuleConfig / LogUtils / HttpUtils / QQCurrentEnv / ...   │
+├─────────────────────────────────────────────────────────────┤
+│              QQ Stub 接口层 (qqinterface)                    │
+│  IKernelService / IFriendsInfoService / MsgElement / ...    │
+└─────────────────────────────────────────────────────────────┘
+```
 
-### 1.2 技术栈
-
-| 层 | 技术 |
-|----|------|
-| 客户端 | Kotlin + Java（JDK 17），Android 9 ~ 16，Jetpack Compose |
-| Hook 框架 | Xposed API 82（LSPosed / LSPatch / FPA / 原子 / 无极 等） |
-| 动态查找 | DexKit 2.2.0（运行时按特征扫描 DEX） |
-| 反射 | java.lang.reflect + 自研 ReflectDSL（类型安全反射） |
-| 脚本引擎 | 内嵌 BeanShell 3.0.0-SNAPSHOT（Android/Dalvik 适配） |
-| 动态类生成 | dalvik-dx 16.0.1 |
-| 协议解析 | protobuf-javalite 4.35.1 + 自研 ProtoData wire-format 解析器 |
-| 后台 | PHP 7.3 + MySQL 5.7+ / MariaDB（InnoDB + utf8mb4） |
-| 构建 | AGP 9.1.1 + Kotlin 2.4.10 + Gradle（Kotlin DSL） |
-
-### 1.3 支持版本
-
-| 平台 | 推荐版本 | 包名 |
-|------|----------|------|
-| NT QQ | 8.9.58 - 9.3.xx | `com.tencent.mobileqq` |
-| NT TIM | 3.9.0 - 4.1.0 | `com.tencent.tim` |
-| KK 键盘 | 最新版 | `im.weshine.keyboard` |
-| 酷狗音乐（普通 / 大字 / 概念） | 最新版 | `com.kugou.android` / `.elder` / `.lite` |
-| 傲软抠图 | 最新版 | `com.apowersoft.backgrounderaser` |
-| Android | 9.0 ~ 16 | — |
-| Xposed 框架 | LSPosed / LSPatch / FPA / 原子 / 无极（Zygisk 模式）等 | — |
-
-### 1.4 模块标识
-
-- `applicationId` = `me.lengyu.qedge`
-- `versionCode` = 15，`versionName` = "0.1.5"
-- Xposed 入口：`me.lengyu.qedge.hook.XposedEntry`（声明于 `assets/xposed_init` 与 `resources/META-INF/xposed/`）
-- 资源包 ID 固定 `0x69`（`--allow-reserved-package-id --package-id 0x69`），避免与宿主资源 ID 冲突
-
----
-
-## 2. 整体架构
-
-QEdge 是一个**多模块 Gradle 工程**，由三大部分组成：
+### 1.2 工程目录结构
 
 ```
 QEdge/
-├── app/                 ① Android Xposed 模块主体（Kotlin + Java）
-├── qqinterface/         ② QQ 内部 API 编译期类型桩（compileOnly）
-└── QEdge后台/QEdge/      ③ PHP + MySQL 在线脚本平台后台
-```
-
-三部分的关系：
-
-- ① 依赖 ② 仅在编译期（`compileOnly`），② 的 `.class` 不会进入 ① 的 APK，运行时由宿主 QQ 进程提供真实类。
-- ① 与 ③ 通过 HTTP 交互：① 内的 `HeartbeatManager` 周期上报心跳、`OnlinePluginService` 拉取 / 上传脚本、`MainActivity` 检查更新。
-- ③ 是独立部署的 Web 服务，不依赖 ① 或 ②。
-
-### 2.1 客户端分层架构
-
-```
-┌────────────────────────────────────────────────────────────────────┐
-│                        Xposed 框架（宿主进程）                       │
-├────────────────────────────────────────────────────────────────────┤
-│  入口层     XposedEntry → MainHook → HookRegistry                  │
-├────────────────────────────────────────────────────────────────────┤
-│  Hook 层    hook/base（基类+注册表）  hook/api（事件监听）            │
-│             hook/item（具体功能）    hook/entry（入口注入）          │
-│             hook/kk / kugou / aoruan（第三方 APP）                  │
-├────────────────────────────────────────────────────────────────────┤
-│  业务层     ColdRainCore + 22 个 ColdRainFeature（QQ 机器人框架）   │
-│             PluginManager + BeanShell 引擎（在线脚本运行时）         │
-├────────────────────────────────────────────────────────────────────┤
-│  UI 层      MainActivity / SettingActivity（Compose）              │
-│             lifecycle（Parasitics + DynamicActivityRegistry）      │
-├────────────────────────────────────────────────────────────────────┤
-│  工具层     utils/dexkit | utils/reflect | utils/qq                │
-│             utils/json | utils/proto | utils/hook                  │
-└────────────────────────────────────────────────────────────────────┘
-```
-
-### 2.2 数据流向
-
-```
-Xposed 事件源
-   ├── MSFServlet.onReceive ──► FromServiceMsgDispatcher ──┬──► OnPaiYiPai
-   │                                                         ├──► OnTroopShutUp
-   │                                                         ├──► OnQZonePush
-   │                                                         └──► AutoLikeBack
-   ├── MsgService.onRecvMsg / onAddSendMsg ──► OnReceiveMsg ──► ColdRainCore.handleMessage
-   ├── IKernelMsgService.CppProxy.sendMsg ──► OnSendMsg ──► VideoToBubble
-   ├── QQCustomMenuExpandableLayout.setMenu ──► OnMenuBuild ──► DownloadEmotion / 脚本菜单
-   ├── PaiYiPaiHandler ──► AntiPokeDelay
-   ├── MsgRecord.* ──► FlashPicBypass
-   └── ArkConfigModel ──► TimArkCardBypass
-```
-
----
-
-## 3. 工程结构与模块划分
-
-```
-QEdge/
-├── app/                                # Android Xposed 模块主体
-│   ├── src/main/
-│   │   ├── assets/xposed_init          # 声明 Xposed 入口类
-│   │   ├── java/
-│   │   │   ├── bsh/                    # 内嵌 BeanShell 脚本引擎
-│   │   │   │   ├── Interpreter.java
-│   │   │   │   ├── BshClassManager.java
-│   │   │   │   ├── classpath/          # 脚本类加载器（含 Dex 适配）
-│   │   │   │   ├── org/objectweb/asm/  # 内嵌 ASM（运行时生成字节码）
-│   │   │   │   ├── security/           # 安全防护
-│   │   │   │   └── BSH*.java           # AST 节点
-│   │   │   └── me/lengyu/qedge/
-│   │   │       ├── MainActivity.kt
-│   │   │       ├── LauncherActivity.kt
-│   │   │       ├── activity/           # SettingActivity / ThemeHelper
-│   │   │       ├── coldrain/           # ColdRain 机器人框架
-│   │   │       │   ├── ColdRainCore.java
-│   │   │       │   ├── ColdRainFeature.java
-│   │   │       │   └── features/       # 22 个业务 Feature
-│   │   │       ├── common/             # ModuleScope
-│   │   │       ├── hook/              # Hook 系统
-│   │   │       │   ├── XposedEntry.java   # Xposed 入口
-│   │   │       │   ├── MainHook.java      # Hook 编排
-│   │   │       │   ├── HeartbeatManager.java
-│   │   │       │   ├── annotation/        # @HookItemAnnotation
-│   │   │       │   ├── base/              # 基类体系 + HookRegistry
-│   │   │       │   ├── api/               # 底层事件监听
-│   │   │       │   ├── entry/             # QQ 入口注入
-│   │   │       │   ├── item/              # 具体功能项
-│   │   │       │   ├── kk/                # KK 键盘
-│   │   │       │   ├── kugou/             # 酷狗音乐
-│   │   │       │   └── aoruan/            # 傲软抠图
-│   │   │       ├── lifecycle/          # Activity 伪装 + 资源注入
-│   │   │       ├── plugin/             # 在线脚本系统
-│   │   │       │   ├── PluginManager.java
-│   │   │       │   ├── PluginCompiler.java
-│   │   │       │   ├── PluginCallback.java
-│   │   │       │   ├── FixClassLoader.java
-│   │   │       │   ├── api/PluginMethod.java   # 脚本可调用 API
-│   │   │       │   ├── bean/            # 数据 Bean
-│   │   │       │   └── view/           # ChatSettingLoader
-│   │   │       ├── ui/                  # Compose UI
-│   │   │       │   ├── pages/           # HomeScreen / FileManagerScreen / coldrain/
-│   │   │       │   ├── components/      # atoms / molecules / dialogs
-│   │   │       │   ├── core/            # theme / compatibility
-│   │   │       │   └── services/        # OnlinePluginService
-│   │   │       └── utils/              # 工具层
-│   │   │           ├── dexkit/ | reflect/ | json/ | proto/ | qq/ | hook/
-│   │   │           └── HostInfo.kt, ModuleConfig.kt, ...
-│   │   ├── res/                        # 资源（图标 PNG/WebP 为主）
-│   │   └── resources/META-INF/xposed/  # scope.list / xposed_init / xposed_module
-│   └── build.gradle.kts
-├── qqinterface/                        # QQ 内部 API 编译期桩
+├── app/                                    # 主模块（Xposed模块 + UI）
+│   └── src/main/java/me/lengyu/qedge/
+│       ├── activity/                       # Activity 入口
+│       │   ├── SettingActivity.kt         # 寄生在QQ中的设置页
+│       │   └── ThemeHelper.java           # 主题辅助
+│       ├── coldrain/                       # 冷雨机器人核心
+│       │   ├── ColdRainCore.java          # 核心调度器（单例）
+│       │   ├── ColdRainFeature.java       # 功能接口
+│       │   └── features/                  # 20+ 功能实现
+│       ├── hook/                           # Hook 系统
+│       │   ├── XposedEntry.java           # Xposed入口
+│       │   ├── MainHook.java              # Hook主加载器
+│       │   ├── HeartbeatManager.java      # 心跳管理
+│       │   ├── annotation/                # Hook注解（分类/标记）
+│       │   ├── api/                       # 通用API Hook（事件分发）
+│       │   ├── base/                      # Hook基类 + 注册中心
+│       │   ├── entry/                     # QQ菜单注入入口
+│       │   ├── item/                      # QQ/TIM具体功能项
+│       │   ├── kk/                        # KK键盘Hook
+│       │   ├── kugou/                     # 酷狗音乐Hook
+│       │   └── aoruan/                    # 傲软抠图Hook
+│       ├── lifecycle/                      # 动态Activity注册
+│       │   ├── Parasitics.kt              # 资源/寄生Activity
+│       │   └── DynamicActivityRegistry.kt # 动态注册Activity
+│       ├── plugin/                         # 在线脚本引擎
+│       │   ├── PluginManager.java         # 插件生命周期管理
+│       │   ├── PluginCompiler.java        # BeanShell编译执行
+│       │   ├── PluginCallback.java        # 插件回调接口
+│       │   ├── api/PluginMethod.java      # 插件暴露的API
+│       │   ├── bean/                      # 插件数据Bean（MsgData等）
+│       │   └── view/ChatSettingLoader.kt  # 聊天设置注入
+│       ├── ui/                             # Compose UI
+│       │   ├── components/                # 组件（atoms/molecules/dialogs）
+│       │   ├── core/theme/                # 主题系统
+│       │   ├── core/compatibility/        # Xposed兼容弹窗
+│       │   └── pages/                     # 页面（Home/ColdRain/File）
+│       ├── utils/                          # 工具集
+│       │   ├── dexkit/                    # DexKit KT封装
+│       │   ├── hook/                      # Hook扩展
+│       │   ├── json/                      # JSON/Proto解析工具
+│       │   ├── proto/                     # 协议包收发
+│       │   ├── qq/                        # QQ专用工具
+│       │   ├── reflect/                   # 反射工具
+│       │   ├── ModuleConfig.kt            # 模块配置（JSON存储）
+│       │   ├── HostInfo.kt                # 宿主信息
+│       │   ├── QQCurrentEnv.java          # QQ当前环境
+│       │   ├── LogUtils.java              # 日志工具
+│       │   ├── HttpUtils.java             # 网络请求
+│       │   ├── JsonConfigUtils.java       # JSON配置底层
+│       │   └── ObjectStore.java           # 对象持久化
+│       ├── LauncherActivity.kt            # 启动入口
+│       └── MainActivity.kt                # 模块主界面
+│
+├── qqinterface/                            # QQ接口stub（compileOnly）
 │   └── src/main/java/
-│       ├── androidx/lifecycle/
-│       ├── com/qq/jce/ | com/qq/taf/jce/   # JCE/WUP 协议
-│       ├── com/tencent/
-│       │   ├── common/app/ | mobileqq/app/  # QQ 应用核心
-│       │   ├── aio/ | biz/ | mobileqq/      # AIO / 业务 / Activity
-│       │   ├── qqnt/kernel/                 # NT 内核（含数百 nativeinterface 类）
-│       │   └── widget/ | smtt/ | ...
-│       └── mqq/ | oicq/ | tenpay/ ...
-├── QEdge后台/QEdge/                     # PHP 后台
-│   ├── require.php / function.php / install.php / index.php
-│   ├── admin/         # 管理后台页面
-│   ├── user/          # 用户中心页面
-│   ├── api/           # HTTP API（admin/* user/*）
-│   ├── online_plugin/ # 脚本上传 / 列表 / 下载 / 详情
-│   ├── update/        # 版本检查 / 更新日志
-│   ├── heartbeat/     # 心跳接收
-│   └── assets/        # common.js / style.css
-├── libs/libxposed/                    # 内嵌 libxposed 源码（参考）
-├── settings.gradle.kts                 # rootProject.name = "QRoutine"，include(":app", ":qqinterface")
-├── gradle/libs.versions.toml          # 版本目录
-└── README.md
+│       ├── com/tencent/qqnt/              # NT内核接口
+│       ├── com/tencent/mobileqq/          # QQ主程序接口
+│       └── com/tencent/common/app/        # 通用应用接口
+│
+├── libs/libxposed/                         # Xposed API（本地库）
+│
+├── QEdge后台/QEdge/                        # PHP后台
+│   ├── admin/                              # 管理员后台
+│   ├── user/                               # 用户中心
+│   ├── api/                                # REST API
+│   ├── online_plugin/                      # 在线脚本平台
+│   ├── update/                             # 更新检查
+│   └── heartbeat/                          # 心跳接口
+│
+├── bsh/                                     # BeanShell解释器（内嵌源码）
+│
+├── build.gradle.kts                        # 根构建脚本
+├── gradle/libs.versions.toml               # 版本目录
+└── gradle.properties                       # Gradle配置（R8 fullMode）
 ```
 
 ---
 
-## 4. 核心模块详解
+## 2. 技术栈与依赖
 
-### 4.1 Hook 系统
+### 2.1 版本信息
 
-Hook 系统是 QEdge 的执行核心，采用「**注解驱动 + 注册表管理 + 监听器分发**」的分层架构。
+| 项目 | 版本 |
+|------|------|
+| namespace / applicationId | `me.lengyu.qedge` |
+| versionCode / versionName | 17 / 0.1.7 |
+| compileSdk / targetSdk | 37 |
+| minSdk | 29 (Android 10) |
+| AGP | 9.1.1 |
+| Kotlin | 2.4.10 |
+| Compose BOM | 2026.06.01 |
 
-#### 4.1.1 基类体系（[hook/base/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base)）
+### 2.2 核心依赖
 
-继承关系：
+| 依赖 | 版本 | 用途 |
+|------|------|------|
+| DexKit | 2.2.0 | 动态查找混淆后的类/方法 |
+| Protobuf JavaLite | 4.35.1 | 协议数据解析 |
+| Dalvik DX | 16.0.1 | BeanShell动态编译dex |
+| Xposed API | 82 | Xposed Hook框架接口（compileOnly） |
+| AndroidX Core KTX | 1.19.0 | Kotlin扩展 |
+| Compose Material3 | BOM管理 | UI组件库 |
+| Activity Compose | 1.13.0 | Compose Activity集成 |
+| qqinterface module | — | QQ/TIM接口stub（compileOnly） |
 
-```
-Listener (marker interface)
-    ▲
-BaseHookItem (abstract)                         # 根基类
-    ├── BaseSwitchHookItem (abstract)            # 带开关 + UI
-    │       └── BaseClickableHookItem<T>         # 带配置弹窗
-    └── BaseApiHookItem<T extends Listener>      # API 监听型
-```
+### 2.3 NDK 配置
 
-| 类 | 职责 |
-|----|------|
-| [Listener.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/Listener.java) | 所有监听器的空标记接口，用于泛型约束 |
-| [BaseHookItem.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/BaseHookItem.java) | 顶层抽象。`isEnable`、`getAnnotation()` 反射读注解、`isInTargetProcess()` 按 `@HookItemAnnotation.process` 字段判定进程生效范围（`"All"`/空 = 全进程，否则要求 `HostInfo.processName == packageName + target`） |
-| [BaseSwitchHookItem.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/BaseSwitchHookItem.java) | 带开关的 Hook 项。生命周期 `init()`：`onInit()` → 进程校验 → `initData()`（若是 Clickable）→ `onHook()`。提供 `getTag()/getDesc()/getCategory()` UI 元数据。`getPrefs()` 返回按当前 QQ 号隔离的 `QEdge_Config_{uin}`（`MODE_MULTI_PROCESS` 跨进程） |
-| [BaseClickableHookItem.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/BaseClickableHookItem.java) | 可点击弹窗配置项，抽象方法 `ConfigContent(Runnable onDismiss)` 由子类构建弹窗 |
-| [BaseApiHookItem.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/BaseApiHookItem.java) | API 监听基类。持有 `Set<T> listenerSet`；核心方法 `forEachChecked(Consumer<T>)` 遍历时自动跳过 `isEnable()==false` 的监听器，实现"开关动态控制监听器是否生效" |
-| [HookRegistry.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/HookRegistry.java) | 全局注册中心。`hookItems: List<BaseHookItem>` + `registeredClasses: Set<Class>` 去重；`getHookItemsByClass(Class<T>)` 按类型筛选供 `MainHook` 批量加载 |
-
-#### 4.1.2 注解（[hook/annotation/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/annotation)）
-
-- [HookCategory.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/annotation/HookCategory.java)：分类常量 `CHAT / API / OTHER / ITEM`
-- [HookItemAnnotation.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/annotation/HookItemAnnotation.java)：`@Retention(RUNTIME) @Target(TYPE)`，属性 `value/tag/desc/category/process`
-
-#### 4.1.3 工作流程
-
-```
-1. XposedEntry.initZygote()           → 保存 modulePath，探测 HookProvider（LSPosed/EdXposed/Dreamland）
-2. XposedEntry.handleLoadPackage()    → 按包名分流
-3. hookBaseApplicationOnCreate()      → Hook BaseApplicationImpl.onCreate after
-4. HostInfo.init(ctx) + Parasitics.initForStubActivity(ctx)
-5. DexKitCache.initCache() + validateAllTasks()
-   ├─ 命中 → MainHook.loadHook()
-   └─ 未命中 → DexKitFinder.doFind()（异步预扫 + 进度对话框 + 重启 QQ）
-6. MainHook.loadHook():
-   ├─ HeartbeatManager.isBanned() 检查（封禁则跳过）
-   ├─ registerHookItems()        → HookRegistry 注册 19 个 Hook 项
-   ├─ FromServiceMsgDispatcher.loadHook()  → MSF 包体监听
-   ├─ loadApiHook()              → 遍历 BaseApiHookItem，目标进程内调 item.loadHook()
-   ├─ initSwitchHookItem()       → 遍历 BaseSwitchHookItem，调 item.init()
-   ├─ hookAccountChange()         → Hook QQAppInterface 账号切换，重置环境 + 加载插件 + 重启心跳
-   ├─ ChatSettingLoader.loadHook() → 聊天页设置入口注入
-   └─ (延迟 2s) loadPluginsIfNeeded() + ColdRainCore.init()
+```kotlin
+ndk {
+    abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+}
 ```
 
-#### 4.1.4 API 层（[hook/api/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api)）
+### 2.4 资源 ID 隔离
 
-| 类 | Hook 目标 | 监听器签名 |
-|----|-----------|------------|
-| [FromServiceMsgDispatcher.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/FromServiceMsgDispatcher.java) | `MSFServlet.onReceive`，过滤 `trpc.msg.olpush.OlPushService.MsgPush` 命令字，wupBuffer → ProtoData → JSON 分发 | `DispatcherListener(cmd, json)` |
-| [OnGetRKey.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnGetRKey.java) | `FromServiceMsg.getWupBuffer`，命令字 `OidbSvcTrpcTcp.0x9067_202`，提取好友/群 RKey | 存入静态字段 `friendRkey / groupRkey` |
-| [OnMenuBuild.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnMenuBuild.kt) | `QQCustomMenuExpandableLayout.setMenu` + 返回 View 的方法；QQ/TIM 分流实现 | `MenuClickListener.onClick(MsgData)` |
-| [OnPaiYiPai.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnPaiYiPai.java) | 订阅 FromServiceMsgDispatcher，`cmd1==732&&cmd2==20`（群）/ `528&&290`（私聊） | `onPai(peerUin, chatType, fromUin)` |
-| [OnQZonePush.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnQZonePush.java) | 三路并行：`QZonePushApiImpl.onHandlePushMsg`、`MessageMicro.mergeFrom`、MSFServlet 命令字 | `onPush(JSONObject)` |
-| [OnReceiveMsg.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnReceiveMsg.java) | `MsgService.onRecvMsg/onAddSendMsg`；三级类查找（DexKitCache → 实时 DexKit → 硬编码 → 反射扫包） | `onReceive(msgRecord)` |
-| [OnSendMsg.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnSendMsg.java) | `IKernelMsgService$CppProxy.sendMsg`（5 参），before | `onSend(Contact, elements)` |
-| [OnTroopJoin.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnTroopJoin.java) | QQ：`TroopMemberAddPushProcessor`；TIM：`TroopOnlinePushHandler.handleJoin` | `onJoin(troopUin, memberUin)` |
-| [OnTroopQuit.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnTroopQuit.java) | `TroopMemberInfoServiceImpl.deleteTroopMember` after | `onQuit(troopUin, memberUin)` |
-| [OnTroopShutUp.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnTroopShutUp.java) | 订阅 FromServiceMsgDispatcher，`msgHead.1==732&&.2==12` | `onShutUp(troopUin, memberUin, time, opUin)` |
+```kotlin
+androidResources {
+    additionalParameters += listOf("--allow-reserved-package-id", "--package-id", "0x69")
+}
+```
+> 目的：模块资源与宿主QQ资源不冲突，实现寄生Activity资源访问。
 
-#### 4.1.5 Entry 注入（[hook/entry/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/entry)）
+### 2.5 R8 优化配置（gradle.properties）
 
-- [QQPlusInject.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/entry/QQPlusInject.java)：Hook `PopupMenuDialog.conversationPlusBuild`，在 "+" 菜单插入 QEdge 入口，点击启动 `SettingActivity`
-- [QQSettingInject.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/entry/QQSettingInject.kt)：DexKit 查找 `SettingConfigProvider`，在 QQ 设置页 sections 列表 index=1 插入 QEdge 入口
+```properties
+android.enableR8.fullMode=true    # 启用R8全模式，激进代码移除
+```
 
-#### 4.1.6 Item 功能项（[hook/item/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item)）
-
-| 类 | 功能 | 开关 SP Key |
-|----|------|-------------|
-| [FlashPicBypass.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/FlashPicBypass.java) | 闪照破解：Hook `MsgRecord` 所有 public 方法，`subMsgType & ~8192` 清除闪照位 | `flash_pic_bypass` |
-| [DownloadEmotion.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/DownloadEmotion.kt) | 图片/视频/语音长按下载，通过 `OnMenuBuild` 注册菜单项 `[QEdge],DownloadEmotion,保存,,2,7,32,6` | `download_emotion` |
-| [AntiPokeDelay.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/AntiPokeDelay.java) | 取消拍一拍时间限制：Hook `PaiYiPaiHandler` 返回 boolean 的方法，强制 `setResult(true)` | `anti_poke_delay` |
-| [TransparentAvatar.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/TransparentAvatar.kt) | 透明头像：四路 Hook（PhotoCropActivity 路径捕获 / `BitmapFactory.decodeFile` / `ProfileCardUtil.F` 绕过尺寸校验 / `Bitmap.compress` 改 PNG 保留透明通道） | `transparent_avatar` |
-| [VideoToBubble.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/VideoToBubble.kt) | 视频转泡泡消息：订阅 `OnSendMsg`，发送前替换视频元素为 `MsgTool.createBubbleVideoElement` | `video_to_bubble`（仅 QQ） |
-| [TimArkCardBypass.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/TimArkCardBypass.kt) | TIM Ark 卡片白名单绕过：DexKit 找 `ArkConfigModel`，Hook `(String,String)→boolean` 强制返回 true。覆写 `isApplicable()` 仅 TIM 生效 | `tim_ark_card_bypass`（默认 true，仅 TIM） |
-| [AutoLikeBack.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/AutoLikeBack.kt) | 名片自动回赞：识别 `type==203` 名片被赞推送，LRU 去重（上限 500），延迟 600+random(400)ms 调 `FriendTool.sendZan` | `profile_auto_like_back` |
-| [QZoneLikeTool.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/QZoneLikeTool.kt) | QZone HTTP 工具集：`doLike / doComment / publishMood / qzoneClockIn / dailySign / bigVipClockIn`，依赖 `CookieTool`（skey/pskey/bkn） | （工具类，无开关） |
-| [QZoneSchedule.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/QZoneSchedule.kt) | 定时任务调度器：凌晨 00:00 跑三签到，自定义 HH:mm 跑定时说说；三重去重（主进程 + AtomicBoolean + SP 日期标记） | `qzone_daily_checkin_enabled` 等 |
-| [KeepAliveHook.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/KeepAliveHook.kt) | QQ 进程保活：三机制独立开关 — ①1x1像素透明悬浮窗（右上角）②前台通知（ongoing 高优先级）③后台通知（普通优先级） | `keep_alive_pixel` / `keep_alive_foreground` / `keep_alive_background` |
-
-#### 4.1.7 第三方 APP Hook
-
-| 文件 | 目标 APP | 策略 |
-|------|----------|------|
-| [KKHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/kk/KKHook.java) | KK 键盘 | `isVip()→true`、`isAdFree()→true`、5 路防退出拦截（UncaughtException / System.exit / Process.killProcess / ActivityManager.forceStopPackage / DexKit 字符串查"do process kill"） |
-| [KuGouHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/kugou/KuGouHook.java) | 酷狗音乐（普通/大字/概念） | 跳过开屏广告（直接跳 MediaActivity）、签名伪造（替换 `PackageInfo.signatures`）、反 Hook 注入空实现、浏览器/检测关键词拦截 |
-| [AoRuanHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/aoruan/AoRuanHook.java) | 傲软抠图 | `VipManager.isVip/isVipValid/isExpire/isVipValidOrBalance→true`，`getDeadlineDate()→"2099.12.31"` |
-
-#### 4.1.8 心跳与远程管控
-
-[HeartbeatManager.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/HeartbeatManager.java) 每 10 分钟（`HEARTBEAT_INTERVAL=600000`）向 `https://v.yuafeng.cn/QEdge/heartbeat/index.php` 上报 `{qq, nickname, qq_version, module_version}`（JSON → 16 进制字符串 POST）。响应三态：
-
-- `code==403`：账号封禁，置 `isBanned=true`，主线程 Toast，`MainHook.loadHook()` 检查后跳过所有 Hook 加载
-- `code==200`：正常，新用户返回 `initial_password` 触发欢迎弹窗
-- `code==0`：有新版本，返回 `apk/version/update` 触发更新弹窗
+- Proguard 规则保留：`-dontobfuscate`（Xposed模块禁止混淆）
+- Proguard 规则保留：`-keep class me.lengyu.qedge.** { *; }`（模块代码全保留）
+- **禁止** `-dontoptimize`（开启R8优化，方法内联/死代码移除）
 
 ---
 
-### 4.2 ColdRain 功能系统
+## 3. 模块职责详解
 
-ColdRain 是一套基于 QQ NT 内核的**机器人功能框架**，采用「**核心 + 特性（Feature）**」分层架构。
+### 3.1 app 模块
 
-#### 4.2.1 核心调度器 [ColdRainCore.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainCore.java)
+Xposed 模块主体，包含以下子系统：
 
-- **单例**：双重检查锁定（DCL）+ `volatile instance`
-- **初始化流程**（`init(Context)`）：
-  1. `initConfigFile()`：在外置存储 `Android/media/<包名>/冷雨Java/` 创建目录 + `config.json` + `data/`
-  2. `loadConfig()`：读 `config.json` 到 `JSONObject configData`，记录 `lastFileModified`
-  3. `registerFeatures()`：硬编码注册 21 个 Feature 到 `Map<String, ColdRainFeature> features`
-  4. `initDefaultConfig()`：写默认 `master_enabled=false`、`menu_name=菜单`，每个 feature 键默认 true
-  5. `setupMessageListener()`：注册 `OnReceiveMsg` 监听器
-  6. 注册 `WelcomeJoinFeature` / `WelcomeQuitFeature` / `BlackWhiteListFeature` 的事件监听器
-  7. `HourlyChimeFeature.startTimer()` 启动整点报时定时器
-- **配置热重载**：`checkAndReloadIfModified()` 比较 `configFile.lastModified()` 与缓存值，文件外部修改则自动重载
-- **配置键命名约定**：
-  - 全局功能开关：`feature_<name>`
-  - 群功能开关：`group_feature_<name>_<groupUin>`
-  - 群主控开关：`group_master_enabled_<groupUin>`
-  - 全局管理员：`global_admins`；群管理员：`group_admins_<groupUin>`；主人：`master_uin`
-- **消息分发**（`handleMessage`）：
-  1. 总开关检查
-  2. "开机/关机"指令（管理员才能操作）
-  3. "开启/关闭+功能中文名"群功能开关指令
-  4. 菜单指令（直接 `new MenuFeature().handle()`，不走 features Map）
-  5. 遍历 features Map，`shouldHandle` + `canTriggerFeature` 权限校验，命中后 `handle` 并 `break`（单消息单处理）
-- **权限分层** `canTriggerFeature`：
-  ```
-  isMasterEnabled 全局总开关
-     ↓
-  isMenuCommand（菜单类指令豁免群功能开关）
-     ↓
-  isFeatureEnabled 全局功能开关（feature_status 例外）
-     ↓
-  isPersonalFeature（feature_status / feature_group_manager / feature_at）
-     ↓
-  群消息：group_master_enabled + isGroupFeatureEnabled 双层校验
-  ```
-- **权限体系** `isAdminOrSelf(MsgData)`：自身发送 → 当前 QQ → master_uin → global_admins → group_admins
-- **回复模式** `reply()`：支持 text/card/image/forward/markdown/reply/guanjia 七种模式，统一变量替换 `[at]/[qq]/[uin]/[qun]/[time]/[Name]/[pic=`，失败降级为纯文本
+| 子包 | 职责 | 关键类 |
+|------|------|--------|
+| `hook/` | Xposed Hook 系统，所有宿主注入逻辑入口 | `XposedEntry`, `MainHook`, `HookRegistry` |
+| `coldrain/` | 冷雨QQ机器人：消息处理、功能调度、群管 | `ColdRainCore`, `ColdRainFeature`, `*Feature` |
+| `plugin/` | 在线脚本平台：BeanShell脚本加载/编译/执行 | `PluginManager`, `PluginCompiler` |
+| `ui/` | Jetpack Compose UI：模块首页、冷雨配置、文件管理 | `HomeScreen`, `MainScreen`, `ColdRainScreen` |
+| `utils/` | 基础设施：配置、日志、网络、反射、DexKit、QQ工具 | `ModuleConfig`, `LogUtils`, `QQCurrentEnv` |
+| `lifecycle/` | 寄生Activity：在QQ进程中启动模块Activity | `Parasitics`, `DynamicActivityRegistry` |
+| `activity/` | Activity实现类 | `SettingActivity`, `ThemeHelper` |
 
-#### 4.2.2 Feature 接口 [ColdRainFeature.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainFeature.java)
+### 3.2 qqinterface 模块
+
+QQ/TIM 接口 Stub 层（compileOnly，不打包进APK）：
+
+- 提供 QQ NT 内核接口签名（`IKernelService`, `IFriendsInfoService`等）
+- 提供消息数据类签名（`MsgElement`, `Contact`, `TroopInfo`等）
+- 提供 QRoute 路由接口
+- 作用：编译时类型检查，运行时通过宿主 ClassLoader 加载真实类
+
+### 3.3 libs/libxposed 模块
+
+本地 Xposed API 库（compileOnly）：
+- `api/`：IXposedHookLoadPackage / IXposedHookZygoteInit 接口
+- `service/`：Xposed 服务端接口
+
+---
+
+## 4. 核心流程与初始化
+
+### 4.1 Xposed 注入全流程
+
+```
+Xposed Framework
+    │
+    ▼
+XposedEntry.initZygote()           ──→ 检测Hook框架（LSPosed/EdXposed）
+    │
+    ▼
+XposedEntry.handleLoadPackage()    ──→ 按包名分流
+    │
+    ├─ QQ/TIM (com.tencent.mobileqq/tim)
+    │       │
+    │       ▼
+    │   hook BaseApplicationImpl.onCreate
+    │       │
+    │       ▼
+    │   HostInfo.init(hostContext)        初始化宿主信息
+    │   Parasitics.initForStubActivity()  注册寄生Activity
+    │       │
+    │       ├─ DexKit缓存有效？
+    │       │   ├─ 是 → MainHook.loadHook()
+    │       │   └─ 否 → DexKitFinder.doFind() → 显示查找弹窗
+    │       │
+    │       ▼
+    │   MainHook.loadHook()
+    │       ├─ registerHookItems()         注册所有BaseHookItem
+    │       ├─ FromServiceMsgDispatcher    服务消息分发
+    │       ├─ loadApiHook()               加载API类Hook
+    │       ├─ initSwitchHookItem()        初始化开关型Hook
+    │       ├─ hookAccountChange()         监听账号切换
+    │       ├─ ChatSettingLoader           聊天设置注入
+    │       └─ Thread[Plugin-AutoLoad]
+    │           ├─ 2s延迟 → loadPluginsIfNeeded()  加载BeanShell插件
+    │           └─ ColdRainCore.init()              冷雨机器人初始化
+    │
+    ├─ KK键盘 (im.weshine.keyboard)  → KKHook.loadHook()
+    ├─ 酷狗大字版/概念版             → KuGouHook.loadHook(flavor)
+    └─ 傲软抠图                      → AoRuanHook.loadHook()
+```
+
+### 4.2 DexKit 查找流程（首次启动/缓存失效）
+
+1. Hook `SplashActivity.doOnCreate` 显示 Compose 查找进度弹窗
+2. 收集所有 `DexKitTask`（含 `HookRegistry` 中 + `TroopTool` + `QZoneLikeTool`）
+3. 过滤 `.filter { it.isApplicable() }`（TIM专属功能在QQ不执行，反之亦然）
+4. 创建 `DexKitBridge.create(sourceDir)` 加载宿主 APK
+5. 逐个执行任务的 `getQueryMap()` → FindClass / FindMethod
+6. 结果存入 `DexKitCache.cacheMap`，key = `TaskTAG->QueryName`
+7. 保存缓存到文件 → 提示"查找完成，点击确定退出QQ" → 杀进程重启
+
+### 4.3 账号切换流程
+
+1. Hook `QQAppInterface` 的消息Facade初始化方法（或构造函数）
+2. 触发后 3s 延迟执行 `onAccountChanged()`：
+   - `QQCurrentEnv.reset()` 清空 Uin/Uid/Nickname 缓存
+   - 保存当前 Uin 到 `QEdge_Config_<Uin>` SP
+   - `processDataForCurrent("init")` → 初始化所有可点击Hook项数据
+   - `loadPluginsIfNeeded()` 重新加载当前账号插件
+   - `HeartbeatManager.startHeartbeat()` 重启心跳
+
+---
+
+## 5. 关键类与函数说明
+
+### 5.1 入口类
+
+#### [XposedEntry.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/XposedEntry.java)
+
+Xposed 模块入口，实现 `IXposedHookLoadPackage` + `IXposedHookZygoteInit`。
+
+| 函数 | 说明 |
+|------|------|
+| `initZygote(StartupParam)` | Zygote 阶段初始化，检测 Hook 框架类型（LSPosed/EdXposed/Dreamland），保存 modulePath |
+| `handleLoadPackage(LoadPackageParam)` | 按包名分发：QQ/TIM → 延迟到 Application.onCreate；第三方APP → 立即Hook |
+| `isNameSupported(packageName)` | 支持的宿主：QQ/TIM/KK键盘/酷狗/傲软（前缀匹配） |
+| `hookBaseApplicationOnCreate(classLoader)` | QQ/TIM 主入口：延迟AtomicBoolean一次性初始化 |
+| `getModulePathFromClassLoader()` | modulePath 为 null 时的兜底，从 ClassLoader 的 dexElements 中反向查找 .apk 路径 |
+
+关键常量：
+```java
+String[] supportedPackages = {
+    "com.tencent.mobileqq", "com.tencent.tim",
+    "im.weshine.keyboard", "com.kugou.android", "com.apowersoft.backgrounderaser"
+}
+```
+
+#### [MainHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/MainHook.java)
+
+Hook 加载调度中心。
+
+| 函数 | 说明 |
+|------|------|
+| `registerHookItems()` | 静态注册 20+ BaseHookItem 到 HookRegistry（OnReceiveMsg/FlashPicBypass/KeepAlive/...） |
+| `loadHook()` | 主加载入口：检查封禁状态 → 注册项 → 加载API Hook → 初始化开关Hook → Hook账号切换 → 线程加载插件+冷雨 |
+| `loadApiHook()` | 遍历所有 BaseApiHookItem，若 `isInTargetProcess()` 则 `item.loadHook()` |
+| `initSwitchHookItem()` | 遍历所有 BaseSwitchHookItem，调用 `item.init()` 读取配置启用/禁用 |
+| `hookAccountChange()` | 监听账号切换（多策略：优先找特定方法→兜底构造函数） |
+| `onAccountChanged()` | 账号变化时：重置QQ环境→写Uin缓存→重初始化数据→重载插件→重启心跳 |
+| `processDataForCurrent(tag)` | 触发所有 BaseClickableHookItem 的 initData/saveData（反射调用protected方法） |
+
+插件管理静态方法（UI调用）：`getPluginList()`, `setPluginRunning()`, `setPluginAutoLoad()`, `deletePlugin()`, `reloadPlugin()`, `createPlugin()`
+
+---
+
+### 5.2 Hook 基类体系
+
+#### [BaseHookItem.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/BaseHookItem.java)
+
+所有 Hook 项的根类。
+
+```java
+public abstract class BaseHookItem {
+    protected boolean isEnable = true;
+    public boolean isInTargetProcess();   // 读HookItemAnnotation，判断当前进程是否匹配
+    public boolean isEnable();
+    public void setEnable(boolean enable);
+}
+```
+
+#### HookItem 继承链
+
+```
+BaseHookItem
+├── BaseApiHookItem<T extends Listener>       // API类Hook（事件分发型）
+│   ├── OnReceiveMsg                          // 接收消息
+│   ├── OnSendMsg                             // 发送消息
+│   ├── OnMenuBuild                           // 菜单构建
+│   ├── OnPaiYiPai                            // 拍一拍
+│   ├── OnQZonePush                           // QZone推送
+│   ├── OnTroopJoin / OnTroopQuit             // 进/退群
+│   ├── OnTroopShutUp                         // 群禁言
+│   ├── OnGetRKey                             // RKey获取
+│   └── FromServiceMsgDispatcher              // 服务消息
+│
+├── BaseSwitchHookItem                        // 开关型Hook（UI开关控制）
+│   ├── FlashPicBypass                        // 闪照破解
+│   ├── DownloadEmotion                       // 资源下载
+│   ├── TransparentAvatar                     // 透明头像
+│   ├── VideoToBubble                         // 视频转泡泡
+│   ├── AntiPokeDelay                         // 取消拍一拍延迟
+│   ├── TimArkCardBypass                      // TIM卡片绕过
+│   ├── AutoLikeBack                          // 名片回赞
+│   ├── KeepAliveHook                         // 保活
+│   ├── QZoneSchedule                         // 定时任务调度
+│   └── RemoveLinkInfo                        // 屏蔽链接卡片
+│
+└── BaseClickableHookItem                     // 可点击菜单项
+    ├── QQPlusInject                          // QQ+注入
+    └── QQSettingInject                       // 设置页注入
+```
+
+#### [HookRegistry.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/HookRegistry.java)
+
+Hook 注册中心（静态 List + Set 去重）。
+
+| 方法 | 说明 |
+|------|------|
+| `register(BaseHookItem)` | 注册单个Hook项（按Class去重） |
+| `getHookItems()` | 返回所有Hook项副本 |
+| `getHookItemsByClass(Class<T>)` | 按类型过滤（如获取所有BaseSwitchHookItem） |
+
+---
+
+## 6. Hook 系统
+
+### 6.1 API Hook 机制（观察者模式）
+
+每个 `BaseApiHookItem` 内部维护一个 `List<T extends Listener>` 监听器列表：
+
+```
+OnReceiveMsg.INSTANCE.registerListener(new ReceiveMsgListener() {
+    void onReceive(Object msgRecord) { ... }
+});
+```
+
+以 [OnReceiveMsg](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/api/OnReceiveMsg.java) 为例：
+
+1. `loadHook()` 查找 `IKernelMsgService` 实现类（DexKit缓存→DexKit查找→硬编码兜底三策略）
+2. Hook `onRecvMsg(ArrayList<MsgRecord>)` after → 取第0条 → `notifyListeners(msgRecord)`
+3. Hook `onAddSendMsg(MsgRecord)` after → 同样通知
+
+### 6.2 Hook 工具封装
+
+`HookUtils.hookAfter(method, callback)` - 统一的 after Hook 封装，避免重复样板代码。
+
+---
+
+## 7. DexKit 动态查找机制
+
+### 7.1 设计目标
+
+不同版本 QQ/TIM 类名/方法名混淆不同，DexKit 通过字符串特征（类中包含的方法名、字段字符串）定位目标。
+
+### 7.2 核心组件
+
+#### [DexKitTask.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitTask.kt) 接口
+
+```kotlin
+interface DexKitTask {
+    val TAG: String
+    fun getQueryMap(): Map<String, BaseFinder>   // "name" -> FindClass/FindMethod
+    fun isApplicable(): Boolean = true           // 宿主适用性（如TIM-only覆写返回HostInfo.isTIM）
+    fun requireClass(name: String): Class<*>     // 缓存获取Class
+    fun requireMethod(name: String): Method      // 缓存获取Method
+}
+```
+
+#### [DexKitFinder.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitFinder.kt) 对象
+
+执行实际的 DexKit 查找。
+
+关键流程：
+1. 从 `HookRegistry` 过滤出 `DexKitTask` 实例 + 追加 `TroopTool` + `QZoneLikeTool`
+2. 过滤 `.filter { it.isApplicable() }`
+3. `DexKitBridge.create(sourceDir)` 打开宿主 dex
+4. 遍历所有 task 的 queryMap：
+   - `FindClass` → `b.findClass(query)` → `singleOrNull()` → 取 descriptor 存入 cache
+   - `FindMethod` → 同理，无匹配时记录 Error 日志
+
+#### [DexKitCache.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitCache.kt)
+
+结果缓存（内存 Map + 磁盘 JSON 文件）。
+
+| 方法 | 说明 |
+|------|------|
+| `initCache()` | 从文件加载缓存到内存 |
+| `validateAllTasks()` | 校验缓存中每个条目是否仍然有效（类是否包含期望方法） |
+| `saveCache()` | 内存cache写入文件 |
+| `getDescriptor(key)` | 取 `TaskTAG->name` 的descriptor字符串 |
+| `getClass(key)` | descriptor → Class（DexClass.getInstance） |
+| `getMethod(key)` | descriptor → Method |
+
+缓存Key格式：`"OnReceiveMsg->msgService"` / `"TroopTool->getMemberInfo"`
+
+---
+
+## 8. 冷雨功能核心
+
+### 8.1 架构设计
+
+[ColdRainCore.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainCore.java) 是整个冷雨机器人的大脑，采用**单例 + 策略模式**：
+
+```
+ColdRainCore (单例)
+├── Map<String, ColdRainFeature> features     // 20+ 功能策略
+│   ├── "feature_status"       → StatusFeature
+│   ├── "feature_menu"         → MenuFeature
+│   ├── "feature_question"     → QuestionFeature
+│   ├── "feature_signin"       → SignInFeature
+│   ├── "feature_group_manager"→ GroupManagerFeature
+│   ├── "feature_ban"          → BanDetectionFeature
+│   ├── "feature_video_parse"  → VideoParseFeature
+│   ├── "feature_image_menu"   → ImageMenuFeature
+│   ├── "feature_music"        → MusicMenuFeature
+│   ├── "feature_weather"      → WeatherFeature
+│   ├── "feature_hourly"       → HourlyChimeFeature
+│   ├── "feature_title"        → TitleFeature
+│   ├── "feature_like"         → LikeFeature
+│   ├── "feature_autoadmin"    → AutoAdminFeature
+│   ├── "feature_at"           → AtFeature
+│   ├── "feature_avatar_menu"  → AvatarMenuFeature
+│   ├── "feature_welcome_join" → WelcomeJoinFeature
+│   ├── "feature_welcome_quit" → WelcomeQuitFeature
+│   └── "feature_black_white_list" → BlackWhiteListFeature
+│
+├── config.json               // 配置（集中式JSON，禁止SharedPreferences）
+├── data/                     // 功能数据文件
+└── OnReceiveMsg.Listener     // 消息入口
+```
+
+### 8.2 [ColdRainFeature.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainFeature.java) 接口
 
 ```java
 public interface ColdRainFeature {
-    boolean shouldHandle(MsgData msgData);
-    void handle(MsgData msgData, ColdRainCore core);
+    boolean shouldHandle(MsgData msgData);   // 判断是否需要处理该消息
+    void handle(MsgData msgData, ColdRainCore core);  // 执行处理
 }
 ```
 
-设计模式：**策略模式 + 责任链变体**，核心按 Map 注册顺序遍历，第一个 `shouldHandle==true` 即消费消息（break）。所有 Feature 的 `handle` 几乎都用 `new Thread().start()` 异步化网络 IO。
-
-#### 4.2.3 Feature 清单（22 个）
-
-| Feature | featureKey | 触发示例 | 说明 |
-|---------|-----------|----------|------|
-| [MenuFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/MenuFeature.java) | — | "菜单" | 装饰菜单展示已启用功能，核心直接 `new` 调用 |
-| [StatusFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/StatusFeature.java) | `feature_status` | "运行状态" | 个人功能，聚合电池/内存/存储/版本/运行时长等信息 |
-| [QuestionFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/QuestionFeature.java) | `feature_question` | "问答功能"/"添加本群精准问#问#答" | 精准+模糊问答，数据文件 `qa_group_<qun>.json` 等，匹配优先级：本群精准→全局精准→本群模糊→全局模糊 |
-| [SignInFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/SignInFeature.java) | `feature_signin` | "签到"/"设置签到金币随机" | 日签到去重，随机/自定义/定值三种金币模式 |
-| [GroupManagerFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/GroupManagerFeature.java) | `feature_group_manager` | "群管菜单"/"禁言@"/"踢@" | 个人功能，禁言/解禁/踢/踢黑/上管/下管/全体禁言等 |
-| [BlackWhiteListFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/BlackWhiteListFeature.java) | `feature_black_white_list` | "黑白名单"/"拉黑<QQ>" | 静态注册 `OnTroopJoin`（黑名单自动踢）+ `OnTroopShutUp`（白名单自动解禁），提供 `canOperate()` 供其他 Feature 调用 |
-| [WelcomeJoinFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/WelcomeJoinFeature.java) | `feature_welcome_join` | "进群欢迎"/"设置进群欢迎" | 注册 `OnTroopJoin` 监听，替换 `{qq}` 变量 |
-| [WelcomeQuitFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/WelcomeQuitFeature.java) | `feature_welcome_quit` | "退群提示" | 注册 `OnTroopQuit` 监听，与 WelcomeJoin 共享"提示系统"指令 |
-| [BanDetectionFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/BanDetectionFeature.java) | `feature_ban` | "违禁系统"/"添加违禁词" | 被动触发，每条群消息经过，命中违禁词自动禁言 |
-| [QueryFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/QueryFeature.java) | `feature_query` | "查Q音<QQ>"/"查等级<QQ>" | 调 `vip.qq.com`/`qzone.qq.com` 等接口查 QQ 等级/达人/QID/空间 |
-| [VideoParseFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/VideoParseFeature.java) | `feature_video_parse` | "视频解析"/含抖音/快手/B站/小红书链接 | 调 `api.yuafeng.cn` 解析视频/图集 |
-| [ImageMenuFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/ImageMenuFeature.java) | `feature_image_menu` | "图片菜单"/"随机腹肌"/"原神系列" | 40+ 图片指令，部分即时拉取部分跟随重定向 |
-| [VideoMenuFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/VideoMenuFeature.java) | `feature_video_menu` | "视频菜单"/"哔哩哔哩<关键词>" | 状态机，`searchCache` 缓存搜索结果，回复序号发送视频 |
-| [MusicMenuFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/MusicMenuFeature.java) | `feature_music` | "音乐菜单"/"点歌"/"QQ点歌" | 多平台搜索（QQ/网易/酷狗/酷我/汽水），状态机选号，7 种发送模式 |
-| [ImageFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/ImageFeature.java) | `feature_image` | "图片功能"/"抠头像<QQ>"/"阴影头像" | 从 gitee 下载 `图片.zip` 素材包，`Bitmap/Canvas/Matrix/PorterDuffXfermode` 实现头像贴图 |
-| [WeatherFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/WeatherFeature.java) | `feature_weather` | "天气系统"/"详细天气#省#市" | 调 `wis.qq.com` 21 项生活指数 |
-| [HourlyChimeFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/HourlyChimeFeature.java) | `feature_hourly` | "整点报时"/"切换文字报时" | 唯一基于定时器触发，每 60s 检查 `mm:ss==00:00` 时遍历所有启用群发送 |
-| [TitleFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/TitleFeature.java) | `feature_title` | "我要头衔 <内容>"/"上头衔<QQ>" | 调 `ExtraTool.setMemberTitle`，自助申请检查违禁词 |
-| [LikeFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/LikeFeature.java) | `feature_like` | "赞我点赞"/"点赞<QQ>" | 调 `FriendTool.sendZan(uin, 20)` |
-| [AutoAdminFeature.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/AutoAdminFeature.java) | `feature_autoadmin` | "自助上管"/"我要管理"/"取消上管" | 群收款支付上管：发起→轮询支付状态（60s）→支付成功设管/过期失败/主动取消；`PendingPayment` 并发追踪 |
-| [AtFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/AtFeature.java) | `feature_at` | "艾特处理"/"设置艾特回复" | 个人功能，4 种艾特行为：回复/禁言/提醒/管家禁言 |
-| [AvatarMenuFeature](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/AvatarMenuFeature.java) | `feature_avatar_menu` | "头像菜单"/"上传头像" | 需先发图片再回复指令，调 `ExtraTool.uploadAvatar/Cover` |
-
-#### 4.2.4 协作关系
-
-- `GroupManagerFeature` / `TitleFeature` 调用 `BlackWhiteListFeature.canOperate()` 检查白名单保护
-- `WelcomeJoinFeature` ↔ `WelcomeQuitFeature` 共享"提示系统"指令
-- `BlackWhiteListFeature` + `WelcomeJoinFeature` + `WelcomeQuitFeature` 均注册 `OnTroop*` 监听器独立响应事件
-- 所有 Feature 通过 `handle(msgData, core)` 反向访问核心的配置/回复/权限
-
-#### 4.2.5 插件化评估
-
-**未使用任何插件化或反射机制**。21 个 Feature 通过 `features.put("feature_xxx", new XxxFeature())` 显式 new，编译期硬依赖。新增功能必须修改 `ColdRainCore.registerFeatures()` 源码并重新编译。
-
----
-
-### 4.3 Plugin 脚本系统
-
-Plugin 系统是一个完整的"在线脚本"运行时框架，基于 BeanShell 解释器在 QQ/TIM 宿主进程内动态执行用户编写的 `main.java` 脚本。
-
-#### 4.3.1 核心组件
-
-| 类 | 职责 |
-|----|------|
-| [PluginManager.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/PluginManager.java) | 全静态工具类，插件系统入口与编排者。`plugins: List<PluginInfo>` + `autoLoadList: List<String>`（持久化到 `data/AutoLoadList.json`）+ `runningCompilers: Map<String, PluginCompiler>` |
-| [PluginCompiler.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/PluginCompiler.java) | 脚本运行容器（非传统编译器）。持有 `Interpreter`、`FixClassLoader`、`PluginMethod api`、`PluginCallback callback`、`menuItems/msgMenuItem` |
-| [PluginCallback.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/PluginCallback.java) | 事件回调分发器，把 6 类 Hook 事件（消息收发/入退群/禁言/拍一拍）+ 聊天界面切换回调到脚本同名方法 |
-| [FixClassLoader.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/FixClassLoader.java) | 聚合 ClassLoader，统一"宿主 QQ 类 + 模块类 + 动态 jar/dex 类"三类加载需求 |
-| [PluginError.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/PluginError.java) | 错误处理，写 `error.log`（带时间戳+分隔线） |
-
-#### 4.3.2 插件目录约定
+### 8.3 消息处理流水线
 
 ```
-plugin/<插件目录>/
-├── info.prop        # 必需，Java Properties 格式（id / pluginName / versionCode / author）
-├── desc.txt         # 可选，纯文本描述
-├── main.java        # 必需，BeanShell 脚本入口
-├── config/          # PluginMethod 的 putXxx/getXxx 默认存这里
-├── log.txt          # 运行时日志
-└── error.log       # PluginError 自动写入
+收到消息 (OnReceiveMsg)
+    │
+    ▼
+handleMessage(msgRecord)
+    ├─ MsgData(msgRecord) 解析消息结构
+    │
+    ├─ [Q群管家token捕获] type=2 && userUin=2854196310 && msg含"token"
+    │   └─ handleGuanjiaTokenMessage() → 解析JSON卡片→保存token→触发问答
+    │
+    ├─ 特殊命令「开机/关机」→ 仅管理员/自己 → 设置 group_master_enabled_<群号>
+    │
+    ├─ 特殊命令「开启/关闭XX功能」→ 管理员命令 → 设置 group_feature_<key>_<群号>
+    │
+    ├─ 「菜单」命令 → isMenuRestricted() 检查 → MenuFeature.handle()
+    │
+    └─ 遍历 features.entrySet()
+        ├─ feature.shouldHandle(msgData)?
+        ├─ canTriggerFeature(featureKey, msgData)?
+        │   ├─ master_enabled?
+        │   ├─ menu_restricted?（仅管理员/自己）
+        │   ├─ group_only?（群聊专属功能在私聊不可用）
+        │   ├─ group_master_enabled?
+        │   ├─ feature_enabled?（全局开关）
+        │   └─ group_feature_enabled?（群独立开关）
+        └─ feature.handle(msgData, this) → break（匹配即停止）
 ```
 
-`info.prop` 示例：
-
-```properties
-id=example_1700000000000
-pluginName=示例脚本
-versionCode=1.0
-author=Developer
-```
-
-#### 4.3.3 生命周期
-
-| 操作 | 方法 | 流程 |
-|------|------|------|
-| 加载 | `loadAll()` | 遍历 plugin/ 子目录 → `PluginInfo.fromDir(dir)` → 若 runningCompilers 已有同 ID 则保留运行态 → `loadAutoLoadConfig()` |
-| 启动 | `startPlugin(plugin)` | `compiler.start()` → `runningCompilers.put(id, compiler)` |
-| 停止 | `stopPlugin(plugin)` | `compiler.stop(true)` 调脚本 `unLoadPlugin()` → 注销 Activity + 反注册监听器 → `runningComparsers.remove(id)` |
-| 卸载 | `deletePlugin(plugin)` | stop + 从列表移除 + 移除自动加载登记 + 递归删除目录 + 保存配置 |
-| 自动加载 | `startAutoLoadPlugins()` | 新线程遍历 autoLoadList 中未运行插件，每个启动间隔 100ms |
-| 热重载 | `reloadPlugin(plugin)` | stop + start |
-| 全量重置 | `initAllPluginForCurrent()` | `stopAllPlugins() → plugins.clear() → loadAll() → startAutoLoadPlugins()` |
-
-触发时机：`MainHook.loadHook()` 延迟 2s 调 `loadPluginsIfNeeded()`（10s 节流），账号切换时也会触发。
-
-#### 4.3.4 启动流程（PluginCompiler.start）
+### 8.4 权限层级
 
 ```
-1. 若已运行，先 stop(false)
-2. info.updateFromDisk() 刷新元数据
-3. 检查 main.java 存在
-4. new Interpreter()
-5. 注入上下文变量：context / myUin / classLoader / pluginPath / pluginId
-6. interpreter.setClassLoader(FixClassLoader)   # 替换 BshClassManager.externalClassLoader
-7. registerApiMethods(interpreter)                # PluginMethod 100+ API 注入为全局函数
-8. info.setRunning(true)
-9. interpreter.source("main.java")                # 解释执行脚本顶层代码
-10. registerCallbacks()                           # PluginCallback 注册 6 类事件监听器 + OnMenuBuild 菜单
+isAdminOrSelf(msgData) 判定（任一满足即通过）
+├── sendType == 1 (自己发送)
+├── uin == getMyUin() (自己)
+├── uin == master_uin (主人)
+├── uin ∈ global_admins.split(",") (全局管理员)
+└── 群聊场景：uin ∈ group_admins_<群号>.split(",") (群管理员)
 ```
 
-#### 4.3.5 PluginInfo 字段
+### 8.5 配置管理
 
-| 字段 | 类型 | 来源 | 说明 |
-|------|------|------|------|
-| `id` | String (final) | info.prop `id` | 唯一 ID，不可变 |
-| `name` | String | info.prop `pluginName` | 显示名 |
-| `version` | String | info.prop `versionCode` | 版本号 |
-| `author` | String | info.prop `author` | 作者 |
-| `dirPath` | String (final) | 目录路径 | 插件目录 |
-| `desc` | String | `desc.txt` | 描述 |
-| `isRunning` | boolean | 运行时 | 是否运行中 |
-| `compiler` | PluginCompiler | 构造时 new | 关联容器 |
+**文件位置**：`<QQCurrentEnv.getLocalPath()>/Android/media/<包名>/冷雨Java/config.json`
 
-#### 4.3.6 脚本 API（[PluginMethod.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/api/PluginMethod.java)）
+| 配置键 | 类型 | 说明 |
+|--------|------|------|
+| `master_enabled` | bool | 冷雨总开关（全局） |
+| `menu_name` | string | 菜单名称，默认"菜单" |
+| `menu_restricted` | bool | 菜单限制：仅主人/管理员/自己可触发 |
+| `master_uin` | string | 主人QQ号 |
+| `global_admins` | string | 全局管理员（逗号分隔） |
+| `group_admins_<群号>` | string | 群管理员（逗号分隔） |
+| `group_master_enabled_<群号>` | bool | 单群开机状态 |
+| `group_<featureKey>_<群号>` | bool | 单群功能开关 |
+| `feature_<name>` | bool | 功能全局开关（默认全true） |
+| `reply_mode` | string | 回复模式：text/card/image/forward/markdown/reply/guanjia |
+| `guanjia_token_<群号>` | string | Q群管家会话token（自动获取） |
+| `menu_name` | string | 自定义菜单触发词 |
 
-通过反射把 `PluginMethod` 所有 public 方法（150+）包装为 `BshMethod` 注入到脚本全局命名空间。分类：
+### 8.6 回复模式（6种）
 
-| 分类 | 代表方法 |
-|------|----------|
-| 日志/Toast | `log / toast / qqToast` |
-| QQ 账号 | `getCurrentUin/Name/Uid / getPluginPath/Id/Name / setPluginEnabled` |
-| 好友/群/成员 | `getAllFriend / isFriend / sendZan / getGroupList / shutUpAll / kickGroup / setGroupAdmin / setMemberTitle / getGroupMemberList` |
-| 消息发送 | `sendMsg / sendPic / sendPtt / sendCard / sendVideo / sendFile / sendReplyMsg / recallMsg / sendBubbleVideo / sendPai` |
-| 多平台音乐 | `qqsendTroopMusic / wysendTroopMusic / kgsendTroopMusic / ...sendFriendMusic` |
-| Cookie/鉴权 | `getSkey / getPskey / getGTK / getBkn / getFriendRKey / getGroupRKey` |
-| 配置存储 | `putString/getString / putInt/getInt / putBoolean/getBoolean / remove / contains / clear`（基于 JSON） |
-| HTTP/文件 | `httpGet / httpPost / downloadFile / readFile / writeFile / listFiles` |
-| 编码/加密 | `urlEncode/Decode / base64Encode/Decode / toJson / parseJson` |
-| Protobuf | `pbDecode / pbEncode / pbToHex / pbFromHex` |
-| Hook/反射 | `hookAfter / hookBefore / callMethod / findClass / findMethod / findField / newInstance` |
-| 动态加载 | `loadJava / loadJar / loadDex` |
-| Activity | `registerActivity / startQQActivity` |
-| 线程 | `runOnUiThread / runOnBackgroundThread / sleep / isMainThread` |
-| 菜单 | `addItem(name, callback) / addMenuItem(name, callback, msgTypes[])` |
-
-#### 4.3.7 聊天页入口注入（[ChatSettingLoader.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/view/ChatSettingLoader.kt)）
-
-三处 Hook：
-1. `ImageView.onAttachedToWindow`：检查 `contentDescription` 含"聊天设置"/"更多功能"，设置 `OnLongClickListener` → `showMenuDialog`
-2. `AIODelegate.show`：保存当前 `aioDelegate`，调 `notifyChatInterface()` 回调脚本 `chatInterface(chatType, peerUin, peerName)`
-3. `AIODelegate.hide`：清空引用
-
-`showMenuDialog`：收集所有运行中插件的 `getMenuItems()`，每个插件一个 Header + Actions，点击 Header 重载该插件，点击 Action 调脚本同名方法。
-
-#### 4.3.8 脚本回调机制
-
-主程序 → 脚本的被动回调：
-
-| 事件源 | 脚本回调方法 |
-|--------|--------------|
-| `OnReceiveMsg` | `onMsg(Object msgData)` |
-| `OnSendMsg` | `getMsg(String content)` / `getSummary(String summary)`（同步拦截改写） |
-| `OnTroopJoin` | `joinGroup(String troopUin, String memberUin)` |
-| `OnTroopQuit` | `quitGroup(String troopUin, String memberUin)` |
-| `OnTroopShutUp` | `shutUpGroup(String troopUin, String memberUin, Long time, String opUin)` |
-| `OnPaiYiPai` | `onPaiYiPai(String peerUin, int chatType, String fromUin)` |
-| `ChatSettingLoader` | `chatInterface(int chatType, String peerUin, String peerName)` |
-| 卸载时 | `unLoadPlugin()` |
-| 消息菜单点击 | `addMenuItem(name, callback)` 注册的同名方法，签名 `(Object msgData)` |
-| 聊天面板菜单点击 | `addItem(name, callback)` 注册的方法，签名 `(int chatType, String peerUin, String peerName)` |
-
-回调执行机制 `invokeMethodExists`：按方法名查找 → 按参数类型匹配 → `BshMethod.invoke`，方法不存在则安静跳过。所有回调在子线程 `Plugin-<pluginId>` 中执行。
-
-#### 4.3.9 数据 Bean（[plugin/bean/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean)）
-
-| Bean | 用途 |
+| mode | 说明 |
 |------|------|
-| [MsgData.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/MsgData.java) | 消息数据，封装 `MsgRecord`，解析文本/图片/视频/语音/文件/回复/At 元素 |
-| [FriendInfo.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/FriendInfo.java) | 好友信息（uin/uid/name/remark） |
-| [GroupInfo.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/GroupInfo.java) | 群信息 |
-| [MemberInfo.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/MemberInfo.java) | 群成员信息 |
-| [ForbidInfo.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/ForbidInfo.java) | 禁言信息 |
-| [BlackUser.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/BlackUser.java) | 黑名单 |
-| [JointGroup.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/JointGroup.java) | 共同群 |
-| [PluginInfo.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/bean/PluginInfo.java) | 插件元数据 |
+| text / 文字 | 纯文本消息 `MsgTool.sendMsg()` |
+| card / 卡片 | 构造Ark JSON卡片发送 |
+| image / 图片 | 调用API生成文字转图后发图 |
+| forward / 转发 | 构造"聊天记录"合并转发卡片 |
+| markdown / MarkDown | 转换为Markdown卡片格式，文本变inline命令链接 |
+| reply / 回复 | 有msgId则引用回复，否则纯文本 |
+| guanjia / 管家 | **群聊专用**：通过Q群管家问答机制间接回复（需群主/管理员权限） |
+
+回复模板变量替换：`[at]→艾特`, `[qq]→自己UIN`, `[uin]→发送者UIN`, `[qun]→群号`, `[time]→时间`, `[Name]→发送者昵称`
+
+### 8.7 Q群管家机制（间接回复）
+
+```
+发送回复请求
+    │
+    ├─ 检查：群聊 + 群主/管理员权限 + pskey/skey存在
+    │
+    ├─ guanjiaAddQna()  添加临时问答 {question=随机串, answer=实际内容}
+    │   └─ POST web.qun.qq.com/qunrobot/proxy/...
+    │      Headers: qname-service:976321:131072 + qname-space:Production
+    │      Body字段全部 escapeJson()（处理"、\、\n、\r、\t）
+    │
+    ├─ 有 token?
+    │   ├─ 否 → 艾特 Q群管家(2854196310) 发"Come on!" → 等卡片 → 保存token
+    │   └─ 是 → guanjiaTriggerQna(question, token)
+    │           ├─ 成功 → guanjiaDeleteQna("1"/"2") 清理临时问答
+    │           └─ 会话过期(ec=70000) → 重新艾特管家
+    │
+    └─ 任何失败 → 回退为纯文本发送
+```
 
 ---
 
-### 4.4 Utils 工具层
+## 9. 在线脚本插件系统
 
-#### 4.4.1 顶层工具
+### 9.1 架构概览
 
-| 类 | 职责 |
-|----|------|
-| [HostInfo.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/HostInfo.kt) | 宿主环境信息单例。`packageName/processName/versionCode/versionName` + `isQQ/isTIM/isInHostProcess` + `getModuleDataPath()` 返回 `/Android/data/<宿主包>/QEdge/` |
-| [ModuleConfig.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/ModuleConfig.kt) | 跨进程配置门面，封装 `JsonConfigUtils`，配置落地为 `data/config.json` |
-| [JsonConfigUtils.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/JsonConfigUtils.java) | 基于 `JSONObject` 的 JSON 文件 KV 存储，`loadConfig`/`saveConfig` 全量读写 |
-| [LogUtils.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/LogUtils.java) | 双通道日志（Logcat + XposedBridge.log），固定 TAG `[QEdge]` |
-| [Toasts.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/Toasts.java) | 主线程 Toast + QQ 风格 `QQToastUtil` |
-| [HookUtils.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/HookUtils.java) | Java 版 Xposed 封装（`HookCallback` 接口） |
-| [HttpUtils.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/HttpUtils.java) | 基于 `HttpURLConnection` 的同步 HTTP，`download` 手动处理 301/302/303/307/308 重定向 |
-| [HybridClassLoader.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/HybridClassLoader.java) | 自定义 ClassLoader，`isHostClass`/`isConflictingClass` 判断冲突类（androidx/kotlin/protobuf）直接抛异常强制走宿主版本 |
-| [ReflectUtils.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/ReflectUtils.java) | Java 版反射查找/调用，`injectClassLoader` 通过反射修改模块 ClassLoader 的 `parent` 字段注入 HybridClassLoader |
-| [QQCurrentEnv.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/QQCurrentEnv.java) | 缓存当前登录 QQ 账号（Uin/Uid/昵称/AppRuntime/KernelMsgService/Activity），`getQQAppInterface()` 通过 `MobileQQ.getMobileQQ().peekAppRuntime()` 获取 |
-| [JarLoader.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/JarLoader.java) | 动态加载 Jar/Dex，`loadJarToSystem` 反射 `PathClassLoader.addDexPath` 注入系统 ClassLoader |
-| [ObjectStore.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/ObjectStore.java) | 基于 `QQCurrentEnv.getCurrentDir()` 的轻量文件存储（List/String） |
-| [ModulePathHolder.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/ModulePathHolder.java) | 静态字段持有模块 APK 路径 |
-
-#### 4.4.2 DexKit 子包（[utils/dexkit/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit)）
-
-| 类 | 职责 |
-|----|------|
-| [DexKitCache.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitCache.kt) | 持久化 DexKit 缓存。`cacheFile` 路径含 `hostVersionCode` + `moduleVersionCode`，宿主或模块升级时自动失效重查。`initCache()` / `saveCache()` JSON 序列化。`validateAllTasks()` 反射 HookRegistry 检查每个 DexKitTask 的 `${TAG}->${key}` 是否齐全 |
-| [DexKitTask.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitTask.kt) | 任务接口：`getQueryMap(): Map<String, BaseFinder>` + `requireClass(name)/requireMethod(name)` 反查缓存 + `isApplicable()` 宿主适配过滤（默认 true） |
-| [DexKitFinder.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitFinder.kt) | 查找调度器。Hook `SplashActivity.doOnCreate` 弹 Compose 进度对话框 → IO 协程遍历所有 `isApplicable()` 通过的 DexKitTask → `DexKitBridge.findClass/findMethod` → `DexKitCache.saveCache()` → 用户点击"确定"后 `Process.killProcess` 重启 QQ |
-
-**DexKit 完整生命周期**：
+[PluginManager.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/plugin/PluginManager.java) 管理所有 BeanShell 脚本插件。
 
 ```
-首次启动 / 版本升级
-   │
-   ▼
-DexKitCache.initCache()  ← Hook 入口调用
-   │ 读取 cacheFile（路径含 hostVersionCode + moduleVersionCode）
-   ▼
-validateAllTasks() 检查每个 "${TAG}->${key}" 是否齐全
-   │
-   ▼ 失败
-DexKitFinder.doFind()
-   ├─ System.loadLibrary("dexkit")
-   ├─ MainHook.registerHookItems()
-   ├─ Hook SplashActivity.doOnCreate after → 显示进度对话框
-   └─ startFind() (IO 协程)
-       ├─ 收集所有 DexKitTask + TroopTool + QZoneLikeTool
-       ├─ DexKitBridge.create(sourceDir)
-       ├─ 遍历 task.getQueryMap()
-       ├─ DexKitCache.saveCache()
-       └─ Process.killProcess  ← 重启 QQ 加载缓存
+存储结构：
+<ModuleDataPath>/plugin/
+├── <插件目录名>/
+│   ├── info.prop       # id, pluginName, versionCode, author
+│   ├── desc.txt        # 描述文本
+│   └── main.java       # BeanShell源码（类Java语法）
 ```
 
-缓存键格式：`"${taskClassSimpleName}->${queryName}"`，如 `"TroopTool->setting"`。
+### 9.2 生命周期
 
-#### 4.4.3 Reflect 子包（[utils/reflect/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/reflect)）
+| 方法 | 说明 |
+|------|------|
+| `loadAll()` | 扫描plugin目录，构建 `List<PluginInfo>`（恢复运行中状态） |
+| `startPlugin(PluginInfo)` | `PluginCompiler.start()` → 编译执行main.java，保存Compiler到runningCompilers |
+| `stopPlugin(PluginInfo)` | `PluginCompiler.stop(true)` → 调用 `unLoadPlugin()` → 移除runningCompilers |
+| `reloadPlugin(PluginInfo)` | stop + start |
+| `deletePlugin(PluginInfo)` | stop → 移除列表 → 递归删目录 |
+| `setAutoLoad(plugin, isAuto)` | 增删 autoLoadList，持久化到 `AutoLoadList.json` |
+| `startAutoLoadPlugins()` | 线程遍历：autoLoadList中且未运行的启动（间隔100ms） |
+| `initAllPluginForCurrent()` | 全停 → 全清 → 重加载 → 自动启动 |
+| `createExamplePlugin()` | 生成含 info.prop/desc.txt/main.java 的示例脚本 |
 
-类型安全的反射 DSL，新代码倾向使用。
+### 9.3 BeanShell 脚本示例
 
-| 类 | 职责 |
-|----|------|
-| [ClassUtils.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/reflect/ClassUtils.kt) | 持有 `hostClassLoader` + `moduleClassLoader`，提供扩展属性 `String.clazz` / `String.toClass` |
-| [ReflectCache.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/reflect/ReflectCache.kt) | `ConcurrentHashMap` 缓存 Method/Field/Constructor，哨兵对象 `NOT_FOUND` 区分"未查找"与"查找为 null" |
-| [ReflectDSL.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/reflect/ReflectDSL.kt) | DSL 搜索器。`MethodSearcher` 可配置 `name/returnType/paramTypes/paramCount/isStatic/visibility`，多候选按继承深度打分选最优 |
-| [ReflectExtensions.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/reflect/ReflectExtensions.kt) | 高层扩展：`Any.callMethod / Class.callStaticMethod / Any.getObject / setObject / Class.newInstanceWithArgs` |
+```java
+log("脚本开始运行...");
+qqToast(2, "Hello World!");
 
-DSL 示例：
+addItem("测试菜单", "onTestClick");
+
+void onTestClick(int chatType, String peerUin, String peerName) {
+    qqToast(2, "点击了菜单");
+}
+
+void unLoadPlugin() {
+    qqToast(0, "脚本停止运行");
+    log("脚本停止运行");
+}
+```
+
+---
+
+## 10. UI 层架构（Jetpack Compose）
+
+### 10.1 组件分层
+
+```
+ui/
+├── components/
+│   ├── atoms/                      # 基础原子组件
+│   │   ├── Buttons.kt             # ActionButton / 各种按钮
+│   │   ├── QEdgeCard.kt           # 统一卡片容器
+│   │   └── QEdgeSwitch.kt         # 自定义开关
+│   ├── molecules/                  # 分子组件
+│   │   ├── QEdgeTopBar.kt         # 顶部栏
+│   │   ├── TabItem.kt             # Tab项
+│   │   ├── EmptyState.kt          # 空状态
+│   │   └── AnimatedComponents.kt  # 动画列表项
+│   └── dialogs/                    # 弹窗
+│       ├── CenterDialogContainerNoButton.kt
+│       ├── ConfirmDialog.kt
+│       ├── PluginMenuDialog.kt
+│       ├── TextDialog.kt
+│       ├── UpdateDialog.kt
+│       └── WelcomeDialog.kt
+│
+├── core/
+│   ├── theme/                      # 主题系统
+│   │   ├── Color.kt               # 颜色定义（Light/Dark/OLED）
+│   │   ├── Dimens.kt              # 尺寸常量
+│   │   └── Theme.kt               # QEdgeTheme入口 + Material3动态色
+│   └── compatibility/
+│       └── XposedComposeDialog.kt # Xposed宿主内启动Compose弹窗的基类
+│
+└── pages/
+    ├── home/                       # 新首页（MainScreen）
+    │   ├── MainScreen.kt
+    │   ├── HomeContentPanel.kt
+    │   ├── HomeSideRail.kt
+    │   └── HomeBatteryState.kt
+    ├── HomeScreen.kt              # 旧版首页（Tab切换：模块/脚本/冷雨/文件）
+    ├── coldrain/                   # 冷雨配置
+    │   ├── ColdRainScreen.kt
+    │   ├── ColdRainConfig.kt
+    │   └── ColdRainConfigSection.kt
+    ├── file/                       # 文件管理
+    │   ├── FileManagerScreen.kt
+    │   ├── FileListPanel.kt
+    │   ├── TextEditorScreen.kt
+    │   ├── AudioPlayerScreen.kt    # 含音频播放
+    │   ├── ImagePreviewScreen.kt   # 含图片预览
+    │   └── FileManagerUtils.kt
+    ├── PluginData.java            # 插件UI数据类
+    └── services/
+        └── OnlinePluginService.kt # 在线脚本平台API
+```
+
+### 10.2 主Activity入口
+
+[MainActivity.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/MainActivity.kt)
+
+- `enableEdgeToEdge()` + `WindowCompat.setDecorFitsSystemWindows(false)` 沉浸式
+- 启动时自动 `checkUpdate(showToast=false)` 访问 `check.php` 检测新版本
+- 提供：`QQ群/Telegram/用户后台/更新日志/检查更新/启动QQ` 入口
+
+[HomeScreen.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/HomeScreen.kt)（模块内设置页，寄生QQ中）
+
+4个Tab：
+1. **模块首页**：QQ空间（秒赞/秒评/定时说说）/ 聊天功能（闪照破解/资源下载/屏蔽链接/视频转泡泡/拍一拍/TIM卡片绕过）/ 资料卡（透明头像/名片回赞）/ 等级加速（4签到+自动加好友+空间浏览）/ 应用保活（像素/前台/后台通知）
+2. **Java脚本**：本地插件列表 + 在线脚本市场（搜索/下载/上传）
+3. **冷雨Java**：冷雨配置界面（`ColdRainScreen`）
+4. **文件管理**：`FileManagerScreen`
+
+---
+
+## 11. 基础设施层
+
+### 11.1 配置存储（严格禁止 SharedPreferences）
+
+#### [ModuleConfig.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/ModuleConfig.kt)
+
+顶层配置入口，单例 object，底层委托 `JsonConfigUtils`。
 
 ```kotlin
-val method = SomeClass::class.java.findMethod {
-    name = "doSomething"
-    returnType = void
-    paramTypes(string, int)
-    visibility = private
+object ModuleConfig {
+    private const val CONFIG_NAME = "config"
+    private val configDir = "${HostInfo.getModuleDataPath()}data/"
+    
+    // 类型安全的 put/get：Boolean/String/Int/Long
+    fun putBoolean(key: String, value: Boolean)
+    fun getBoolean(key: String, defaultValue: Boolean): Boolean
+    // ... 其他类型
+    fun contains(key: String): Boolean
+    fun remove(key: String)
 }
 ```
 
-#### 4.4.4 JSON 子包（[utils/json/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/json)）
-
-| 类 | 职责 |
-|----|------|
-| [JsonExt.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/json/JsonExt.java) | `walk(json, vararg path)` 路径取值；`findUidDeep(obj)` 深度优先遍历找 `u_` 开头 UID |
-| [MessageTool.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/json/MessageTool.java) | 通过 DexKit 在 `pbandk` 包下查找 `Message` 与 `FieldDescriptor` 类，反射读写 protobuf 字段 |
-| [ProtoData.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/json/ProtoData.java) | **自研 protobuf wire-format 解析/序列化器**，不依赖 .proto 文件。`fromBytes/toBytes/fromJSON/toJSON`，`isLikelyString` 启发式判断字段是字符串还是嵌套 message。提供 `get/set/removeField` 等完整访问器，用于防撤回篡改 |
-
-#### 4.4.5 Proto 子包（[utils/proto/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/proto)）
-
-| 类 | 职责 |
-|----|------|
-| [PacketHelper.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/proto/PacketHelper.java) | QQ 数据包核心。`sendRequest(serviceCmd, rawData, protoListener)` 通过 `SSOEasyServlet` + `ToServiceMsg` 发送，`BusinessObserver.onReceive` 异步回调；`sendPacket(cmd, JSONObject, packetListener)` 用 `ProtoData` 序列化 |
-| [packetListener.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/proto/packetListener.java) | 高层结果回调接口 `onResult(boolean success, JSONObject json)` |
-| [protoListener.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/proto/protoListener.java) | 底层 cmd 级回调 `onSuccess(cmd, json) / onFailure(cmd, error)` |
-
-**数据包监听机制**：请求-响应配对模式，不是被动监听所有包。`ExtraTool.sendPacket/fetchPacket` 用 `CountDownLatch` 把异步回调转同步（30s 超时）。
-
-#### 4.4.6 QQ 子包（[utils/qq/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq)）
-
-| 类 | 职责 |
-|----|------|
-| [QQServiceHelper.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/QQServiceHelper.java) | 通过 QRoute 路由系统获取 API/Runtime/Handler，多重回退（QRoute.api → 反射 QQAppInterface） |
-| [CookieTool.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/CookieTool.java) | 从 TicketManager 获取 skey/p_skey/real_skey/pt4token/stweb，`getBkn(key)` 标准 bkn 哈希 `5381 + (hash<<5) + char`，`getFriendRKey/getGroupRKey` 从 OnGetRKey 静态字段读 |
-| [FriendTool.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/FriendTool.java) | `getAllFriend / isFriend / getUidFromUin / getUinFromUid / sendZan`（构造特定字节序列调 CardHandler） |
-| [MsgTool.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/MsgTool.java) | 消息发送工具：`sendMsg/sendPic/sendPtt/sendCard/sendVideo/sendFile/sendMarkDown/sendReplyMsg/sendPai/recallMsg/addLocalJsonGrayTipMsg/createBubbleVideoElement`。`makeContact(peerUin, chatType)` 构造 Contact；`sendMsg` 解析 `[atUin=xxx]/[pic=url]` 标签 |
-| [TroopTool.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/TroopTool.kt) | 群组工具，DexKitTask 典范实现。用 `Proxy.newProxyInstance` + `CompletableFuture.get(5s)` 把 QQ NT 异步回调转同步（`getMemberInfo/getGroupMemberList/getForbidInfo`） |
-| [ExtraTool.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/ExtraTool.java) | 综合协议工具（代码量最大）。头像/封面上传、音乐/小程序卡片发送、`sendPacket/fetchPacket` 同步包装、`addFriend/getGroupBlackList/getJointGroupList` 等通过 OidbSvc 协议 |
-
-#### 4.4.7 Hook 子包（[utils/hook/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/hook)）
-
-| 类 | 职责 |
-|----|------|
-| [HookExtensions.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/hook/HookExtensions.kt) | Kotlin lambda DSL：`Member.hookAfter/hookBefore/hookReplace(owner, block)`，`MethodHookParam.invokeOriginal()` |
-| [HookStatusImpl.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/hook/HookStatusImpl.java) | 纯 Java 静态字段（**NO KOTLIN, NO ANDROIDX** 注释），`sZygoteHookMode/sZygoteHookProvider/sIsLsposedDexObfsEnabled`，在 ClassLoader 注入早期被读取 |
-
-#### 4.4.8 跨进程配置存储机制
-
-```
-业务代码
-   │ ModuleConfig.putBoolean("feature_x", true)
-   ▼
-ModuleConfig.kt
-   │ configDir = "${HostInfo.getModuleDataPath()}data/"
-   │ = "/storage/emulated/0/Android/data/<宿主包>/QEdge/data/"
-   ▼
-JsonConfigUtils.java
-   │ putValue → loadConfig → saveConfig
-   │ 文件：data/config.json
-   ▼
-外部存储（Android/data/<宿主包>/QEdge/data/config.json）
-   ▲
-   │ 其他进程（如 QQ 主进程、模块配置进程）读取同一文件
-```
-
-跨进程特性：路径基于宿主包名，多进程共享同一 Android/data 目录；JSON 文本无文件锁，依赖"最后一次写入胜出"语义，适合低频配置场景。
-
-#### 4.4.9 双轨制说明
-
-| 功能 | 旧版（Java） | 新版（Kotlin） |
-|------|-------------|---------------|
-| ClassLoader 获取 | `ClassUtils.java` | `reflect/ClassUtils.kt` |
-| 反射查找 | `ReflectUtils.java` | `reflect/ReflectDSL.kt + ReflectExtensions.kt` |
-| DexKit 缓存 | `DexKitCache.java`（纯内存） | `dexkit/DexKitCache.kt`（持久化 JSON） |
-| Hook | `HookUtils.java`（接口） | `hook/HookExtensions.kt`（lambda） |
-
-新代码倾向用 Kotlin 子包，但 `QQCurrentEnv/MsgTool/ExtraTool/FriendTool/CookieTool/TroopTool` 仍引用旧版 `ReflectUtils.java`，两套体系长期并存。
-
----
-
-### 4.5 UI 层与生命周期注入
-
-#### 4.5.1 Activity 清单
-
-| Activity | 作用 |
-|----------|------|
-| [MainActivity.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/MainActivity.kt) | 模块自身启动入口（LAUNCHER），Compose 渲染 `MainScreen`，检查更新 + 更新日志弹窗 |
-| [LauncherActivity.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/LauncherActivity.kt) | NoDisplay 透明 Activity，用于无 UI 启动 |
-| [SettingActivity.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/activity/SettingActivity.kt) | 模块设置主页（在 QQ 进程内运行），Compose + `AnimatedContent` 侧滑切换 plugin/file_manager/cold_rain 三页 |
-
-#### 4.5.2 SettingActivity 注入方式
-
-`SettingActivity` 通过 `Parasitics + DynamicActivityRegistry` 在 QQ 宿主进程内运行：
-
-1. `XposedEntry.handleLoadPackage()` 中调 `DynamicActivityRegistry.register(SettingActivity.class)`
-2. `Parasitics.initForStubActivity(ctx)` 替换 `ActivityThread.mInstrumentation` 为 `ProxyInstrumentation`，Hook `IActivityManager.startActivity` 把目标 Activity 替换为 Stub `CameraPreviewActivity`，Hook `IPackageManager.getActivityInfo` 返回伪造的 `ActivityInfo`
-3. 启动时通过 `Intent.putExtra(ACTIVITY_PROXY_INTENT, realIntent)` 携带真实 Intent
-4. `Handler.mCallback` 拦截 `LAUNCH_ACTIVITY`（what=100/159）消息，`unwrapIntent` 还原真实 Intent
-5. `ProxyInstrumentation.newActivity` 用 `moduleLoader.loadClass` 加载模块 Activity 类
-6. `ProxyInstrumentation.callActivityOnCreate` 调 `injectModuleResources` 注入模块资源
-
-#### 4.5.3 主题系统
-
-[ThemeHelper.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/activity/ThemeHelper.java) + [ui/core/theme/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/core/theme)（Theme.kt / Color.kt / Dimens.kt）：
-
-- Material 3 动态色（Light/Dark 双主题 + OLED 纯黑）
-- `SettingActivity.setupTheme()` 读 `QEdge_Theme` SP，-1 跟随系统，0/1 强制亮/暗
-- `SettingActivity` 通过反射 `MainHook.*` 方法操作插件列表（`getPluginList/setPluginRunning/setPluginAutoLoad/deletePlugin/reloadPlugin/createPlugin/processDataForCurrent`）
-
-#### 4.5.4 Compose 页面结构
-
-```
-SettingActivity
-  └─ QEdgeTheme
-      └─ AnimatedContent (currentPage)
-          ├─ "plugin"      → HomeScreen（插件列表 + 功能开关卡片分组）
-          ├─ "file_manager" → FileManagerScreen（文件管理）
-          └─ "cold_rain"   → ColdRainScreen（ColdRain 配置）
-```
-
-UI 组件按 Atomic Design 分层：
-- [ui/components/atoms/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/components/atoms)：Buttons / QEdgeCard / QEdgeSwitch
-- [ui/components/molecules/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/components/molecules)：QEdgeTopBar / TabItem / EmptyState / AnimatedComponents
-- [ui/components/dialogs/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/components/dialogs)：UpdateDialog / WelcomeDialog / ConfirmDialog / TextDialog / PluginMenuDialog
-- [ui/core/compatibility/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/core/compatibility)：`XposedComposeDialog`（在宿主进程弹 Compose 对话框）
-
-#### 4.5.5 在线脚本服务 [OnlinePluginService.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/services/OnlinePluginService.kt)
-
-- `BASE_URL = "https://v.yuafeng.cn/QEdge"`
-- `fetchOnlinePlugins(search, callback)`：GET `/online_plugin/list.php?api=json&search=...`
-- `downloadPlugin(pluginId, pluginName, callback)`：下载 ZIP 到 `temp/`，`extractPluginZip` 解压到 `plugin/<pluginName>/`（含 Zip Slip 防护 + 自动找根目录）
-- `uploadPlugin(...)`：`zipDirectory` 打包后 multipart/form-data POST 到 `/online_plugin/index.php`
-
-#### 4.5.6 生命周期与资源注入（[lifecycle/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/lifecycle)）
-
-| 类 | 职责 |
-|----|------|
-| [Parasitics.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/lifecycle/Parasitics.kt) | 资源注入 + Activity 伪装。Stub Activity 为 `com.tencent.mobileqq.activity.photo.CameraPreviewActivity`。`injectModuleResources`：API 30+ 用 `ResourcesLoader`，低版本反射 `AssetManager.addAssetPath` |
-| [DynamicActivityRegistry.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/lifecycle/DynamicActivityRegistry.kt) | 动态 Activity 注册表（`registeredActivities: MutableMap<String, Class<out Activity>>`），供脚本 `registerActivity` 使用 |
-| [CounterfeitActivityInfoFactory.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/lifecycle/CounterfeitActivityInfoFactory.java) | 伪造 `ActivityInfo`，让系统认为模块 Activity 是 QQ 已注册的 `CameraPreviewActivity`，绕过 manifest 校验 |
-
----
-
-### 4.6 BeanShell 脚本引擎
-
-项目内嵌完整 BeanShell 3.0.0-SNAPSHOT（[bsh/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/bsh)），是 Plugin 系统的运行时核心。
-
-#### 4.6.1 角色
-
-1. 解析 `main.java` 的 Java 风格语法（含 BSH* AST 节点、Parser、ParserTreeConstants）
-2. 在 `NameSpace` 中维护脚本变量与方法
-3. 解释执行顶层语句与方法调用
-4. 通过 `BshClassManager` 管理类加载（脚本定义 class、外部 jar、宿主类）
-5. 把 `PluginMethod` 的 Java 方法包装成 `BshMethod` 注入到脚本全局命名空间
-
-#### 4.6.2 Android/Dalvik 适配
-
-- [BshScriptClassLoader.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/bsh/classpath/BshScriptClassLoader.java)：`addClass(name, byte[])` 把 BeanShell 生成的 Java 字节码用 `DexClassLoaderHelper.convertClassToDex` 转 DEX，再用 `InMemoryDexClassLoader` 加载，新 ClassLoader 挂到链头
-- [DexClassLoaderHelper.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/bsh/util/DexClassLoaderHelper.java)：用 `com.android.dx` 的 `CfTranslator.translate` 把 `.class` 翻译为 DEX
-- [BshClassManager.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/bsh/BshClassManager.java)：多级类加载架构（脚本生成类 > 脚本 classpath > 外部 ClassLoader（FixClassLoader）> 线程上下文 ClassLoader > Class.forName > 源文件类）
-- [bsh/security/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/bsh/security)：`MainSecurityGuard` + `SecurityGuard` 危险代码防护
-- [bsh/org/objectweb/asm/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/bsh/org/objectweb/asm)：内嵌 ASM 库，运行时生成类字节码
-
----
-
-### 4.7 qqinterface 桩模块
-
-[qqinterface/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/qqinterface) 是**纯编译期类型桩模块**，不是运行时实际承载逻辑的库。
-
-#### 4.7.1 定位判定
-
-1. `qqinterface/build.gradle.kts` 依赖全部 `compileOnly`，无 `implementation`
-2. `AndroidManifest.xml` 为空 `<manifest>` 标签
-3. 源码中 `throw new RuntimeException("Stub !")` / `UnsupportedOperationException("only view.")`
-4. 在 `app/build.gradle.kts` 第 107 行以 `compileOnly(project(":qqinterface"))` 引用
-
-#### 4.7.2 Stub 设计模式
-
-| 模式 | 示例 |
-|------|------|
-| 纯空壳类 | `LifecycleOwner`（空接口）、`AIOContact`、`ChatFragment`、`DrawerFrameViewGroup` |
-| 抛异常 | `QQAppInterface.getApp()` → `throw new RuntimeException("Stub !")`；`BaseApplicationImpl.getApplication()` → `UnsupportedOperationException("only view.")` |
-| 返回默认值 | `AppRuntime.getCurrentUin()` → `""`；`isLogin()` → `false` |
-| 保留签名抽象类 | `JceStruct`（抽象 `readFrom/writeTo`）、`OidbWrapper`（抽象 `createToServiceMsg`）、`AppInterface`（抽象 `getApp/getAppid/getCurrentAccountUin`） |
-| 完整 POJO | `com.tencent.qqnt.kernel.nativeinterface.Contact`（含字段/getter/setter/构造/toString），供 `:app` 本地构造实例传入 QQ 接口 |
-
-#### 4.7.3 存在意义
-
-1. **编译期类型解析**：让 `:app` 编译时能"看见"QQ 内部类的符号，避免 `cannot find symbol`
-2. **强类型编码**：替代纯反射字符串，支持 IDE 自动补全与重构
-3. **保留继承链**：让 `:app` 能定义 QQ 类的子类（如自定义 BusinessHandler）
-4. **规避版权与体积**：纯桩无 QQ 真实业务代码，`compileOnly` 不进 APK
-
-#### 4.7.4 关键包族
-
-覆盖 QQ 几乎全部主要技术域，桩规模超过 200 个 Java 文件：
-
-| 包族 | 作用域 |
-|------|--------|
-| `com.qq.jce.wup` / `com.qq.taf.jce` | JCE/WUP/TAF 协议序列化 |
-| `com.tencent.common.app` / `com.tencent.mobileqq.app` | QQ 应用层基类（AppInterface / BaseApplicationImpl / QQAppInterface / BusinessHandler） |
-| `com.tencent.mobileqq.msf.sdk` / `com.qphone.base.remote` | MSF 消息服务框架 |
-| `com.tencent.mobileqq.pb` | protobuf-micro 字段体系 |
-| `com.tencent.aio` / `biz` / `mobileqq.activity` | AIO 聊天 / 业务 / Activity |
-| `com.tencent.mobileqq.troop` / `profilecard` | 群功能 / 资料卡 |
-| `com.tencent.qqnt.kernel.api` / `nativeinterface` | NT 内核服务接口（含数百个数据/回调类） |
-| `mqq.app` / `manager` / `observer` | mqq 框架（AppRuntime / MobileQQ / Servlet / MSFServlet / TicketManagerImpl） |
-| `com.tencent.qroute` / `mvi` | QRoute 路由 / MVI 架构 |
-| `oicq.wlogin_sdk` / `com.tenpay.sdk` | 登录 SDK / 支付 SDK |
-| `com.tencent.smtt.sdk` | X5 WebView |
-
----
-
-### 4.8 PHP 后台
-
-[QEdge后台/QEdge/](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/QEdge后台/QEdge) 是独立部署的 PHP + MySQL Web 服务。
-
-#### 4.8.1 数据库 Schema（[install.php](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/QEdge后台/QEdge/install.php)）
-
-7 张核心表 + feedbacks 表，全部 InnoDB + utf8mb4_unicode_ci：
-
-| 表 | 主键/唯一键 | 关键字段 | 说明 |
-|----|------------|----------|------|
-| `users` | `id` PK / `qq` UNIQUE | nickname / password / is_sponsor / is_banned / signature / module_version / qq_version / upload_permission / review_permission / register_time / last_login_time / last_login_ip | 用户表 |
-| `plugins` | `id` PK / `plugin_id` UNIQUE | plugin_name / version_code / author_name / upload_qq / file_path / download_count / status(0待审核/1通过/2拒绝) / reject_reason / description / review_time / reviewer_qq | 在线插件表 |
-| `email_codes` | `id` PK | email / code / type / expires_at / used | 邮箱验证码表 |
-| `user_stats` | `id` PK / `stat_date` UNIQUE | new_users / active_users / online_plugins | 用户活跃统计表 |
-| `sessions` | `id` PK / `session_id` UNIQUE | user_qq / user_type(user/admin) / ip_address / user_agent / created_at / last_activity | 会话表 |
-| `banned_users` | `id` PK / `qq` UNIQUE | nickname | 黑名单表（支持未注册用户） |
-| `sponsor_users` | `id` PK / `qq` UNIQUE | nickname / amount / note | 赞助用户表（支持未注册用户） |
-
-`install.php` 还创建管理员账号（`password_hash(ADMIN_PASSWORD, PASSWORD_DEFAULT)`），创建 `logs/` 与 `uploads/plugins/` 目录，写 `install.lock` 防止重装。
-
-#### 4.8.2 全局引入 [require.php](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/QEdge后台/QEdge/require.php)
-
-- **错误处理**：`error_reporting(E_ALL)` + `display_errors=1` + `log_errors=1`，日志写 `logs/error.log`
-- **字符集三层 UTF-8**：`default_charset=UTF-8` + `mb_internal_encoding/http_output/regex_encoding` + `iconv_set_encoding`；输入由 `function.php` 的 `decodeUtf8Input() + forceUtf8()` 兜底
-- **时区**：`Asia/Shanghai`
-- **数据库连接** `getDBConnection()`：PDO + `ERRMODE_EXCEPTION` + `FETCH_ASSOC` + `EMULATE_PREPARES=false`，DSN charset + 二次 `SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci` + `SET character_set_*` 三重兜底
-- **会话**：
-  - `SESSION_LIFETIME = 86400*7`（7 天）
-  - `SESSION_SAVE_PATH = __DIR__/data/sessions`（本地私有目录，防系统 /tmp 定时清理，带 `.htaccess` Deny from all）
-  - `session.gc_maxlifetime = SESSION_LIFETIME`，`gc_probability=1 / gc_divisor=100`（1% GC）
-  - `cookie_lifetime = SESSION_LIFETIME`（关闭浏览器不过期）
-  - PHP 7.3+ 用 `session_set_cookie_params(array)` 设置 `SameSite=Lax` + `httponly=true` + `secure=$isHttps`
-- **硬编码配置**：数据库账密、管理员账密、SMTP 授权码（生产应改为环境变量）
-
-#### 4.8.3 关键 API 端点
-
-##### 在线脚本下载协议
-
-| 端点 | 方法 | 请求 | 响应 |
-|------|------|------|------|
-| `/online_plugin/list.php?api=json` | GET | 可选 `search` | `{code:200, data:[{could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time}]}` |
-| `/online_plugin/download.php?id=<could_id>` | GET | `id` | `Content-Type: application/zip` + `Content-Disposition: attachment; filename="<name>_v<version>.zip"`，下载次数 +1 |
-| `/online_plugin/index.php` | POST | multipart `pluginFile` + 表单 `qq` | `{code:200/400/500, message, data?}` |
-
-##### 心跳协议 `/heartbeat/index.php`
-
-- 方法：POST，Body 为 hex 字符串（`hex2bin` 解码为 JSON）
-- 请求 JSON：`{qq, nickname, qq_version, module_version}`
-- QQ 号正则校验 `^[1-9][0-9]{4,10}$`
-- 查 `banned_users` 黑名单 → `code=403`
-- 新用户：自动注册，生成 12 位随机密码 `encryptPassword`，响应 `code=200` + `data.initial_password`
-- 老用户：`is_banned==1` → `code=403`；否则更新信息，响应 `code=200` + `data.{qq, nickname, is_sponsor, upload_permission}`
-- 有新版本：响应 `code=0` + `data.{apk, version, update}`
-
-##### 版本检查协议 `/update/check.php`
-
-- 方法：GET，参数 `version` 和/或 `version_code`
-- 响应：
-
-```json
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "has_update": true,
-    "latest_version": "0.1.3",
-    "latest_version_code": 13,
-    "update_log": "v0.1.3 (...)\n• ...\n• ...",
-    "changelog": [{"version": "0.1.3", "date": "...", "items": [...]}],
-    "download_url": "https://cdn.yuafeng.cn/ly/QEdge_0.1.3.apk"
-  }
+#### [JsonConfigUtils.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/JsonConfigUtils.java)
+
+底层JSON文件读写：
+
+- 每个配置名 = 一个 `.json` 文件（绝对路径 `absoluteDir/configName.json`）
+- 操作：loadConfig（读文件→JSONObject）→ 修改 → saveConfig（写回文件）
+- 支持类型：String/Int/Long/Double/Boolean + remove/clear/contains
+- 提供 `getConfigMap()` 转为 `Map<String,Object>`
+
+#### ColdRainCore 独立配置
+
+冷雨使用自己的 `config.json`（`冷雨Java/config.json`），不经过 ModuleConfig，原因：
+- 多账号隔离路径不同（基于 `QQCurrentEnv.getLocalPath()`）
+- 支持 `checkAndReloadIfModified()`：每次读取前比较文件 mtime，发现外部修改自动 reload
+
+### 11.2 宿主信息
+
+[HostInfo.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/HostInfo.kt)
+
+```kotlin
+object HostInfo {
+    const val PACKAGE_NAME_QQ = "com.tencent.mobileqq"
+    const val PACKAGE_NAME_TIM = "com.tencent.tim"
+    
+    lateinit var packageName: String      // 宿主包名
+    lateinit var processName: String      // 当前进程名
+    var versionCode: Long = 0             // 宿主版本号
+    var versionName: String = ""          // 宿主版本名
+    
+    val isQQ: Boolean      // packageName == QQ
+    val isTIM: Boolean     // packageName == TIM
+    val isInHostProcess: Boolean  // isQQ || isTIM
+    
+    fun init(context)       // PM获取包信息、计算moduleDataPath
+    fun getHostContext(): Context?   // 宿主Context
+    fun getModuleDataPath(): String  // 模块数据目录（Android/data/.../QEdge/）
 }
 ```
 
-##### 用户中心 API（`/api/user/`）
+### 11.3 QQ 当前环境
 
-| 端点 | 功能 |
-|------|------|
-| `login.php` | 用户登录（QQ + 密码，`password_verify`） |
-| `forgot_password.php` | 忘记密码（发邮箱验证码） |
-| `change_password.php` | 修改密码 |
-| `update_nickname.php` | 更新昵称 |
-| `update_signature.php` | 更新签名 |
-| `feedback_submit.php` | 提交反馈 |
-| `plugin_download.php` | 用户下载脚本 |
-| `plugin_review.php` | 用户审核脚本（有 review_permission） |
-| `zip_file_content.php` | 读取 ZIP 内部文件（零信任，直接解 ZIP 读 `info.prop`） |
-| `zip_preview.php` | ZIP 预览 |
+[QQCurrentEnv.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/QQCurrentEnv.java)
 
-##### 管理员 API（`/api/admin/`）
+| 方法/字段 | 说明 |
+|-----------|------|
+| `getCurrentUin()` | 当前登录QQ号（多级兜底：getCurrentAccountUin→getAccount→getAccountUin→currentUin字段） |
+| `getCookieUin()` | Cookie格式UIN，自动补零到10位，前缀"o"（如 o0123456789） |
+| `getCurrentUid()` | 当前Uid（NT架构新标识） |
+| `getCurrentName()` | 当前昵称 |
+| `getQQAppInterface()` | `QQAppInterface` 实例（MobileQQ.peekAppRuntime→wait兜底→BaseApplicationImpl兜底） |
+| `getKernelMsgService()` | NT内核消息服务（IKernelService → msgService.getValue） |
+| `getActivity()` | 当前前台Activity（反射ActivityThread.mActivities遍历） |
+| `getCurrentDir()` | 模块数据目录路径（自动mkdirs） |
+| `getLocalPath()` | 存储根路径 `Environment.getExternalStorageDirectory().getPath()+"/"` |
+| `getHostPath()` | 宿主数据目录 `/Android/data/<包名>/` |
+| `reset()` | 账号切换时清空全部缓存 |
 
-| 端点 | 功能 |
-|------|------|
-| `login.php` | 管理员登录 |
-| `plugin_review.php` | 脚本审核通过/拒绝 |
-| `plugin_edit.php` | 编辑脚本名称/介绍/作者 |
-| `plugin_delete.php` | 删除脚本 |
-| `feedback_reply.php` | 回复用户反馈 |
-| `sponsor_action.php` | 赞助管理 |
-| `user_action.php` | 用户操作（封禁/解封/权限） |
+### 11.4 日志系统
 
-#### 4.8.4 安全设计
+[LogUtils.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/LogUtils.java)
 
-| 维度 | 实现 |
-|------|------|
-| SQL 注入 | PDO 预处理 + `EMULATE_PREPARES=false` |
-| XSS | `htmlspecialchars(ENT_QUOTES, 'UTF-8')` 转义输出；`sanitizeInput` |
-| CSRF | `SameSite=Lax` Cookie；`CSRF_TOKEN_NAME` 常量 |
-| 会话安全 | 本地私有 session 目录 + `.htaccess Deny`；`httponly=true` 防 JS 读取；7 天 + 滑动续期 |
-| 密码哈希 | `password_hash(PASSWORD_DEFAULT)` + `password_verify`（管理员登录有明文比较的待修复点） |
-| 验证码 | GD 扩展生成图形验证码（`api/captcha.php`） |
-| 文件上传 | 零信任设计：服务端直接解 ZIP 读 `info.prop`，不信任客户端文本字段；同一 `plugin_id + version_code` 唯一索引兜底 |
-| 编码兜底 | 三层 UTF-8：`forceUtf8` / `decodeUtf8Input` / `dbFixUtf8` |
-| `.htaccess` | 各目录防护规则 |
+- 双输出：`android.util.Log` + 写入磁盘文件
+- 文件位置：`<CurrentDir>/log/yyyy-MM-dd.log`
+- 线程安全：`synchronized(LOCK)` 包裹写文件
+- 格式：`yyyy-MM-dd HH:mm:ss.SSS LEVEL TAG: message`
+- Throwable：`StringWriter + PrintWriter` 捕获完整堆栈
+- 日志级别：`d/i/w/e`，均支持 `(message)` 和 `(tag, message)` 双签名
+
+### 11.5 网络工具
+
+HttpUtils.java - HTTP 请求封装：
+
+- `get(url)` / `get(url, headers)` - GET请求
+- `post(url, body)` / `post(url, body, headers)` - POST请求（body=String）
+- 用于：Q群管家API、等级加速签到、空间接口、视频解析、更新检查等
 
 ---
 
-## 5. 关键类与函数索引
+## 12. QQ 服务接口封装
 
-### 5.1 入口与编排
+### 12.1 QQServiceHelper
 
-| 类/方法 | 位置 | 说明 |
-|---------|------|------|
-| `XposedEntry` | [XposedEntry.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/XposedEntry.java) | Xposed 入口，`initZygote` + `handleLoadPackage` 按包名分流 |
-| `MainHook.loadHook()` | [MainHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/MainHook.java) | Hook 编排核心：注册 → 加载 API Hook → 初始化开关项 → 账号切换监听 → 异步加载插件 + ColdRain |
-| `MainHook.registerHookItems()` | 同上 | 注册 19 个 Hook 项到 HookRegistry |
-| `MainHook.processDataForCurrent(tag)` | 同上 | 反射调所有 `BaseClickableHookItem` 的 `initData()`/`saveData()` |
-| `MainHook.getPluginList()` | 同上 | 返回 `List<PluginData>` 供 UI |
-| `HookRegistry.register(item)` | [HookRegistry.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/base/HookRegistry.java) | 去重注册 Hook 项 |
-| `HookRegistry.getHookItemsByClass(clazz)` | 同上 | 按类型筛选 Hook 项 |
+[QQServiceHelper.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/QQServiceHelper.java)
 
-### 5.2 Hook 基类
+统一的 QQ 服务获取入口，**优先直接调用而非反射**：
 
 | 方法 | 说明 |
 |------|------|
-| `BaseHookItem.isInTargetProcess()` | 按注解 `process` 字段判定进程生效 |
-| `BaseSwitchHookItem.init()` | 生命周期：`onInit()` → 进程校验 → `initData()` → `onHook()` |
-| `BaseSwitchHookItem.getPrefs()` | 返回 `QEdge_Config_{uin}` 跨进程 SP |
-| `BaseApiHookItem.forEachChecked(action)` | 遍历监听器自动跳过 `isEnable()==false` |
-| `BaseApiHookItem.loadHook()` | 抽象，子类安装具体 Xposed Hook |
+| `<T> T getApi(Class<T>)` | **QRouteApi接口**：优先 `QRoute.api(apiClass)` → 兜底反射 |
+| `<T> T getRuntime(Class<T>)` | getApi兜底 → QQAppInterface中查找匹配返回类型的方法 |
+| `<T> T getHandler(Class<T>)` | getBusinessHandler(handlerClass.getName) → 兜底按返回类型查找 |
+| `AppRuntime getRuntime()` | `BaseApplicationImpl.getApplication().getRuntime()` |
+| `<T extends IRuntimeService> T getRuntimeService(serviceClass)` | `runtime.getRuntimeService(serviceClass, "")`（**直接泛型调用，无反射**） |
 
-### 5.3 ColdRain 核心
+### 12.2 MsgTool
 
-| 方法 | 说明 |
-|------|------|
-| `ColdRainCore.getInstance()` | DCL 单例 |
-| `ColdRainCore.init(ctx)` | 初始化流程（建目录 → 加载配置 → 注册 Feature → 注册监听器 → 启动定时器） |
-| `ColdRainCore.handleMessage(msgRecord)` | 消息分发主流程 |
-| `ColdRainCore.canTriggerFeature(featureKey, msgData)` | 权限分层校验 |
-| `ColdRainCore.isAdminOrSelf(msgData)` | 管理员判定（自身→当前QQ→master→global_admins→group_admins） |
-| `ColdRainCore.reply(msgData, text)` | 7 种回复模式分派 |
-| `ColdRainCore.checkAndReloadIfModified()` | 配置热重载 |
-| `ColdRainFeature.shouldHandle(msgData)` | 判定是否处理 |
-| `ColdRainFeature.handle(msgData, core)` | 执行业务 |
-
-### 5.4 Plugin 系统
+消息发送工具（`utils/qq/MsgTool.java`）：
 
 | 方法 | 说明 |
 |------|------|
-| `PluginManager.loadAll()` | 扫描 plugin/ 目录加载所有插件 |
-| `PluginManager.startPlugin(plugin)` | 启动插件 |
-| `PluginManager.stopPlugin(plugin)` | 停止插件（调 `unLoadPlugin`） |
-| `PluginManager.initAllPluginForCurrent()` | 全量重置 |
-| `PluginCompiler.start()` | 启动 BeanShell 解释器 + 注入 API + 执行 main.java + 注册回调 |
-| `PluginCompiler.stop(invokeCallback)` | 停止 + 注销 Activity + 反注册监听器 |
-| `PluginCompiler.registerApiMethods(interpreter)` | 注入 PluginMethod 100+ 方法为全局函数 |
-| `PluginCompiler.registerCallbacks()` | 注册 6 类事件监听器 + 菜单 |
-| `PluginCallback.invokeMethodExists(name, paramTypes, args)` | 按名查找脚本方法并调用 |
-| `FixClassLoader.addClassLoader(loader)` | 添加动态 jar/dex ClassLoader 到聚合链 |
-| `PluginMethod.*` | 150+ 脚本可调用 API |
+| `sendMsg(Contact, text)` / `sendMsg(peerUin, type, text)` | 发送纯文本 |
+| `sendReplyMsg(Contact, msgId, text)` | 引用回复 |
+| `sendPic(peerUin, url, type)` | 发送图片（URL） |
+| `sendVideo(peerUin, path, type, size, ...)` | 发送视频 |
+| `sendPtt(peerUin, url, type)` | 发送语音（音乐解析功能用） |
+| `sendCard(peerUin, cardJson, type)` | 发送Ark卡片 |
+| `sendMarkDown(peerUin, mdText, type)` | 发送Markdown卡片 |
+| `recallMsg(type, peerUin, msgId)` | 撤回消息 |
+| `sendMusicCard(...)` / `sendMiniApp(...)` | 构造特殊卡片（ExtraTool中） |
 
-### 5.5 Utils 关键方法
+### 12.3 TroopTool
 
-| 方法 | 说明 |
-|------|------|
-| `HostInfo.init(context)` | 初始化宿主环境信息 |
-| `HostInfo.getModuleDataPath()` | 返回 `/Android/data/<包名>/QEdge/` |
-| `ModuleConfig.putBoolean/getString/...` | 跨进程配置读写 |
-| `DexKitCache.initCache()` / `saveCache()` / `validateAllTasks()` | DexKit 缓存生命周期 |
-| `DexKitFinder.doFind()` | 启动 DexKit 预扫 + 进度对话框 + 重启 QQ |
-| `ReflectDSL.findMethod/findMethods/findField` | 类型安全反射查找 |
-| `ProtoData.fromBytes/toBytes/fromJSON/toJSON` | 无 .proto 协议解析 |
-| `PacketHelper.sendRequest/sendPacket` | QQ 数据包收发 |
-| `CookieTool.getSkey/getPskey/getBkn/getGTK` | 登录态票据 |
-| `MsgTool.sendMsg/sendPic/sendPtt/.../createBubbleVideoElement` | 消息发送 |
-| `TroopTool.shutUp/kickGroup/setGroupAdmin/setGroupMemberTitle` | 群操作 |
-| `ExtraTool.sendMusic/sendMiniApp/uploadAvatar/sendPacket/fetchPacket` | 综合协议工具 |
-| `FriendTool.getAllFriend/getUidFromUin/sendZan` | 好友操作 |
-| `HybridClassLoader.isHostClass/isConflictingClass` | 类冲突隔离 |
-
-### 5.6 生命周期注入
+群相关操作（`utils/qq/TroopTool.kt`，实现 DexKitTask）：
 
 | 方法 | 说明 |
 |------|------|
-| `Parasitics.initForStubActivity(ctx)` | 替换 Instrumentation + Hook IActivityManager/IPackageManager |
-| `Parasitics.injectModuleResources(res)` | API 30+ 用 ResourcesLoader，低版本反射 addAssetPath |
-| `DynamicActivityRegistry.register(clazz)` | 注册动态 Activity |
-| `CounterfeitActivityInfoFactory.makeProxyActivityInfo(className, flags)` | 伪造 ActivityInfo |
+| `getGroupInfo(groupUin): TroopInfo` | 获取群信息（isTroopOwner / isTroopAdmin 判断） |
+| `getMemberInfo(groupUin, uin): MemberInfo` | 获取群成员信息（uinName群名片） |
+| `shutUp(groupUin, uin, timeSec)` | 群禁言 |
+| `kickMember(groupUin, uin, refuseForever)` | 踢人 |
+| `setAdmin(groupUin, uin, isAdmin)` | 设置/取消管理员 |
+| `setUniqueTitle(groupUin, uin, title, expireTime)` | 设置专属头衔 |
+
+### 12.4 FriendTool
+
+好友操作（`utils/qq/FriendTool.java`）：
+
+| 方法 | 说明 |
+|------|------|
+| `getUidFromUin(uin): String` | Uin → Uid 转换（NT需要） |
+| `getFriendInfo(uid)` | 获取好友信息（昵称等） |
+| `likeProfile(uid, count)` | 名片点赞 |
+| `addFriend(uin, message)` | 添加好友（等级加速用） |
+| `delFriend(uin, delType, notShieldTmpSession)` | 删除好友（IDelFriendService.delFriend） |
+
+### 12.5 CookieTool
+
+Cookie 管理（`utils/qq/CookieTool.java`）：
+
+| 方法 | 说明 |
+|------|------|
+| `getSkey(): String?` | 获取 skey |
+| `getPskey(domain): String?` | 获取指定域名的 pskey（如 qun.qq.com） |
+| `getBkn(skey): long` | skey → bkn（g_tk）计算算法 |
+| `getFullCookie(domain): String` | 组装完整 Cookie 字符串：`p_uin=o0xxx;uin=o0xxx;skey=xxx;p_skey=xxx` |
 
 ---
 
-## 6. 依赖关系
+## 13. 项目构建与运行
 
-### 6.1 模块依赖
-
-```
-settings.gradle.kts: rootProject.name = "QRoutine", include(":app", ":qqinterface")
-
-:app
-  ├─ compileOnly(project(":qqinterface"))   # QQ 内部 API 桩（编译期，不进 APK）
-  ├─ compileOnly(libs.xposed)               # Xposed API 82
-  ├─ compileOnly(libs.androidx.savedstate / lifecycle.* / common.java8)
-  ├─ implementation(libs.dexkit)            # DexKit 2.2.0
-  ├─ implementation(libs.protobuf.javalite) # protobuf-javalite 4.35.1（轻量版）
-  ├─ implementation(libs.dalvik.dx)         # dalvik-dx 16.0.1
-  ├─ implementation(platform(libs.androidx.compose.bom))  # Compose BOM 2026.06.01
-  └─ implementation(libs.androidx.material3 / ui / activity.compose / core.ktx)
-
-:qqinterface
-  ├─ compileOnly(androidx.annotation:annotation:1.7.0)
-  ├─ compileOnly(org.jetbrains:annotations:24.1.0)
-  └─ compileOnly(org.jetbrains.kotlin:kotlin-stdlib:1.9.24)
-```
-
-### 6.2 客户端内部依赖层次
-
-```
-第 1 层（无 utils 内部依赖）:
-  HostInfo, LogUtils, ModulePathHolder, HybridClassLoader, JsonConfigUtils,
-  HttpUtils, ClassUtils.java/.kt, JarLoader, HookStatusImpl, packetListener,
-  protoListener, JsonExt, ReflectCache.kt
-
-第 2 层:
-  ModuleConfig → HostInfo, JsonConfigUtils
-  ReflectUtils → HybridClassLoader, LogUtils
-  Toasts → HostInfo, QQCurrentEnv
-  DexKitCache.kt → HostInfo, LogUtils, ReflectUtils
-  ReflectDSL.kt → ReflectCache
-  ReflectExtensions.kt → ReflectCache, XposedBridge
-  MessageTool → DexKitBridge
-  ProtoData → protobuf
-
-第 3 层:
-  QQCurrentEnv → HostInfo, ReflectUtils, LogUtils
-  DexKitHelper → DexKitCache.java, ReflectUtils
-  DexKitTask → DexKitCache.kt, ReflectUtils
-  ObjectStore → QQCurrentEnv, LogUtils
-  HookExtensions → BaseHookItem
-
-第 4 层:
-  QQServiceHelper → QQCurrentEnv, ReflectUtils, QRoute
-  PacketHelper → ProtoData, LogUtils
-
-第 5 层（业务工具）:
-  CookieTool → QQCurrentEnv, ReflectUtils, QQServiceHelper
-  FriendTool → QQServiceHelper, QQCurrentEnv, ReflectUtils
-  MsgTool → QQCurrentEnv, ReflectUtils, HttpUtils, LogUtils, DexKitHelper, FriendTool, QQServiceHelper
-  TroopTool → QQServiceHelper, QQCurrentEnv, ClassUtils, ReflectUtils, PacketHelper, DexKitTask, reflect.*, HostInfo
-  ExtraTool → QQCurrentEnv, HostInfo, PacketHelper, HttpUtils, ProtoData, Toasts, LogUtils
-  DexKitFinder → HookRegistry, HostInfo, LogUtils, reflect, hook.hookAfter, TroopTool, QZoneLikeTool, DexKitBridge, DexKitCache, ModuleScope
-```
-
-### 6.3 客户端 ↔ 后台 HTTP 交互
-
-| 客户端组件 | 后台端点 | 频率 |
-|------------|----------|------|
-| `HeartbeatManager` | `/heartbeat/index.php` | 每 10 分钟 |
-| `MainActivity.checkUpdate` | `/update/check.php?version_code=` | 启动时 + 手动 |
-| `MainActivity.showUpdateLogDialog` | `/update/changelog.php` | 手动 |
-| `OnlinePluginService.fetchOnlinePlugins` | `/online_plugin/list.php?api=json` | 进入在线脚本页 |
-| `OnlinePluginService.downloadPlugin` | `/online_plugin/download.php?id=` | 用户下载 |
-| `OnlinePluginService.uploadPlugin` | `/online_plugin/index.php` | 用户上传 |
-
----
-
-## 7. 项目运行方式
-
-### 7.1 运行时启动时序
-
-```
-1. 用户安装 QEdge APK，在 LSPosed 中勾选作用域（QQ/TIM/KK/酷狗/傲软）
-2. QQ 进程启动 → Zygote → Xposed 框架加载 QEdge
-3. XposedEntry.initZygote()            # 保存 modulePath，探测 HookProvider
-4. XposedEntry.handleLoadPackage()     # 按包名分流
-5. Hook BaseApplicationImpl.onCreate after:
-   a. HostInfo.init(ctx)                # 读取宿主版本信息
-   b. Parasitics.initForStubActivity(ctx)  # Activity 伪装 + 资源注入就绪
-   c. DexKitCache.initCache() + validateAllTasks()
-      ├─ 命中 → MainHook.loadHook()
-      └─ 未命中 → DexKitFinder.doFind()（进度对话框 + 预扫 + 重启 QQ）
-6. MainHook.loadHook():
-   a. HeartbeatManager.isBanned() 检查
-   b. registerHookItems()              # 注册 19 个 Hook 项
-   c. FromServiceMsgDispatcher.loadHook()
-   d. loadApiHook()                    # 安装各 API Hook
-   e. initSwitchHookItem()            # 初始化开关项
-   f. hookAccountChange()              # 监听账号切换
-   g. ChatSettingLoader.loadHook()    # 聊天页设置入口
-   h. (延迟 2s) loadPluginsIfNeeded() + ColdRainCore.init()
-7. HeartbeatManager.getInstance().startHeartbeat()  # 启动心跳（10 分钟周期）
-8. 用户在 QQ 中点 "+" 菜单或设置页 → 启动 SettingActivity（通过 Parasitics 伪装）
-9. SettingActivity 通过反射 MainHook.* 操作插件列表
-```
-
-### 7.2 数据存储位置
-
-| 数据 | 路径 | 说明 |
-|------|------|------|
-| 模块配置 | `/Android/data/<宿主包>/QEdge/data/config.json` | 跨进程 JSON 配置 |
-| DexKit 缓存 | `/Android/data/<宿主包>/QEdge/global/dexkit/CacheMap_<host>_<module>` | 版本感知失效 |
-| ColdRain 配置 | `/Android/media/<宿主包>/冷雨Java/config.json` | 机器人配置（支持热重载） |
-| ColdRain 数据 | `/Android/media/<宿主包>/冷雨Java/data/` | 问答库等独立 JSON |
-| 插件目录 | `/Android/data/<宿主包>/QEdge/plugin/<插件目录>/` | 每个插件一个子目录 |
-| 插件自动加载列表 | `/Android/data/<宿主包>/QEdge/data/AutoLoadList.json` | 自动启动插件 ID 列表 |
-| 下载媒体 | `/storage/emulated/0/Tencent/QEdge/{Pictures,Videos,PTT}/` | 图片/视频/语音下载 |
-| 主题 SP | `QEdge_Theme` | 主题模式 + 当前页面 |
-| 功能开关 SP | `QEdge_Config_<uin>` | 按 QQ 号隔离，`MODE_MULTI_PROCESS` |
-| 心跳 SP | `QEdge_Heartbeat` | 当前 uin 缓存 |
-
-### 7.3 支持的运行模式
-
-- **LSPosed**：标准 Hook 模式，Dex 混淆启用（`sIsLsposedDexObfsEnabled=true`）
-- **LSPatch / FPA / 原子 / 无极（Zygisk 模式）**：兼容支持
-- **EdXposed / Dreamland（PineXposed）**：通过 TAG 前缀识别
-
----
-
-## 8. 构建与部署
-
-### 8.1 客户端构建
-
-#### 环境要求
-
-- AGP 9.1.1 + Kotlin 2.4.10 + Gradle（Kotlin DSL）
-- JDK 17
-- `compileSdk = 37`，`minSdk = 29`，`targetSdk = 37`
-- ABI：`arm64-v8a` + `armeabi-v7a`
-
-#### 构建命令
+### 13.1 构建命令
 
 ```bash
 # Debug 构建
 ./gradlew :app:assembleDebug
 
-# Release 构建（需 qedge.jks 签名，已配置在 build.gradle.kts）
+# Release 构建（R8优化+资源压缩+签名）
 ./gradlew :app:assembleRelease
+
+# 安装Debug并重启QQ（自定义Gradle任务）
+./gradlew installDebugAndRestartQQ
 ```
 
-签名配置（`app/build.gradle.kts`）：
+### 13.2 自定义 Gradle 任务（app/build.gradle.kts）
 
-```kotlin
-signingConfigs {
-    create("release") {
-        storeFile = file("qedge.jks")
-        storePassword = "lengyu520."
-        keyAlias = "qedge_key"
-        keyPassword = "lengyu520."
-    }
-}
-// Debug 也使用 release 签名，确保 debug/release 包可互相覆盖安装
-getByName("debug") { signingConfig = signingConfigs.getByName("release") }
-```
-
-#### ADB 便捷任务
-
-`app/build.gradle.kts` 定义了 QQ 相关 Gradle 任务：
-
-| 任务 | 作用 |
-|------|------|
+| 任务名 | 说明 |
+|--------|------|
 | `killQQ` | `adb shell am force-stop com.tencent.mobileqq` |
-| `openQQ` | `adb shell monkey -p com.tencent.mobileqq -c LAUNCHER 1` |
-| `restartQQ` | 依赖 killQQ 后打开 QQ |
-| `installDebugAndRestartQQ` | 依赖 `:app:installDebug`，完成后 restartQQ |
+| `openQQ` | `adb shell monkey -p com.tencent.mobileqq ... LAUNCHER` |
+| `restartQQ` | 先 kill 再 open |
+| `installDebugAndRestartQQ` | `:app:installDebug` → restartQQ |
 
-```bash
-./gradlew installDebugAndRestartQQ   # 安装 Debug 版并重启 QQ
+### 13.3 运行要求
+
+| 项目 | 要求 |
+|------|------|
+| Android 系统 | 9.0 ~ 16 (API 28 ~ 37) |
+| Xposed 框架 | LSPosed / LSPatch / FPA / 原子 / 无极（Zygisk模式） |
+| NT QQ | 8.9.58 ~ 9.3.xx（包名 com.tencent.mobileqq） |
+| NT TIM | 3.9.0 ~ 4.1.0（包名 com.tencent.tim） |
+| 作用域 | LSPosed中勾选：QQ/TIM/KK键盘/酷狗/傲软 |
+
+### 13.4 首次启动流程
+
+1. 安装 APK → LSPosed 中勾选 QQ / TIM 作用域
+2. 重启 QQ → 首次启动弹出 DexKit 查找进度对话框
+3. 等待所有方法查找完成 → 点击"确定"杀进程
+4. 再次打开 QQ → 注入成功
+5. QQ首页下拉 → QQ Plus → QEdge 设置入口进入设置页
+6. 或从桌面 QEdge 图标进入独立模块界面
+
+### 13.5 签名配置
+
+Release/Debug 均使用硬编码签名：
+```kotlin
+storeFile = file("qedge.jks")
+storePassword = "lengyu520."
+keyAlias = "qedge_key"
+keyPassword = "lengyu520."
 ```
 
-#### 资源与混淆
+---
 
-- 资源包 ID 固定 `0x69`（`--allow-reserved-package-id --package-id 0x69`）
-- Release 启用 `isMinifyEnabled=true` + `isShrinkResources=true`
-- ProGuard 规则见 [proguard-rules.pro](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/proguard-rules.pro)
-- 排除 `/META-INF/{AL2.0,LGPL2.1}`
+## 14. 第三方 APP Hook
 
-### 8.2 后台部署
+### 14.1 KK 键盘 (im.weshine.keyboard) - [KKHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/kk/KKHook.java)
 
-#### 环境要求
+- 解锁 SVIP / VIP：皮肤、字体、表情全部可用
+- 关闭所有广告
+- DexKit 查找退出拦截逻辑 + 全局兜底防崩溃
+- Hook Application.onCreate 后直接注入
 
-- PHP 7.3+
+### 14.2 酷狗音乐 (com.kugou.android.elder / .lite) - [KuGouHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/kugou/KuGouHook.java)
+
+**大字版** Hook `KGTinkerApplication.onCreate`
+**概念版** Hook `KGApplication.onCreate`
+
+- 跳过所有开屏广告：
+  - GdtSplashActivity / AdContainerActivity → 直接跳 MediaActivity
+  - 大字版/概念版 gotoAd 方法 → 返回跳过
+
+### 14.3 傲软抠图 (com.apowersoft.backgrounderaser) - [AoRuanHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/aoruan/AoRuanHook.java)
+
+- 解锁 VIP：Hook `VipManager` 的以下方法全返回 true：
+  - `isVip()` / `isVipValid()` / `isExpire()` / `isVipValidOrBalance()`
+- `getDeadlineDate()` 改写为长有效期
+- 抠图不限次数
+
+---
+
+## 15. PHP 后台架构
+
+### 15.1 环境要求
+
+- PHP 7.3+ （全局 utf8mb4 字符集）
 - MySQL 5.7+ / MariaDB
-- PDO / Session / GD 扩展
+- 必需目录写入权限：`sessions/ cache/ upload/ backup/` (chmod 755)
 
-#### 部署步骤
-
-1. 上传 `QEdge后台/QEdge/` 全部文件到网站根目录
-2. 修改 `require.php` 中的数据库连接信息（`DataBase_HOST/USER/PASS/NAME`）、管理员账密（`ADMIN_USERNAME/PASSWORD/QQ`）、SMTP 配置（`SMTP_HOST/PORT/USER/PASS`）
-3. 首次访问 `install.php` 创建数据表（自动建库 + 建表 + 创建管理员 + 写 `install.lock`）
-4. 管理员默认账号：手动在 `users` 表把 `permission` 改成 `admin`，或用 `install.php` 创建的默认管理员
-5. 目录权限：`sessions/ cache/ upload/ backup/ data/ logs/` 必须可写（`chmod 755` 或 `777`）
-
-#### 目录结构
+### 15.2 目录结构
 
 ```
-QEdge/
-├── require.php              # 全局引入（DB + session + 字符集）
-├── function.php             # 公共函数（sanitizeInput / encryptPassword / jsonResponse / logMessage / sendMail / generateRandomPassword / getClientIP / forceUtf8 / decodeUtf8Input）
-├── install.php              # 安装脚本（建库建表 + 创建管理员 + install.lock）
-├── index.php                # 首页（赞助墙 + 脚本列表）
-├── admin/                   # 管理后台（dashboard/plugins/feedback/sponsor/banned）
-├── user/                    # 用户中心（login/feedback/sponsor/plugin_review）
-├── api/admin/               # 管理 API
-├── api/user/                # 用户 API
-├── api/captcha.php          # 图形验证码
-├── api/get_qq_info.php      # QQ 昵称查询
-├── online_plugin/           # 脚本上传/列表/下载/详情/预览
-├── update/                  # 版本检查/更新日志
-├── heartbeat/               # 心跳接收
-├── assets/common.js         # 前端通用 JS
-├── assets/style.css         # 前端样式
-├── data/sessions/            # session 文件（.htaccess Deny）
-├── logs/                    # 日志目录
-└── uploads/plugins/         # 脚本 ZIP 上传目录
+QEdge后台/QEdge/
+├── index.php              # 首页：赞助墙 + 脚本列表
+├── require.php            # 全局引入：DB连接 + Session + 字符集 + 安全过滤
+├── install.php            # 首次访问：创建数据表
+├── function.php           # 公共函数库
+├── .htaccess              # URL重写 + 安全限制
+├──
+├── admin/                 # 管理后台（需admin权限）
+│   ├── index.php          # 仪表盘
+│   ├── plugins.php        # 脚本列表 + 编辑名称/介绍/作者 + 删除
+│   ├── sponsor.php        # 赞助管理
+│   ├── feedback.php       # 用户反馈处理 + 回复
+│   ├── banned.php         # 封禁用户
+│   ├── login.php          # 管理员登录
+│   └── logout.php
+├──
+├── user/                  # 用户中心
+│   ├── index.php          # 个人中心
+│   ├── login.php          # 用户登录
+│   ├── forgotpassword.php # 找回密码
+│   ├── feedback.php       # 反馈提交 + 查看历史
+│   ├── sponsor.php        # 赞助作者（微信/支付宝收款码）
+│   ├── plugin_review.php  # 脚本评论
+│   ├── motify_password.php# 修改密码
+│   ├── header.php         # 公共头部（侧滑栏布局）
+│   └── footer.php
+├──
+├── api/                   # REST API（模块端调用，JSON返回）
+│   ├── captcha.php        # 验证码
+│   ├── get_qq_info.php    # 获取QQ信息
+│   ├── admin/             # 管理员API
+│   │   ├── login.php
+│   │   ├── plugin_edit.php / plugin_delete.php / plugin_review.php
+│   │   ├── sponsor_action.php
+│   │   ├── user_action.php
+│   │   └── feedback_reply.php
+│   └── user/              # 用户API
+│       ├── login.php / forgot_password.php / change_password.php
+│       ├── plugin_download.php / plugin_review.php
+│       ├── feedback_submit.php
+│       ├── zip_preview.php / zip_file_content.php
+│       └── update_nickname.php / update_signature.php
+├──
+├── online_plugin/         # 在线脚本平台（前端页面）
+│   ├── index.php          # 列表页
+│   ├── list.php           # 列表数据
+│   ├── details.php        # 详情页
+│   ├── preview.php        # 预览脚本内容
+│   └── download.php       # 下载ZIP
+├──
+├── update/                # 模块更新
+│   ├── check.php          # 版本检查API（模块端MainActivity调用）
+│   ├── changelog.php      # 更新日志API
+│   └── index.php
+├──
+├── heartbeat/             # 模块心跳
+│   └── index.php          # 模块定期上报保活
+└── assets/                # 静态资源
+    ├── common.js          # 公共JS
+    └── style.css          # 公共CSS
 ```
 
-### 8.3 模块安装与作用域配置
+### 15.3 安全特性
 
-1. 安装 QEdge APK 到设备
-2. 在 LSPosed 管理器中启用 QEdge 模块
-3. 勾选作用域：QQ / TIM（必需），KK 键盘 / 酷狗音乐 / 傲软抠图（可选）
-4. 强制停止目标 APP 并重新启动
-5. 首次启动会触发 DexKit 预扫（显示进度对话框），完成后自动重启 QQ 加载缓存
-6. 在 QQ "+" 菜单或设置页找到 QEdge 入口进入 `SettingActivity`
+| 特性 | 实现 |
+|------|------|
+| SQL注入防护 | 全部用户输入使用 PDO 预处理 |
+| XSS 防护 | 输出时 `htmlspecialchars(ENT_QUOTES, 'UTF-8')` 转义 |
+| Session 安全 | 私有存储路径 + `gc_maxlifetime/cookie_lifetime` 7天 + 滑动窗口续期 |
+| 脚本上传校验 | ZIP 内部读取 `info.prop`（id/name/version/author），避免 multipart 编码问题 |
+| 版本唯一约束 | 数据库 `idx_plugin_version(plugin_id, version_code)` 唯一索引，同ID同版本无论作者都驳回 |
+| 字符集 | require.php 全局 `SET NAMES utf8mb4` |
 
-### 8.4 脚本插件开发流程
+### 15.4 数据库（核心表推测）
 
-1. 在 `SettingActivity` 点击"创建示例脚本"，或手动在 `plugin/` 目录下创建子目录
-2. 编写 `info.prop`（id/pluginName/versionCode/author）、`desc.txt`、`main.java`
-3. `main.java` 使用 BeanShell 语法，可直接调用 `PluginMethod` 暴露的 150+ API（如 `sendMsg / httpGet / hookBefore / loadJar`）
-4. 实现回调方法（如 `onMsg / joinGroup / chatInterface / unLoadPlugin`）响应事件
-5. 通过 `addItem / addMenuItem` 注册聊天菜单
-6. 点击 `SettingActivity` 的"上传"按钮，`OnlinePluginService.uploadPlugin` 打包 ZIP 上传到后台审核
-7. 审核通过后其他用户可在"在线脚本"页下载使用
+- `users` - 用户表（含 permission 字段：user/admin）
+- `plugins` - 脚本表（plugin_id, plugin_name, version_code, author, desc, upload_qq, download_count, review_status）
+- `plugin_reviews` - 脚本评论表
+- `feedback` - 反馈表（user_id, content, reply, status）
+- `sponsors` - 赞助墙表
+- `sessions` - Session存储表
 
 ---
 
-## 附录：设计亮点
+## 附录 A：关键约束与工程规范
 
-1. **注解驱动 + 注册表**：`@HookItemAnnotation` 声明元数据，`HookRegistry` 集中管理，`MainHook` 按类型批量加载，新增功能只需注册一行
-2. **进程隔离**：`isInTargetProcess()` 基于注解 `process` 字段精准控制 Hook 生效进程
-3. **监听器解耦**：`BaseApiHookItem.forEachChecked` 自动按 `BaseSwitchHookItem.isEnable()` 过滤，API 层与 Item 层彻底解耦，开关动态生效
-4. **多版本兼容**：`OnReceiveMsg` 三级类查找（DexKitCache → DexKit 实时 → 硬编码 → 反射扫包）
-5. **QQ/TIM 双适配**：`OnMenuBuild` 分 `loadHook_QQ` / `loadHook_TIM` 两套实现
-6. **DexKit 预扫缓存**：`DexKitCache` 文件名带版本号实现版本感知失效，避免运行时卡顿
-7. **跨进程 SP**：`MODE_MULTI_PROCESS` + 按 UIN 隔离的 `QEdge_Config_{uin}`
-8. **幂等与去重**：`QZoneSchedule` 三重去重，`AutoLikeBack` LRU 去重，`HookRegistry` 类去重
-9. **反检测策略**（酷狗）：签名伪造 + 反 Hook 注入空实现 + 浏览器/检测关键词拦截
-10. **远程管控**：`HeartbeatManager` 实现封禁、首次欢迎、版本更新三态响应
-11. **零信任上传**：服务端直接解 ZIP 读 `info.prop`，不信任客户端文本字段
-12. **Activity 伪装**：替换 Instrumentation + 动态代理 IActivityManager/IPackageManager，让模块 Activity 在 QQ 宿主进程运行
-13. **HybridClassLoader 类冲突隔离**：`isConflictingClass` 显式抛异常强制走宿主版本
-14. **TroopTool 的 CompletableFuture + Proxy 模式**：把 QQ NT 异步回调接口转同步结果
-15. **ProtoData 无 .proto 协议解析**：直接对 wire format 字节流操作，结合 `isLikelyString` 启发式判断
-16. **BeanShell Android 适配**：`DexClassLoaderHelper` 把生成的字节码用 dx 转 DEX，让脚本 `class` 定义在 Android 上可加载
-17. **FixClassLoader 聚合加载**：统一宿主类 + 模块类 + 动态 jar/dex 类三类加载需求
+（来自项目实际约束，必须遵守）
+
+| 约束 | 说明 |
+|------|------|
+| **禁止 SharedPreferences** | 所有配置使用 JsonConfigUtils / ColdRainCore.config.json 的集中式 JSON 文件 |
+| **禁止 Build.CPU_ABI** | API 21 废弃，必须使用 `Build.SUPPORTED_ABIS[0]` 并检查数组长度 |
+| **禁止 MODE_MULTI_PROCESS** | API 23 废弃，必须使用 MODE_PRIVATE |
+| **禁止 -dontoptimize** | Proguard 中不得包含，必须开启 R8 优化 |
+| **必须 R8 fullMode** | gradle.properties 中 `android.enableR8.fullMode=true` |
+| **必须 -dontobfuscate** | Xposed 模块不得混淆代码 |
+| **必须 keep 模块代码** | `-keep class me.lengyu.qedge.** { *; }` |
+| **DexKitTask 必须 isApplicable()** | 宿主专属功能覆写返回 HostInfo.isTIM / isQQ，任务列表必须 `.filter { it.isApplicable() }` |
+| **HTTP/IO 必须异步** | 所有 Hook 回调 O(1)，耗时操作丢新 Thread |
+| **定时任务仅主进程** | 通过 `HostInfo.processName == HostInfo.packageName` 判断，避免子进程重复 |
+| **QQServiceHelper.getRuntimeService** | 必须 `<T extends IRuntimeService>` 直接泛型调用，禁止反射 |
+| **QRouteApi 接口必须 getApi()** | 如 IFriendsInfoService 必须用 `QQServiceHelper.getApi()` 而非 getRuntimeService |
+| **多账号路径隔离** | 文件路径必须使用 `QQCurrentEnv.getLocalPath()/getHostPath()` 或 `Environment.getExternalStorageDirectory()`，禁止硬编码 `/storage/emulated/0/` |
+| **菜单限制启用时** | 触发冷雨功能 (`ColdRainCore.java:427`) + 显示菜单 (`ColdRainCore.java:380`) 都必须通过 `isMenuRestricted()` 检查 |
+| **Q群管家功能** | 需要群主/管理员权限 + 仅群聊(mtype=2) + 首次需艾特Q群管家(2854196310) |
+| **LogUtils 异常日志** | 必须重定向到 `QEdge/log/yyyy-MM-dd.log`，禁止使用 `XposedBridge.log(throwable)` |
+| **KeepAliveHook WindowManager** | 必须使用主线程 Looper，通知每3秒重新下发（QQ onResume 会 cancelAll） |
 
 ---
 
-<p align="center">Made with Java/Kotlin by LengYu</p>
+## 附录 B：等级加速三重触发机制
+
+所有等级加速功能（空间签到/日签/大会员/自动加好友/空间浏览）必须三重触发保证执行：
+
+1. **加载时触发**：loadHook 启动时检查是否已做
+2. **开关切换触发**：用户在 UI 打开开关时立即检查
+3. **00:00 每日触发**：Timer 定时任务，每天零点检查
+
+每日去重：`isDoneToday(tag)` / `markDoneToday(tag)` 幂等机制，避免重复执行。
+
+---
+
+<p align="center">QEdge Code Wiki v1.0 — 基于项目源码自动生成</p>

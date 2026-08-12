@@ -75,7 +75,7 @@ public class OnSendMsg extends BaseApiHookItem<OnSendMsg.SendMsgListener> {
 
         } catch (Throwable e) {
             LogUtils.e("OnSendMsg", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

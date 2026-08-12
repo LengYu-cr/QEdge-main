@@ -18,6 +18,7 @@ import java.util.Date;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 
 public class StatusFeature implements ColdRainFeature {
@@ -34,17 +35,14 @@ public class StatusFeature implements ColdRainFeature {
     public void handle(MsgData msgData, ColdRainCore core) {
         if (!core.isAdminOrSelf(msgData)) return;
         
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("StatusFeature", () -> {
                 try {
                     String info = buildStatusInfo(msgData, core);
                     core.reply(msgData, info);
                 } catch (Throwable e) {
                     core.reply(msgData, "运行状态:\n出错" + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private String buildStatusInfo(MsgData msgData, ColdRainCore core) {

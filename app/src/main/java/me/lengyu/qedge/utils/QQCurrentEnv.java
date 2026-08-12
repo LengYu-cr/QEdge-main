@@ -186,11 +186,7 @@ public class QQCurrentEnv {
             return "o" + uin;
         }
 
-        String cookieUin = "";
-        for (int i = 0; i < (10 - uin.length()); i++) {
-            cookieUin += "0";
-        }
-        return "o" + cookieUin + uin;
+        return "o" + String.format("%010d", Long.parseLong(uin));
     }
 
     public static String getCurrentUid() {

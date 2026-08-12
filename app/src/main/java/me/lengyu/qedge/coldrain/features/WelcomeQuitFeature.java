@@ -8,6 +8,7 @@ import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.hook.api.OnTroopQuit;
 import me.lengyu.qedge.plugin.bean.MsgData;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
 
 public class WelcomeQuitFeature implements ColdRainFeature {
@@ -61,7 +62,7 @@ public class WelcomeQuitFeature implements ColdRainFeature {
 
                     core.reply(troopUin, 2, quitMsg);
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    LogUtils.e(e);
                 }
             }
         });

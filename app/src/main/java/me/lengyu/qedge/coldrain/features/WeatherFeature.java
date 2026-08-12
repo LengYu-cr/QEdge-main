@@ -10,6 +10,7 @@ import java.util.Map;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
@@ -53,16 +54,13 @@ public class WeatherFeature implements ColdRainFeature {
         }
 
         final ColdRainCore finalCore = core;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("WeatherFeature", () -> {
                 try {
                     handleWeather(msgData, text, peerUin, finalCore);
                 } catch (Throwable e) {
                     finalCore.reply(msgData, "出错: " + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private void handleWeather(MsgData msgData, String text, String peerUin, ColdRainCore core) throws Exception {

@@ -50,7 +50,7 @@ public class ReflectUtils {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -66,7 +66,7 @@ public class ReflectUtils {
                 method.setAccessible(true);
                 return method;
             } catch (NoSuchMethodException ex) {
-                ex.printStackTrace();
+                LogUtils.e(ex);
             }
         }
         return null;
@@ -87,7 +87,7 @@ public class ReflectUtils {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -131,7 +131,7 @@ public class ReflectUtils {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -171,7 +171,7 @@ public class ReflectUtils {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -208,7 +208,7 @@ public class ReflectUtils {
                 field.setAccessible(true);
                 return field;
             } catch (NoSuchFieldException ex) {
-                ex.printStackTrace();
+                LogUtils.e(ex);
             }
         }
         return null;
@@ -221,7 +221,7 @@ public class ReflectUtils {
                 return field.get(obj);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -233,7 +233,7 @@ public class ReflectUtils {
                 field.set(obj, value);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -248,7 +248,7 @@ public class ReflectUtils {
                 return method.invoke(obj, args);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -260,7 +260,7 @@ public class ReflectUtils {
                 return method.invoke(obj, (Object[]) null);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -289,7 +289,7 @@ public class ReflectUtils {
                 return method.invoke(null, args);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }

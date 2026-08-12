@@ -15,6 +15,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
 import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.LogUtils
 
 object OnlinePluginService {
 
@@ -81,6 +82,8 @@ object OnlinePluginService {
         callback: (filePath: String?, error: String?, zipPath: String?, targetPath: String?) -> Unit
     ) {
         Thread {
+            var tempFile: File? = null
+            var targetDir: File? = null
             try {
                 val url = URL("$PLUGIN_DOWNLOAD_URL?id=$pluginId")
                 val connection = url.openConnection() as HttpURLConnection
@@ -89,16 +92,17 @@ object OnlinePluginService {
                 connection.requestMethod = "GET"
 
                 val inputStream = connection.inputStream
-                val tempDir = File(QQCurrentEnv.getCurrentDir(), "temp")
-                if (!tempDir.exists()) {
-                    tempDir.mkdirs()
+                val tempDirLocal = File(QQCurrentEnv.getCurrentDir(), "temp")
+                if (!tempDirLocal.exists()) {
+                    tempDirLocal.mkdirs()
                 }
-                val tempFile = File(tempDir, "plugin_download_${pluginId}.zip")
-                if (tempFile.exists()) {
-                    tempFile.delete()
+                val downloadedFile = File(tempDirLocal, "plugin_download_${pluginId}.zip")
+                tempFile = downloadedFile
+                if (downloadedFile.exists()) {
+                    downloadedFile.delete()
                 }
 
-                tempFile.outputStream().use { outputStream ->
+                downloadedFile.outputStream().use { outputStream ->
                     val buffer = ByteArray(8192)
                     var bytesRead: Int
                     while (inputStream.read(buffer).also { bytesRead = it } != -1) {
@@ -108,71 +112,70 @@ object OnlinePluginService {
                 inputStream.close()
 
                 val pluginBaseDir = File(QQCurrentEnv.getCurrentDir(), "plugin")
-                val targetDir = pluginBaseDir.resolve(pluginName)
-                val pluginDir = extractPluginZip(tempFile, targetDir)
-
-                if (pluginDir != null) {
-                    tempFile.delete()
-                    callback(pluginDir.absolutePath, null, null, null)
-                } else {
-                    callback(null, "解压插件失败", tempFile.absolutePath, targetDir.absolutePath)
-                }
+                val extractTargetDir = pluginBaseDir.resolve(pluginName)
+                targetDir = extractTargetDir
+                val pluginDir = extractPluginZip(downloadedFile, extractTargetDir)
+                downloadedFile.delete()
+                callback(pluginDir.absolutePath, null, null, null)
             } catch (e: Exception) {
-                callback(null, e.message, null, null)
+                LogUtils.e(e)
+                callback(null, "解压失败: ${e.message}", tempFile?.absolutePath, targetDir?.absolutePath)
             }
         }.start()
     }
 
-    private fun extractPluginZip(zipFile: File, targetDir: File): File? {
-        return try {
-            if (targetDir.exists() && !deleteDir(targetDir)) {
-                return null
-            }
-            if (!targetDir.mkdirs()) {
-                return null
-            }
+    private fun extractPluginZip(zipFile: File, targetDir: File): File {
+        if (targetDir.exists() && !deleteDir(targetDir)) {
+            throw IOException("无法删除已存在的目录: ${targetDir.absolutePath}")
+        }
+        if (!targetDir.mkdirs()) {
+            throw IOException("无法创建目标目录: ${targetDir.absolutePath}")
+        }
 
-            val rootFolder = findRootFolder(zipFile)
+        val rootFolder = findRootFolder(zipFile)
+        val targetDirAbs = targetDir.absolutePath.trimEnd('/')
 
-            ZipInputStream(BufferedInputStream(FileInputStream(zipFile)), StandardCharsets.UTF_8).use { zis ->
-                var entry: ZipEntry? = zis.nextEntry
-                while (entry != null) {
-                    val entryName = entry.name
-                    val relativePath = if (rootFolder.isNotEmpty() && entryName.startsWith("$rootFolder/")) {
-                        entryName.substring(rootFolder.length + 1)
-                    } else {
-                        entryName
-                    }
+        ZipInputStream(BufferedInputStream(FileInputStream(zipFile)), StandardCharsets.UTF_8).use { zis ->
+            var entry: ZipEntry? = zis.nextEntry
+            while (entry != null) {
+                val entryName = entry.name
+                val relativePath = if (rootFolder.isNotEmpty() && entryName.startsWith("$rootFolder/")) {
+                    entryName.substring(rootFolder.length + 1)
+                } else {
+                    entryName
+                }
 
-                    if (relativePath.isEmpty() || relativePath == "/") {
-                        zis.closeEntry()
-                        entry = zis.nextEntry
-                        continue
-                    }
-
-                    val targetFile = targetDir.resolve(relativePath)
-                    if (!targetFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
-                        throw SecurityException("Zip Slip: ${entry.name}")
-                    }
-
-                    if (entry.isDirectory) {
-                        targetFile.mkdirs()
-                    } else {
-                        targetFile.parentFile?.mkdirs()
-                        targetFile.outputStream().buffered().use { fos ->
-                            zis.copyTo(fos, 8192)
-                        }
-                    }
+                if (relativePath.isEmpty() || relativePath == "/") {
                     zis.closeEntry()
                     entry = zis.nextEntry
+                    continue
                 }
-            }
 
-            targetDir
-        } catch (e: Exception) {
-            e.printStackTrace()
-            null
+                // 用 normalize() + absolutePath 做 Zip Slip 检测，纯字符串操作，不依赖文件系统
+                val targetFile = targetDir.resolve(relativePath).normalize()
+                if (!targetFile.absolutePath.startsWith("$targetDirAbs/") && targetFile.absolutePath != targetDirAbs) {
+                    throw SecurityException("Zip Slip: ${entry.name}")
+                }
+
+                if (entry.isDirectory) {
+                    if (!targetFile.mkdirs() && !targetFile.isDirectory) {
+                        throw IOException("无法创建目录: ${targetFile.absolutePath}")
+                    }
+                } else {
+                    val parent = targetFile.parentFile
+                    if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                        throw IOException("无法创建父目录: ${parent.absolutePath}")
+                    }
+                    targetFile.outputStream().buffered().use { fos ->
+                        zis.copyTo(fos, 8192)
+                    }
+                }
+                zis.closeEntry()
+                entry = zis.nextEntry
+            }
         }
+
+        return targetDir
     }
 
     private fun findRootFolder(zipFile: File): String {
@@ -206,7 +209,7 @@ object OnlinePluginService {
         return try {
             file.readText(StandardCharsets.UTF_8)
         } catch (e: IOException) {
-            e.printStackTrace()
+            LogUtils.e(e)
             ""
         }
     }

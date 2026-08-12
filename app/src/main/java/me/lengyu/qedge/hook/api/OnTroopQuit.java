@@ -31,7 +31,7 @@ public class OnTroopQuit extends BaseApiHookItem<OnTroopQuit.TroopQuitListener> 
                         notifyListeners(troopUin, memberUin);
                     } catch (Throwable e) {
                         LogUtils.e("OnTroopQuit", "callback error: " + e.getMessage());
-                        e.printStackTrace();
+                        LogUtils.e(e);
                     }
                 });
             } else {
@@ -39,10 +39,10 @@ public class OnTroopQuit extends BaseApiHookItem<OnTroopQuit.TroopQuitListener> 
             }
         } catch (ClassNotFoundException e) {
             LogUtils.e("OnTroopQuit", "TroopMemberInfoServiceImpl not found");
-            e.printStackTrace();
+            LogUtils.e(e);
         } catch (NoSuchMethodException e) {
             LogUtils.e("OnTroopQuit", "deleteTroopMember method not found");
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

@@ -10,8 +10,10 @@ import java.util.Map;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
 
 public class VideoMenuFeature implements ColdRainFeature {
@@ -41,7 +43,7 @@ public class VideoMenuFeature implements ColdRainFeature {
             if (videoUrl == null || videoUrl.isEmpty()) return;
             MsgTool.sendVideo(msgData.peerUin, videoUrl, msgData.type);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -50,7 +52,7 @@ public class VideoMenuFeature implements ColdRainFeature {
             if (imgUrl == null || imgUrl.isEmpty()) return;
             MsgTool.sendPic(msgData.peerUin, imgUrl, msgData.type);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -94,16 +96,13 @@ public class VideoMenuFeature implements ColdRainFeature {
             return;
         }
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("VideoMenuFeature", () -> {
                 try {
                     handleCommand(msgData, text, peerUin);
                 } catch (Throwable e) {
                     sendMsg(msgData, "出错: " + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private void handleCommand(MsgData msgData, String text, String peerUin) throws Exception {

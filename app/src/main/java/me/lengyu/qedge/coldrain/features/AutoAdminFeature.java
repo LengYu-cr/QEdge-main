@@ -1,5 +1,6 @@
 package me.lengyu.qedge.coldrain.features;
 
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.plugin.bean.MsgData;
@@ -177,7 +178,7 @@ public class AutoAdminFeature implements ColdRainFeature {
         final String finalMyUin = myUin;
 
         // 支付流程在新线程中执行，轮询最多60秒，避免阻塞消息处理
-        new Thread(() -> {
+        ModuleScope.launchIOJava("AutoAdmin", () -> {
             try {
                 String skey = CookieTool.getSkey();
                 String tenpayPskey = CookieTool.getPskey("tenpay.com");
@@ -285,6 +286,6 @@ public class AutoAdminFeature implements ColdRainFeature {
                 pendingPayments.remove(key);
                 core.reply(msgData, "自助上管异常: " + e.getMessage());
             }
-        }).start();
+        });
     }
 }

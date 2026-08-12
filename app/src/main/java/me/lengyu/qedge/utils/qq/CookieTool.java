@@ -1,6 +1,7 @@
 package me.lengyu.qedge.utils.qq;
 
 import java.lang.reflect.Method;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 
@@ -31,7 +32,7 @@ public class CookieTool {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -44,7 +45,7 @@ public class CookieTool {
                 return result != null ? result.toString() : null;
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -57,7 +58,7 @@ public class CookieTool {
                 return result != null ? result.toString() : null;
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -70,7 +71,7 @@ public class CookieTool {
                 return result != null ? result.toString() : null;
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -83,7 +84,7 @@ public class CookieTool {
                 return result != null ? result.toString() : null;
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -96,7 +97,7 @@ public class CookieTool {
                 return result != null ? result.toString() : null;
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }

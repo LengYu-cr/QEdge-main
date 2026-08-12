@@ -6,9 +6,11 @@ import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
+import java.nio.charset.StandardCharsets
 import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import me.lengyu.qedge.utils.HostInfo
+import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.QQCurrentEnv
 
 object FileManagerUtils {
@@ -85,7 +87,7 @@ object FileManagerUtils {
                 true
             }
         } catch (e: IOException) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -105,7 +107,7 @@ object FileManagerUtils {
             }
             true
         } catch (e: IOException) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -128,7 +130,7 @@ object FileManagerUtils {
                 true
             }
         } catch (e: IOException) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -141,7 +143,7 @@ object FileManagerUtils {
                 file.delete()
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -157,7 +159,7 @@ object FileManagerUtils {
             }
             dir.delete()
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -172,7 +174,7 @@ object FileManagerUtils {
                 false
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -186,7 +188,7 @@ object FileManagerUtils {
                 false
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -200,18 +202,19 @@ object FileManagerUtils {
                 false
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
 
     fun unzip(zipFile: File, targetDir: File, onProgress: ((Int, Int) -> Unit)? = null): Boolean {
         return try {
-            if (!targetDir.exists()) {
-                targetDir.mkdirs()
+            if (!targetDir.exists() && !targetDir.mkdirs()) {
+                LogUtils.e("FileManager", "Failed to create target dir: ${targetDir.absolutePath}")
+                return false
             }
 
-            val zipInputStream = ZipInputStream(FileInputStream(zipFile))
+            val zipInputStream = ZipInputStream(FileInputStream(zipFile), StandardCharsets.UTF_8)
             val entries = mutableListOf<ZipEntry>()
             var entry: ZipEntry?
 
@@ -223,26 +226,36 @@ object FileManagerUtils {
             val totalEntries = entries.size
             var currentEntry = 0
 
-            val newZipInputStream = ZipInputStream(FileInputStream(zipFile))
+            val newZipInputStream = ZipInputStream(FileInputStream(zipFile), StandardCharsets.UTF_8)
             var newEntry: ZipEntry?
 
             while (newZipInputStream.nextEntry.also { newEntry = it } != null) {
                 newEntry?.let { zipEntry ->
                     val newFile = File(targetDir, zipEntry.name)
 
+                    // Zip Slip 防护
+                    if (!newFile.canonicalPath.startsWith(targetDir.canonicalPath)) {
+                        LogUtils.e("FileManager", "Zip Slip detected: ${zipEntry.name}")
+                        newZipInputStream.close()
+                        return false
+                    }
+
                     if (zipEntry.isDirectory) {
-                        newFile.mkdirs()
-                    } else {
-                        newFile.parentFile?.mkdirs()
-                        val outputStream = FileOutputStream(newFile)
-                        val buffer = ByteArray(4096)
-                        var len: Int
-
-                        while (newZipInputStream.read(buffer).also { len = it } > 0) {
-                            outputStream.write(buffer, 0, len)
+                        if (!newFile.mkdirs() && !newFile.isDirectory) {
+                            LogUtils.e("FileManager", "Failed to create dir: ${newFile.absolutePath}")
+                            newZipInputStream.close()
+                            return false
                         }
-
-                        outputStream.close()
+                    } else {
+                        val parent = newFile.parentFile
+                        if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                            LogUtils.e("FileManager", "Failed to create parent dir: ${parent.absolutePath}")
+                            newZipInputStream.close()
+                            return false
+                        }
+                        newFile.outputStream().buffered().use { fos ->
+                            newZipInputStream.copyTo(fos, 8192)
+                        }
                     }
 
                     currentEntry++
@@ -253,7 +266,7 @@ object FileManagerUtils {
             newZipInputStream.close()
             true
         } catch (e: IOException) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -262,7 +275,7 @@ object FileManagerUtils {
         return try {
             file.readText(Charsets.UTF_8)
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             ""
         }
     }
@@ -272,7 +285,7 @@ object FileManagerUtils {
             file.writeText(content, Charsets.UTF_8)
             true
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }
@@ -305,7 +318,7 @@ object FileManagerUtils {
 
     fun listZipEntries(zipFile: File, zipPath: String = ""): List<ZipItem> {
         return try {
-            val zipInputStream = ZipInputStream(FileInputStream(zipFile))
+            val zipInputStream = ZipInputStream(FileInputStream(zipFile), StandardCharsets.UTF_8)
             val entries = mutableListOf<ZipEntry>()
             var entry: ZipEntry?
 
@@ -350,28 +363,35 @@ object FileManagerUtils {
             result.sortWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
             result
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             emptyList()
         }
     }
 
     fun extractZipEntry(zipFile: File, entryPath: String, targetFile: File): Boolean {
         return try {
-            val zipInputStream = ZipInputStream(FileInputStream(zipFile))
+            val zipInputStream = ZipInputStream(FileInputStream(zipFile), StandardCharsets.UTF_8)
             var entry: ZipEntry?
             var found = false
 
             while (zipInputStream.nextEntry.also { entry = it } != null) {
                 if (entry?.name == entryPath) {
-                    found = true
-                    targetFile.parentFile?.mkdirs()
-                    val outputStream = FileOutputStream(targetFile)
-                    val buffer = ByteArray(4096)
-                    var len: Int
-                    while (zipInputStream.read(buffer).also { len = it } > 0) {
-                        outputStream.write(buffer, 0, len)
+                    // Zip Slip 防护
+                    if (!targetFile.canonicalPath.startsWith(targetFile.parentFile?.canonicalPath ?: return false)) {
+                        LogUtils.e("FileManager", "Zip Slip detected: $entryPath")
+                        zipInputStream.close()
+                        return false
                     }
-                    outputStream.close()
+                    found = true
+                    val parent = targetFile.parentFile
+                    if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                        LogUtils.e("FileManager", "Failed to create parent dir: ${parent.absolutePath}")
+                        zipInputStream.close()
+                        return false
+                    }
+                    targetFile.outputStream().buffered().use { fos ->
+                        zipInputStream.copyTo(fos, 8192)
+                    }
                     break
                 }
             }
@@ -379,7 +399,7 @@ object FileManagerUtils {
             zipInputStream.close()
             found
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             false
         }
     }

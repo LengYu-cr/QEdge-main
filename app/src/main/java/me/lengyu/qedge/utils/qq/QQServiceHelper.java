@@ -6,6 +6,7 @@ import mqq.app.api.IRuntimeService;
 import com.tencent.mobileqq.qroute.QRoute;
 import com.tencent.mobileqq.app.QQAppInterface;
 import me.lengyu.qedge.utils.ReflectUtils;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 import com.tencent.common.app.BaseApplicationImpl;
 
@@ -30,7 +31,7 @@ public class QQServiceHelper {
                 return (T) apiObj;
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -50,7 +51,7 @@ public class QQServiceHelper {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -73,7 +74,7 @@ public class QQServiceHelper {
                 }
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }

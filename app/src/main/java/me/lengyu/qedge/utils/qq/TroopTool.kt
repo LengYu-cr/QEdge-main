@@ -3,8 +3,9 @@ package me.lengyu.qedge.utils.qq
 import me.lengyu.qedge.plugin.bean.ForbidInfo
 import me.lengyu.qedge.plugin.bean.GroupInfo
 import me.lengyu.qedge.plugin.bean.MemberInfo
-import me.lengyu.qedge.utils.ClassUtils
+import me.lengyu.qedge.utils.reflect.ClassUtils
 import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.dexkit.DexKitTask
 import me.lengyu.qedge.utils.proto.PacketHelper
 import me.lengyu.qedge.utils.proto.packetListener
@@ -119,12 +120,12 @@ object TroopTool : DexKitTask {
                             groupInfoList.add(GroupInfo(troopUin, troopName ?: troopUin, troopOwnerUin ?: "", troop))
                         }
                     } catch (e: Throwable) {
-                        e.printStackTrace()
+                        LogUtils.e(e)
                     }
                 }
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
         return groupInfoList
     }
@@ -138,7 +139,7 @@ object TroopTool : DexKitTask {
                 return service.getTroopInfo(troopUin)
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
         return TroopInfo()
     }
@@ -234,7 +235,7 @@ object TroopTool : DexKitTask {
     private fun getMemberInfoList(troopUin: String): List<Any> {
         val completableFuture = CompletableFuture<ArrayList<Any>>()
         val callback = Proxy.newProxyInstance(
-            ClassUtils.getHostClassLoader(),
+            ClassUtils.hostClassLoader,
             arrayOf(fetchTroopMemberList.parameterTypes[4])
         ) { _, method, args ->
             if (method.returnType == Void.TYPE && method.parameterCount == 2) {
@@ -257,7 +258,7 @@ object TroopTool : DexKitTask {
     fun getMemberInfo(troopUin: String, uin: String): MemberInfo {
         val completableFuture = CompletableFuture<Any>()
         val callback = Proxy.newProxyInstance(
-            ClassUtils.getHostClassLoader(),
+            ClassUtils.hostClassLoader,
             arrayOf(fetchTroopMemberInfo.parameterTypes[5])
         ) { _, method, args ->
             if (method.returnType == Void.TYPE && method.parameterTypes[0] == Class.forName("com.tencent.mobileqq.data.troop.TroopMemberInfo")) {
@@ -280,7 +281,7 @@ object TroopTool : DexKitTask {
                 memberList.add(processMemberInfo(it))
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
         return memberList
     }
@@ -303,7 +304,7 @@ object TroopTool : DexKitTask {
                 }
             }
         } catch (e: Throwable) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
         return forbidList
     }

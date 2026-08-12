@@ -2,31 +2,24 @@ package me.lengyu.qedge.utils.dexkit
 
 import android.content.Context
 import android.os.Bundle
-import android.os.Process
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.tencent.mobileqq.activity.SplashActivity
 import me.lengyu.qedge.common.ModuleScope
+import me.lengyu.qedge.hook.MainHook
 import me.lengyu.qedge.hook.base.HookRegistry
 import me.lengyu.qedge.ui.components.dialogs.CenterDialogContainerNoButton
 import me.lengyu.qedge.ui.core.compatibility.XposedComposeDialog
@@ -46,6 +39,7 @@ object DexKitFinder {
 
     private var progressText by mutableStateOf("QEdge准备开始查找...")
     private var isFindComplete by mutableStateOf(false)
+    private var dialogRef: XposedComposeDialog? = null
 
     @JvmStatic
     fun doFind() {
@@ -61,7 +55,7 @@ object DexKitFinder {
             .hookAfter {
                 val context = it.thisObject as Context
 
-                object : XposedComposeDialog(context) {
+                dialogRef = object : XposedComposeDialog(context) {
                     override fun configureWindow() {
                         super.configureWindow()
                         window?.apply {
@@ -90,20 +84,6 @@ object DexKitFinder {
                                         lineHeight = 22.sp,
                                         modifier = Modifier.fillMaxWidth()
                                     )
-                                    if (isFindComplete) {
-                                        Spacer(modifier = Modifier.height(20.dp))
-                                        TextButton(
-                                            onClick = { Process.killProcess(Process.myPid()) },
-                                            modifier = Modifier.fillMaxWidth()
-                                        ) {
-                                            Text(
-                                                "确定",
-                                                fontSize = 16.sp,
-                                                fontWeight = FontWeight.Medium,
-                                                color = colors.textPrimary
-                                            )
-                                        }
-                                    }
                                 }
                             }
                         }
@@ -178,9 +158,13 @@ object DexKitFinder {
                     }.onFailure { LogUtils.e(task.TAG, it) }
                 }
             }
-            progressText = "查找完成，点击确定退出QQ"
+            progressText = "查找完成，正在初始化..."
             DexKitCache.saveCache()
             isFindComplete = true
+            Handler(Looper.getMainLooper()).post {
+                dialogRef?.dismiss()
+                MainHook.loadHook()
+            }
         }
     }
 }

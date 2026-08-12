@@ -9,6 +9,7 @@ import java.util.Map;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
@@ -71,9 +72,7 @@ public class MusicMenuFeature implements ColdRainFeature {
     public void handle(MsgData msgData, ColdRainCore core) {
         final ColdRainCore finalCore = core;
         final MsgData finalMsgData = msgData;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("MusicMenuFeature", () -> {
                 try {
                     String text = finalMsgData.msg.trim();
                     String qun = finalMsgData.peerUin;
@@ -181,8 +180,7 @@ public class MusicMenuFeature implements ColdRainFeature {
                 } catch (Throwable e) {
                     LogUtils.e("MusicMenuFeature", "error: " + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private void randomMusic(String qun, int mtype, String yyms, ColdRainCore core, MsgData msgData) {
@@ -585,9 +583,7 @@ public class MusicMenuFeature implements ColdRainFeature {
     }
     
     private void downloadAndSendFile(String qun, String url, String filePath, String song, String singer, String cover, int mtype, ColdRainCore core, MsgData msgData) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("MusicMenuFeature", () -> {
                 try {
                     String resultPath = HttpUtils.download(url, filePath);
                     if (resultPath != null && new java.io.File(resultPath).exists()) {
@@ -599,8 +595,7 @@ public class MusicMenuFeature implements ColdRainFeature {
                     LogUtils.e("MusicMenuFeature", "downloadAndSendFile error: " + e.getMessage());
                     core.reply(msgData, "下载失败");
                 }
-            }
-        }).start();
+        });
     }
 
     private String getMusicMode(String qun) {

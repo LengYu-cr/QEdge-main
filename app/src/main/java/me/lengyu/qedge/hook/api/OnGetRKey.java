@@ -39,7 +39,7 @@ public class OnGetRKey extends BaseApiHookItem<Listener> {
                             cmd = (String) fromServiceMsg.getServiceCmd();
                         } catch (Throwable e) {
                             LogUtils.e("OnGetRKey", "getServiceCmd error: " + e.getMessage());
-                            e.printStackTrace();
+                            LogUtils.e(e);
                             return;
                         }
                     }
@@ -61,12 +61,12 @@ public class OnGetRKey extends BaseApiHookItem<Listener> {
                     }
                 } catch (Throwable e) {
                     LogUtils.e("OnGetRKey", "hook error: " + e.getMessage());
-                    e.printStackTrace();
+                    LogUtils.e(e);
                 }
             });
         } catch (Throwable e) {
             LogUtils.e("OnGetRKey", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -107,7 +107,7 @@ public class OnGetRKey extends BaseApiHookItem<Listener> {
             }
         } catch (Throwable e) {
             LogUtils.e("OnGetRKey", "parseRKey error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 }

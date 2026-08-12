@@ -8,6 +8,7 @@ import java.io.InputStreamReader;
 import java.util.Properties;
 
 import me.lengyu.qedge.plugin.PluginCompiler;
+import me.lengyu.qedge.utils.LogUtils;
 
 public class PluginInfo {
     private final String id;
@@ -49,7 +50,7 @@ public class PluginInfo {
                 this.desc = readFileContent(descFile);
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -61,7 +62,7 @@ public class PluginInfo {
                 content.append(line).append("\n");
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return content.toString();
     }
@@ -88,7 +89,7 @@ public class PluginInfo {
                     dir.getAbsolutePath()
             );
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
             return null;
         }
     }

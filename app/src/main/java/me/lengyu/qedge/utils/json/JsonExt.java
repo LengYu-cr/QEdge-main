@@ -5,6 +5,8 @@ import org.json.JSONObject;
 
 import java.util.Iterator;
 
+import me.lengyu.qedge.utils.LogUtils;
+
 public class JsonExt {
 
     /**
@@ -60,7 +62,7 @@ public class JsonExt {
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }

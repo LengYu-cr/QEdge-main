@@ -371,25 +371,28 @@ object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
 
     private val levelBoostRunning = java.util.concurrent.atomic.AtomicBoolean(false)
 
-    /** 等级加速·自动加机器人好友：是好友先删再加，不是直接加，每次间隔数秒，加完不删 */
+    /** 等级加速·自动加机器人好友：已是好友则跳过，不是好友才加，每次间隔数秒 */
     private fun runLevelBoost(today: String) {
         if (!levelBoostRunning.compareAndSet(false, true)) return
         Thread {
             runCatching {
+                var addedCount = 0
                 for (botUin in BOT_UINS) {
                     try {
                         if (FriendTool.isFriend(botUin)) {
-                            FriendTool.deleteFriend(botUin)
-                            Thread.sleep(3000)
+                            // LogUtils.d(TAG, "level boost: $botUin already friend, skip")
+                            continue
                         }
                         ExtraTool.addFriend(botUin, "", "")
+                        addedCount++
                         Thread.sleep(5000)
                     } catch (e: Throwable) {
                         LogUtils.e(TAG, "level boost add $botUin error: ${e.message}")
                     }
                 }
+                // 不管加了多少个都标记完成，避免反复触发
                 markDoneToday(SP_PREFIX_LEVEL_BOOST_DONE, today)
-                // LogUtils.i(TAG, "level boost add friends done")
+                LogUtils.d(TAG, "level boost done: added $addedCount friends")
             }.onFailure { LogUtils.e(TAG, "runLevelBoost error: ${it.message}") }
             levelBoostRunning.set(false)
         }.start()

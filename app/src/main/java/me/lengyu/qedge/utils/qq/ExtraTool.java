@@ -33,6 +33,7 @@ import me.lengyu.qedge.utils.proto.PacketHelper;
 import me.lengyu.qedge.utils.proto.packetListener;
 import me.lengyu.qedge.utils.Toasts;
 import me.lengyu.qedge.utils.LogUtils;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.json.ProtoData;
 
@@ -273,7 +274,7 @@ public class ExtraTool {
         final Object lock = new Object();
         final boolean[] done = {false};
         
-        new Thread(() -> {
+        ModuleScope.launchIOJava("ExtraTool", () -> {
             try {
                 final CountDownLatch latch = new CountDownLatch(1);
                 
@@ -285,7 +286,7 @@ public class ExtraTool {
                                 resultHolder[0] = jsonResult.toString();
                             }
                         } catch (Exception e) {
-                            e.printStackTrace();
+                            LogUtils.e(e);
                         } finally {
                             latch.countDown();
                         }
@@ -309,7 +310,7 @@ public class ExtraTool {
                     lock.notify();
                 }
             }
-        }).start();
+        });
         
         synchronized (lock) {
             while (!done[0]) {

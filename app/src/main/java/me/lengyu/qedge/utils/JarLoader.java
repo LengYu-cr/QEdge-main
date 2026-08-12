@@ -13,6 +13,7 @@ import java.util.jar.JarFile;
 
 import dalvik.system.DexClassLoader;
 import dalvik.system.PathClassLoader;
+import me.lengyu.qedge.utils.LogUtils;
 
 public class JarLoader {
 
@@ -65,7 +66,7 @@ public class JarLoader {
             addDexPathMethod.setAccessible(true);
             addDexPathMethod.invoke(systemClassLoader, jarPath);
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

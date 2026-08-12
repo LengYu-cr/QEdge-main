@@ -68,7 +68,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
                     }
                 } catch (e: Throwable) {
                     LogUtils.e("OnMenuBuild", "setMenu hook error: " + e.message)
-                    e.printStackTrace()
+                    LogUtils.e(e)
                 }
             }
 
@@ -180,7 +180,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
                 }
             } catch (e: Throwable) {
                 LogUtils.e("OnMenuBuild", "View hook error: " + e.message)
-                e.printStackTrace()
+                LogUtils.e(e)
             }
         }
     }
@@ -343,7 +343,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
             items.add(0, newItem)
         } catch (e: Throwable) {
             LogUtils.e("OnMenuBuild", "addMenuItem error: " + e.message)
-            e.printStackTrace()
+            LogUtils.e(e)
         }
     }
 

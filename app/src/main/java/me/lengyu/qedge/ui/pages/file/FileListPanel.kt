@@ -40,6 +40,7 @@ import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.molecules.EmptyStateView
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.LogUtils
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -375,7 +376,7 @@ private fun loadFiles(path: String, callback: (List<FileItem>) -> Unit) {
                 callback(fileItems)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             android.os.Handler(android.os.Looper.getMainLooper()).post {
                 callback(emptyList())
             }

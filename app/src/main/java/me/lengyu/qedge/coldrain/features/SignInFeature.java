@@ -2,7 +2,9 @@ package me.lengyu.qedge.coldrain.features;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
+import me.lengyu.qedge.utils.LogUtils;
 
 public class SignInFeature implements ColdRainFeature {
     @Override
@@ -21,9 +23,7 @@ public class SignInFeature implements ColdRainFeature {
 
     @Override
     public void handle(MsgData msgData, ColdRainCore core) {
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("SignInFeature", () -> {
                 try {
                     String quntext = msgData.msg.trim();
                     String qun = msgData.peerUin;
@@ -166,10 +166,9 @@ public class SignInFeature implements ColdRainFeature {
                         return;
                     }
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    LogUtils.e(e);
                 }
-            }
-        }).start();
+        });
     }
 
     private String getTodayDate() {

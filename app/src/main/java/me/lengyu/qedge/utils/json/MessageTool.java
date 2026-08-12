@@ -10,6 +10,8 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.Map;
 
+import me.lengyu.qedge.utils.LogUtils;
+
 public class MessageTool {
 
     private static Class<?> messageClass;
@@ -80,7 +82,7 @@ public class MessageTool {
             }
             inited = true;
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -105,7 +107,7 @@ public class MessageTool {
             return methodReadValue.invoke(descriptor);
             
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
             return null;
         }
     }

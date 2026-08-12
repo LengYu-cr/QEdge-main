@@ -5,16 +5,18 @@ import java.net.URLClassLoader;
 import java.util.ArrayList;
 import java.util.List;
 
+import me.lengyu.qedge.utils.LogUtils;
+
 public class FixClassLoader extends ClassLoader {
     private final List<ClassLoader> classLoaders = new ArrayList<>();
     private ClassLoader hostClassLoader;
 
     public FixClassLoader() {
         try {
-            hostClassLoader = (ClassLoader) me.lengyu.qedge.utils.ClassUtils.class
+            hostClassLoader = (ClassLoader) me.lengyu.qedge.utils.reflect.ClassUtils.class
                     .getDeclaredField("hostClassLoader").get(null);
         } catch (Exception e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

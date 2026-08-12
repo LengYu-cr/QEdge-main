@@ -1,7 +1,7 @@
 package me.lengyu.qedge.hook;
 
 import android.content.Context;
-import android.content.SharedPreferences;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.hook.api.FromServiceMsgDispatcher;
 import me.lengyu.qedge.hook.item.DownloadEmotion;
 import me.lengyu.qedge.hook.item.FlashPicBypass;
@@ -33,6 +33,7 @@ import me.lengyu.qedge.hook.HeartbeatManager;
 import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.HookUtils;
 import me.lengyu.qedge.utils.LogUtils;
+import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.hook.entry.QQSettingInject;
@@ -97,10 +98,7 @@ public class MainHook {
             LogUtils.e("MainHook", "Failed to load ChatSettingLoader: " + e.getMessage());
         }
 
-        new Thread(() -> {
-            try {
-                Thread.sleep(2000);
-            } catch (InterruptedException ignored) {}
+        ModuleScope.launchDelayedIO("Plugin-AutoLoad", 2000, () -> {
             try {
                 loadPluginsIfNeeded();
             } catch (Throwable e) {
@@ -111,7 +109,7 @@ public class MainHook {
             } catch (Throwable e) {
                 LogUtils.e("MainHook", "Failed to init ColdRainCore: " + e.getMessage());
             }
-        }, "Plugin-AutoLoad").start();
+        });
 
     }
 
@@ -161,19 +159,12 @@ public class MainHook {
             if (targetMethod == null) {
                 LogUtils.w("hookAccountChange", "Specific method not found, trying constructor hook");
                 HookUtils.hookAfter(qqAppInterface.getDeclaredConstructors()[0], (param) -> {
-                    new Thread(() -> {
-                        try {
-                            Thread.sleep(3000);
-                        } catch (InterruptedException ignored) {}
-                        onAccountChanged();
-                    }).start();
+                    ModuleScope.launchDelayedIO("AccountChange", 3000, () -> onAccountChanged());
                 });
                 return;
             }
             HookUtils.hookAfter(targetMethod, (param) -> {
-                new Thread(() -> {
-                    onAccountChanged();
-                }).start();
+                ModuleScope.launchIOJava("AccountChange", () -> onAccountChanged());
             });
         } catch (Throwable e) {
             LogUtils.e("hookAccountChange", e);
@@ -184,19 +175,11 @@ public class MainHook {
         try {
             QQCurrentEnv.reset();
             String currentUin = QQCurrentEnv.getCurrentUin();
-            Context context = HostInfo.getHostContext();
-            if (context != null) {
-                // 只有获取到有效的 UIN 时才写入缓存，防止 null 覆盖
-                if (currentUin != null && !currentUin.isEmpty()) {
-                    SharedPreferences prefs = context.getSharedPreferences(
-                            "QEdge_Config_" + currentUin, Context.MODE_PRIVATE);
-                    prefs.edit().putString("currentUin", currentUin).apply();
-                    
-                    SharedPreferences heartbeatPrefs = context.getSharedPreferences("QEdge_Heartbeat", Context.MODE_PRIVATE);
-                    heartbeatPrefs.edit().putString("current_uin", currentUin).apply();
-                } else {
-                    LogUtils.w("onAccountChanged", "currentUin is null or empty, skip saving to prefs.");
-                }
+            if (currentUin != null && !currentUin.isEmpty()) {
+                ModuleConfig.INSTANCE.putString("currentUin", currentUin);
+                ModuleConfig.INSTANCE.putString("heartbeat_current_uin", currentUin);
+            } else {
+                LogUtils.w("onAccountChanged", "currentUin is null or empty, skip saving to config.");
             }
             processDataForCurrent("init");
             loadPluginsIfNeeded();
@@ -221,7 +204,7 @@ public class MainHook {
                         method.setAccessible(true);
                         method.invoke(item);
                     } catch (Throwable e) {
-                        e.printStackTrace();
+                        LogUtils.e(e);
                     }
                 } else if ("save".equals(tag)) {
                     try {
@@ -229,7 +212,7 @@ public class MainHook {
                         method.setAccessible(true);
                         method.invoke(item);
                     } catch (Throwable e) {
-                        e.printStackTrace();
+                        LogUtils.e(e);
                     }
                 }
             }
@@ -275,7 +258,7 @@ public class MainHook {
             for (PluginInfo plugin : me.lengyu.qedge.plugin.PluginManager.plugins) {
                 if (plugin.getId().equals(pluginId)) {
                     if (running) {
-                        boolean success = me.lengyu.qedge.plugin.PluginManager.startPlugin(plugin);
+                        me.lengyu.qedge.plugin.PluginManager.startPlugin(plugin);
                     } else {
                         me.lengyu.qedge.plugin.PluginManager.stopPlugin(plugin);
                     }

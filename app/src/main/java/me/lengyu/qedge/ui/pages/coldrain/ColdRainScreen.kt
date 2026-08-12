@@ -24,8 +24,6 @@ import androidx.compose.material3.ripple
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -47,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
+import me.lengyu.qedge.ui.components.atoms.QEdgeSwitch
 import me.lengyu.qedge.ui.core.theme.AccentBlue
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 
@@ -121,16 +120,12 @@ fun ColdRainScreen(
                             color = if (masterEnabled) AccentBlue else colors.textSecondary
                         )
                     }
-                    Switch(
+                    QEdgeSwitch(
                         checked = masterEnabled,
                         onCheckedChange = {
                             masterEnabled = it
                             ColdRainConfig.setBoolean("master_enabled", it)
-                        },
-                        colors = SwitchDefaults.colors(
-                            checkedThumbColor = AccentBlue,
-                            checkedTrackColor = AccentBlue.copy(alpha = 0.3f)
-                        )
+                        }
                     )
                 }
             }
@@ -576,16 +571,12 @@ private fun FeatureSwitchItemColdRain(
                 color = colors.textSecondary
             )
         }
-        Switch(
+        QEdgeSwitch(
             checked = checked,
             onCheckedChange = {
                 checked = it
                 ColdRainConfig.setFeatureEnabled(feature.key, it)
-            },
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = AccentBlue,
-                checkedTrackColor = AccentBlue.copy(alpha = 0.3f)
-            )
+            }
         )
     }
 }
@@ -659,82 +650,9 @@ private fun SwitchItemColdRain(
                 )
             }
         }
-        Switch(
+        QEdgeSwitch(
             checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = AccentBlue,
-                checkedTrackColor = AccentBlue.copy(alpha = 0.3f)
-            )
+            onCheckedChange = onCheckedChange
         )
-    }
-}
-
-@Composable
-private fun QEdgeTopBarColdRain(
-    title: String,
-    showBackButton: Boolean = false,
-    onBackClick: () -> Unit = {},
-    isDarkTheme: Boolean = false,
-    onThemeToggle: () -> Unit = {}
-) {
-    val colors = QEdgeTheme.colors
-
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        if (showBackButton) {
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.cardBackground)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = ripple(color = colors.ripple),
-                        onClick = onBackClick
-                    ),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    painterResource(R.drawable.ic_chevron_right),
-                    "back",
-                    Modifier.size(20.dp).rotate(180f),
-                    colors.textPrimary
-                )
-            }
-            Spacer(modifier = Modifier.width(12.dp))
-        }
-
-        Text(
-            text = title,
-            fontSize = 18.sp,
-            fontWeight = FontWeight.Bold,
-            color = colors.textPrimary,
-            modifier = Modifier.weight(1f)
-        )
-
-        Box(
-            modifier = Modifier
-                .size(40.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(colors.cardBackground)
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = ripple(color = colors.ripple),
-                    onClick = onThemeToggle
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                painterResource(if (isDarkTheme) R.drawable.ic_sun else R.drawable.ic_moon),
-                "Toggle theme",
-                Modifier.size(20.dp),
-                colors.textPrimary
-            )
-        }
     }
 }

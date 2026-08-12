@@ -45,6 +45,7 @@ import androidx.compose.ui.window.DialogProperties
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.LogUtils
 import java.io.File
 import java.util.concurrent.TimeUnit
 
@@ -83,7 +84,7 @@ fun AudioPlayerDialog(
                 false
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             errorMessage = "加载失败: ${e.message}"
         }
     }
@@ -96,7 +97,7 @@ fun AudioPlayerDialog(
                     try {
                         currentPosition = mediaPlayer.currentPosition
                     } catch (e: Exception) {
-                        e.printStackTrace()
+                        LogUtils.e(e)
                     }
                 }
                 handler.postDelayed(this, 500)
@@ -109,7 +110,7 @@ fun AudioPlayerDialog(
             try {
                 mediaPlayer.release()
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
             }
         }
     }
@@ -124,7 +125,7 @@ fun AudioPlayerDialog(
             }
             isPlaying = !isPlaying
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
     }
 
@@ -134,7 +135,7 @@ fun AudioPlayerDialog(
             mediaPlayer.seekTo(position)
             currentPosition = position
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
     }
 

@@ -7,6 +7,7 @@ import com.tencent.qphone.base.remote.FromServiceMsg;
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
 import me.lengyu.qedge.hook.base.BaseApiHookItem;
 import me.lengyu.qedge.hook.base.Listener;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.utils.HookUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ModuleConfig;
@@ -271,7 +272,7 @@ public class OnQZonePush extends BaseApiHookItem<OnQZonePush.QZonePushListener> 
 
                 if (autoLike || autoComment) {
                     LogUtils.d(TAG, "auto action or comment, uin=" + uinStr + ", cellid=" + finalCellid);
-                    new Thread(() -> {
+                    ModuleScope.launchIOJava("OnQZonePush", () -> {
                         try {
                             // Thread.sleep(1000);
                             if (autoLike) {
@@ -285,7 +286,7 @@ public class OnQZonePush extends BaseApiHookItem<OnQZonePush.QZonePushListener> 
                         } catch (Throwable e) {
                             LogUtils.e(TAG, "auto action error: " + e.getMessage());
                         }
-                    }).start();
+                    });
                 }
             }
 

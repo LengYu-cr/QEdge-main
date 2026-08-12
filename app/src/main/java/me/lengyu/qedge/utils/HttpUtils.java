@@ -7,6 +7,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import me.lengyu.qedge.utils.LogUtils;
+
 public class HttpUtils {
 
     public static boolean downloadSync(String urlStr, String savePath) {
@@ -37,7 +39,7 @@ public class HttpUtils {
                 return true;
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return false;
     }
@@ -97,7 +99,7 @@ public class HttpUtils {
                     try {
                         urlFileName = java.net.URLDecoder.decode(urlFileName, "UTF-8");
                     } catch (Exception e) {
-                        e.printStackTrace();
+                        LogUtils.e(e);
                     }
 
                     // 检查后缀是否是动态脚本或无效后缀
@@ -139,7 +141,7 @@ public class HttpUtils {
                 return saveFile.getAbsolutePath();
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -213,7 +215,7 @@ public class HttpUtils {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -253,7 +255,7 @@ public class HttpUtils {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -291,7 +293,7 @@ public class HttpUtils {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -330,7 +332,7 @@ public class HttpUtils {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }
@@ -368,7 +370,7 @@ public class HttpUtils {
                 }
             }
         } catch (IOException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }

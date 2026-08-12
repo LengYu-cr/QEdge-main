@@ -78,13 +78,13 @@ class SettingActivity : ComponentActivity() {
         try {
             mainHookClass = Class.forName("me.lengyu.qedge.hook.MainHook")
         } catch (e: ClassNotFoundException) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
         
         try {
             HeartbeatManager.getInstance().startHeartbeat()
         } catch (e: Throwable) {
-            e.printStackTrace()
+            LogUtils.e(e)
         }
         
         setupUI()
@@ -136,7 +136,7 @@ class SettingActivity : ComponentActivity() {
             result
         } catch (e: Exception) {
             LogUtils.e("[DEBUG-PLUGIN]DP-001 ERROR: ${e.message}", e)
-            e.printStackTrace()
+            LogUtils.e(e)
             null
         }
     }
@@ -146,7 +146,7 @@ class SettingActivity : ComponentActivity() {
         return try {
             callMainHookMethod("getPluginList") as? List<PluginData> ?: emptyList()
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             emptyList()
         }
     }

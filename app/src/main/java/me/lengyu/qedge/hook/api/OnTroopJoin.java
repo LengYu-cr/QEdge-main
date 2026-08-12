@@ -58,7 +58,7 @@ public class OnTroopJoin extends BaseApiHookItem<OnTroopJoin.TroopJoinListener> 
                             }
                         } catch (Throwable e) {
                             LogUtils.e("OnTroopJoin", "callback error: " + e.getMessage());
-                            e.printStackTrace();
+                            LogUtils.e(e);
                         }
                     });
                 } else {
@@ -75,7 +75,7 @@ public class OnTroopJoin extends BaseApiHookItem<OnTroopJoin.TroopJoinListener> 
                             notifyListeners(troopUin, memberUin);
                         } catch (Throwable e) {
                             LogUtils.e("OnTroopJoin", "handleJoin callback error: " + e.getMessage());
-                            e.printStackTrace();
+                            LogUtils.e(e);
                         }
                     });
                 } else {
@@ -84,7 +84,7 @@ public class OnTroopJoin extends BaseApiHookItem<OnTroopJoin.TroopJoinListener> 
             }
         } catch (Throwable e) {
             LogUtils.e("OnTroopJoin", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

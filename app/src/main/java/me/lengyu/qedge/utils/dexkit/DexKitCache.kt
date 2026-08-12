@@ -14,7 +14,7 @@ object DexKitCache {
 
     private val cacheFile by lazy {
         File(
-            "${HostInfo.getModuleDataPath()}global/dexkit",
+            "${HostInfo.getModuleDataPath()}dexkit",
             "CacheMap_${HostInfo.versionCode}_${me.lengyu.qedge.BuildConfig.VERSION_CODE}"
         )
     }

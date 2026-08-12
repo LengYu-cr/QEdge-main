@@ -7,7 +7,9 @@ import java.util.List;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
 
 public class QuestionFeature implements ColdRainFeature {
@@ -105,9 +107,7 @@ public class QuestionFeature implements ColdRainFeature {
     @Override
     public void handle(MsgData msgData, ColdRainCore core) {
         this.core = core;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("QuestionFeature", () -> {
                 try {
                     String text = msgData.msg.trim();
                     String qun = msgData.peerUin;
@@ -551,10 +551,9 @@ public class QuestionFeature implements ColdRainFeature {
                     }
 
                 } catch (Throwable e) {
-                    e.printStackTrace();
+                    LogUtils.e(e);
                 }
-            }
-        }).start();
+        });
     }
 
     private String formatAnswer(String answer, String uin, String qq, String qun, String userName) {

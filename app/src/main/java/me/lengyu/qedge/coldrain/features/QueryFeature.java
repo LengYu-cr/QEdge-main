@@ -11,6 +11,7 @@ import java.net.URLEncoder;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
@@ -85,9 +86,7 @@ public class QueryFeature implements ColdRainFeature {
 
         final String finalUin = uin;
         final MsgData finalMsg = msgData;
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("QueryFeature", () -> {
                 try {
                     if (text.startsWith("查Q音")) {
                         queryQMusic(finalUin, finalMsg, core);
@@ -109,8 +108,7 @@ public class QueryFeature implements ColdRainFeature {
                 } catch (Throwable e) {
                     core.reply(finalMsg, "查询失败: " + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private void queryQMusic(String uin, MsgData msgData, ColdRainCore core) {

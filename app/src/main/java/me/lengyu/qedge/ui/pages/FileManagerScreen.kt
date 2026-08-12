@@ -47,6 +47,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import me.lengyu.qedge.R
 import me.lengyu.qedge.utils.HostInfo
+import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
@@ -982,7 +983,7 @@ private fun copyFiles(files: Set<File>, targetPath: String) {
                     file.copyTo(File(targetDir, file.name), overwrite = true)
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
             }
         }
     }.start()
@@ -1012,7 +1013,7 @@ private fun deleteFiles(files: Set<File>) {
                     file.delete()
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
             }
         }
     }.start()

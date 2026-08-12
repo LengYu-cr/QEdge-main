@@ -61,7 +61,7 @@ public class KKHook {
 
         } catch (Throwable e) {
             LogUtils.e("hookVip", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -117,7 +117,7 @@ public class KKHook {
             }
         } catch (Throwable e) {
             LogUtils.e("hookVipInfo", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -151,7 +151,7 @@ public class KKHook {
 
         } catch (Throwable e) {
             LogUtils.e("hookExit", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -162,7 +162,7 @@ public class KKHook {
             Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
                 LogUtils.e("hookExit", "Uncaught exception in " + thread.getName() +
                     ": " + throwable.getMessage());
-                throwable.printStackTrace();
+                LogUtils.e(throwable);
             });
         } catch (Throwable e) {
             LogUtils.e("hookExit", "hookUncaughtException error: " + e.getMessage());

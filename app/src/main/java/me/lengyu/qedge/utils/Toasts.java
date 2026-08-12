@@ -8,6 +8,7 @@ import android.widget.Toast;
 
 import com.tencent.util.QQToastUtil;
 
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 
 public class Toasts {
@@ -29,7 +30,7 @@ public class Toasts {
                 QQToastUtil.showQQToastInUiThread(icon, message);
             }
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
             toast(message);
         }
     }

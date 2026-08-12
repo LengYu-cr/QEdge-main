@@ -35,12 +35,15 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.core.compatibility.XposedComposeDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.core.theme.AccentBlue
 import me.lengyu.qedge.ui.core.theme.LightTextSecondary
+import me.lengyu.qedge.common.ModuleScope
+import me.lengyu.qedge.utils.LogUtils
 
 class UpdateDialog(
     context: Context,
@@ -56,7 +59,7 @@ class UpdateDialog(
             setGravity(Gravity.CENTER)
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            setDimAmount(0f)
+            setDimAmount(0.35f)
         }
     }
 
@@ -91,6 +94,18 @@ private fun UpdateContent(
     var isDownloading by remember { mutableStateOf(false) }
     var downloadProgress by remember { mutableStateOf(0) }
     var downloadCompleted by remember { mutableStateOf(false) }
+    var showBrowserButton by remember { mutableStateOf(false) }
+    var downloadError by remember { mutableStateOf<String?>(null) }
+
+    // 5秒仍卡在0%时显示浏览器下载按钮
+    LaunchedEffect(isDownloading, downloadProgress) {
+        if (isDownloading && downloadProgress == 0 && !showBrowserButton) {
+            kotlinx.coroutines.delay(5000)
+            if (downloadProgress == 0) {
+                showBrowserButton = true
+            }
+        }
+    }
 
     AnimatedVisibility(
         visible = visible,
@@ -99,7 +114,8 @@ private fun UpdateContent(
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth(0.88f)
+                .padding(horizontal = 24.dp)
+                .fillMaxWidth()
                 .clip(RoundedCornerShape(24.dp))
                 .background(colors.cardBackground)
                 .padding(vertical = 24.dp)
@@ -207,6 +223,61 @@ private fun UpdateContent(
                         }
                     }
 
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    // 下载出错或卡在0%时显示错误信息和浏览器下载按钮
+                    AnimatedVisibility(
+                        visible = showBrowserButton || downloadError != null,
+                        enter = fadeIn(tween(200)),
+                        exit = fadeOut(tween(200))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            if (downloadError != null) {
+                                Text(
+                                    text = downloadError!!,
+                                    fontSize = 12.sp,
+                                    color = Color(0xFFFF6B6B),
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.fillMaxWidth()
+                                )
+                                Spacer(modifier = Modifier.height(12.dp))
+                            }
+                            val context = LocalContext.current
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(16.dp))
+                                    .background(AccentBlue)
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = {
+                                            try {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(downloadUrl))
+                                                context.startActivity(intent)
+                                            } catch (e: Exception) {
+                                                LogUtils.e(e)
+                                            }
+                                        }
+                                    )
+                                    .padding(vertical = 14.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "在浏览器中下载",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = Color.White
+                                )
+                            }
+                        }
+                    }
+
                     Spacer(modifier = Modifier.height(20.dp))
 
                     Row(
@@ -246,6 +317,8 @@ private fun UpdateContent(
                                         if (!isDownloading && !downloadCompleted) {
                                             isDownloading = true
                                             downloadProgress = 0
+                                            showBrowserButton = false
+                                            downloadError = null
                                         }
                                     }
                                 )
@@ -267,23 +340,32 @@ private fun UpdateContent(
 
                     if (isDownloading) {
                         LaunchedEffect(Unit) {
-                            downloadApk(downloadUrl) { progress ->
-                                downloadProgress = progress
-                                if (progress >= 100) {
-                                    downloadCompleted = true
+                            downloadApk(downloadUrl,
+                                onProgress = { progress ->
+                                    downloadProgress = progress
+                                    if (progress >= 100) {
+                                        downloadCompleted = true
+                                        isDownloading = false
+                                    }
+                                },
+                                onError = { error ->
+                                    downloadError = error
                                     isDownloading = false
                                 }
-                            }
+                            )
                         }
                     }
                 }
             }
     }
 
-private fun downloadApk(url: String, onProgress: (Int) -> Unit) {
-    Thread {
+private fun downloadApk(url: String, onProgress: (Int) -> Unit, onError: (String) -> Unit) {
+    ModuleScope.launchIOJava("UpdateDialog") {
         try {
-            val context = me.lengyu.qedge.utils.HostInfo.getHostContext() ?: return@Thread
+            val context = me.lengyu.qedge.utils.HostInfo.getHostContext() ?: run {
+                onError("无法获取应用上下文")
+                return@launchIOJava
+            }
             val downloadManager = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
             val cleanUrl = url.trim().removeSurrounding("`", "`").removeSurrounding("\"", "\"")
@@ -316,6 +398,8 @@ private fun downloadApk(url: String, onProgress: (Int) -> Unit) {
                         cursor.close()
                         break
                     } else if (status == DownloadManager.STATUS_FAILED) {
+                        val reason = cursor.getInt(cursor.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+                        onError("下载失败 (错误码: $reason)")
                         cursor.close()
                         break
                     } else if (bytesTotal > 0) {
@@ -330,9 +414,10 @@ private fun downloadApk(url: String, onProgress: (Int) -> Unit) {
                 Thread.sleep(500)
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
+            onError(e.message ?: "下载异常")
         }
-    }.start()
+    }
 }
 
 private fun openApk(context: Context, uri: Uri) {

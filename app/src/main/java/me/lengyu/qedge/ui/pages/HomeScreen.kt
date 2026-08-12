@@ -2,6 +2,8 @@ package me.lengyu.qedge.ui.pages
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -45,9 +47,13 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import me.lengyu.qedge.common.ModuleScope
 import me.lengyu.qedge.ui.components.atoms.ActionButton
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.atoms.QEdgeSwitch
@@ -61,8 +67,12 @@ import me.lengyu.qedge.ui.core.theme.AccentBlue
 import me.lengyu.qedge.ui.core.theme.AccentGreen
 import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.ui.pages.home.HomeCommentInputDialog
+import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
+import me.lengyu.qedge.ui.pages.home.HomeUpdateLogDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.ModuleConfig
+import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.hook.item.QZoneSchedule
 import me.lengyu.qedge.hook.item.KeepAliveHook
 import androidx.compose.foundation.text.BasicTextField
@@ -119,11 +129,12 @@ fun HomeScreen(
     var keepAlivePixel by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_PIXEL, false)) }
     var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
     var keepAliveBackground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_BACKGROUND, false)) }
+    var chatSettingEntry by remember { mutableStateOf(ModuleConfig.getString("chat_setting_entry", "more_features")) }
 
     fun loadOnlinePlugins() {
         isLoading = true
         errorMessage = ""
-        Thread {
+        ModuleScope.launchIOJava("OnlinePlugin") {
             try {
                 val urlString = if (searchQuery.isNotEmpty()) {
                     "https://v.yuafeng.cn/QEdge/online_plugin/list.php?api=json&search=${java.net.URLEncoder.encode(searchQuery, "UTF-8")}"
@@ -165,24 +176,24 @@ fun HomeScreen(
                             )
                         )
                     }
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    ModuleScope.postToMain {
                         onlinePlugins = plugins
                     }
                 } else {
-                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    ModuleScope.postToMain {
                         errorMessage = json.getString("message")
                     }
                 }
             } catch (e: Exception) {
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                ModuleScope.postToMain {
                     errorMessage = e.message ?: "获取失败"
                 }
             } finally {
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                ModuleScope.postToMain {
                     isLoading = false
                 }
             }
-        }.start()
+        }
     }
 
     Box(
@@ -230,22 +241,22 @@ fun HomeScreen(
                     val forward = targetState > initialState
                     if (forward) {
                         slideInHorizontally(
-                            animationSpec = tween(250),
+                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                             initialOffsetX = { it }
                         ) + fadeIn(animationSpec = tween(150)) togetherWith
                         slideOutHorizontally(
-                            animationSpec = tween(250),
+                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                             targetOffsetX = { -it / 3 }
-                        ) + fadeOut(animationSpec = tween(150))
+                        ) + fadeOut(animationSpec = tween(120))
                     } else {
                         slideInHorizontally(
-                            animationSpec = tween(250),
+                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                             initialOffsetX = { -it }
                         ) + fadeIn(animationSpec = tween(150)) togetherWith
                         slideOutHorizontally(
-                            animationSpec = tween(250),
+                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                             targetOffsetX = { it / 3 }
-                        ) + fadeOut(animationSpec = tween(150))
+                        ) + fadeOut(animationSpec = tween(120))
                     }
                 },
                 modifier = Modifier.weight(1f)
@@ -360,6 +371,11 @@ fun HomeScreen(
                                 ModuleConfig.putBoolean(KeepAliveHook.SP_BACKGROUND, it)
                                 KeepAliveHook.refresh()
                             }.start()
+                        },
+                        chatSettingEntry = chatSettingEntry,
+                        onChatSettingEntryChange = { newValue ->
+                            chatSettingEntry = newValue
+                            Thread { ModuleConfig.putString("chat_setting_entry", newValue) }.start()
                         }
                     )
                     1 -> JavaPluginsPage(
@@ -383,7 +399,7 @@ fun HomeScreen(
             }
         }
 
-        CommentInputDialog(
+        HomeCommentInputDialog(
             show = showCommentDialog,
             commentText = qzoneCommentText,
             onDismiss = { showCommentDialog = false },
@@ -394,7 +410,7 @@ fun HomeScreen(
             }
         )
 
-        MoodScheduleDialog(
+        HomeMoodScheduleDialog(
             show = showMoodConfigDialog,
             initialTime = moodTime,
             initialText = moodText,
@@ -410,7 +426,7 @@ fun HomeScreen(
             }
         )
 
-        UpdateLogDialog(
+        HomeUpdateLogDialog(
             show = showUpdateLogDialog,
             onDismiss = { showUpdateLogDialog = false }
         )
@@ -487,7 +503,9 @@ private fun HomePage(
     keepAliveBackground: Boolean,
     onKeepAlivePixelToggle: (Boolean) -> Unit,
     onKeepAliveForegroundToggle: (Boolean) -> Unit,
-    onKeepAliveBackgroundToggle: (Boolean) -> Unit
+    onKeepAliveBackgroundToggle: (Boolean) -> Unit,
+    chatSettingEntry: String,
+    onChatSettingEntryChange: (String) -> Unit
 ) {
     val colors = QEdgeTheme.colors
 
@@ -623,6 +641,62 @@ private fun HomePage(
                         checked = timArkCardBypass,
                         onCheckedChange = onTimArkCardBypassToggle
                     )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    "聊天页脚本菜单入口",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    "长按聊天页对应按钮打开脚本菜单（重启QQ生效）",
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                val options = ChatSettingLoader.ENTRY_OPTIONS.entries.toList()
+                val chunked = options.chunked(4)
+                for (row in chunked) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        for ((key, label) in row) {
+                            val selected = chatSettingEntry == key
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(
+                                        if (selected) AccentBlue else colors.background
+                                    )
+                                    .clickable { onChatSettingEntryChange(key) }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selected) Color.White else colors.textPrimary
+                                )
+                            }
+                        }
+                        // 补齐空位
+                        repeat(4 - row.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
             }
         }
@@ -833,355 +907,6 @@ private fun SettingSwitchItem(
     }
 }
 
-@Composable
-private fun CommentInputDialog(
-    show: Boolean,
-    commentText: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    if (!show) return
-
-    val colors = QEdgeTheme.colors
-    var text by remember(commentText) { mutableStateOf(commentText) }
-
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(colors.cardBackground)
-                .padding(20.dp)
-        ) {
-            Text(
-                "自定义评论内容",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            ComposeBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.textSecondary.copy(alpha = 0.08f))
-                    .padding(14.dp)
-            ) {
-                BasicTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 14.sp,
-                        color = colors.textPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 4,
-                    decorationBox = { innerTextField ->
-                        if (text.isEmpty()) {
-                            Text("说点什么吧...", fontSize = 14.sp, color = colors.textSecondary)
-                        }
-                        innerTextField()
-                    }
-                )
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                ComposeBox(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onDismiss
-                        )
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                ComposeBox(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(AccentGreen)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = { onConfirm(text) }
-                        )
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("确定", fontSize = 14.sp, fontWeight = FontWeight.Medium, color = androidx.compose.ui.graphics.Color.White)
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun MoodScheduleDialog(
-    show: Boolean,
-    initialTime: String,
-    initialText: String,
-    onDismiss: () -> Unit,
-    onConfirm: (time: String, text: String) -> Unit
-) {
-    if (!show) return
-
-    val colors = QEdgeTheme.colors
-    var time by remember(initialTime) { mutableStateOf(initialTime) }
-    var text by remember(initialText) { mutableStateOf(initialText) }
-    val timeOk = QZoneSchedule.HH_MM_REGEX.matches(time.trim())
-    val canConfirm = timeOk
-
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(20.dp))
-                .background(colors.cardBackground)
-                .padding(20.dp)
-        ) {
-            Text(
-                "定时说说设置",
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                "仅需 HH:mm，无需日期，每天同一时间触发一次",
-                fontSize = 12.sp,
-                color = colors.textSecondary
-            )
-
-            Spacer(modifier = Modifier.height(14.dp))
-            Text("发送时间 (HH:mm)", fontSize = 13.sp, color = colors.textPrimary)
-            Spacer(modifier = Modifier.height(6.dp))
-            ComposeBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.textSecondary.copy(alpha = 0.08f))
-                    .padding(14.dp)
-            ) {
-                BasicTextField(
-                    value = time,
-                    onValueChange = { v ->
-                        val t = v.filter { it.isDigit() || it == ':' }.take(5)
-                        time = t
-                    },
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 16.sp,
-                        color = colors.textPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    singleLine = true,
-                    decorationBox = { innerTextField ->
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            if (time.isEmpty()) {
-                                Text("08:30", fontSize = 16.sp, color = colors.textSecondary)
-                            } else {
-                                innerTextField()
-                            }
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                if (timeOk) "格式正确" else "格式错误",
-                                fontSize = 12.sp,
-                                color = if (timeOk) AccentGreen else android.graphics.Color.parseColor("#FF5252").let { androidx.compose.ui.graphics.Color(it) }
-                            )
-                        }
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(14.dp))
-            Text("说说内容", fontSize = 13.sp, color = colors.textPrimary)
-            Spacer(modifier = Modifier.height(6.dp))
-            ComposeBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(colors.textSecondary.copy(alpha = 0.08f))
-                    .padding(14.dp)
-            ) {
-                BasicTextField(
-                    value = text,
-                    onValueChange = { text = it },
-                    textStyle = androidx.compose.ui.text.TextStyle(
-                        fontSize = 14.sp,
-                        color = colors.textPrimary
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    maxLines = 6,
-                    decorationBox = { innerTextField ->
-                        if (text.isEmpty()) {
-                            Text("今天也要加油哦~", fontSize = 14.sp, color = colors.textSecondary)
-                        } else {
-                            innerTextField()
-                        }
-                    }
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                ComposeBox(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onDismiss
-                        )
-                        .padding(horizontal = 16.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
-                }
-                Spacer(modifier = Modifier.width(8.dp))
-                ComposeBox(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (canConfirm) AccentGreen else colors.textSecondary.copy(alpha = 0.3f))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = {
-                                if (!canConfirm) return@clickable
-                                val t = time.trim()
-                                val txt = text.trim()
-                                onConfirm(t, txt)
-                            }
-                        )
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        "保存",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium,
-                        color = if (canConfirm) androidx.compose.ui.graphics.Color.White else colors.textSecondary
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun UpdateLogDialog(
-    show: Boolean,
-    onDismiss: () -> Unit
-) {
-    if (!show) return
-
-    val colors = QEdgeTheme.colors
-    var logText by remember { mutableStateOf("加载中...") }
-
-    androidx.compose.runtime.LaunchedEffect(Unit) {
-        Thread {
-            try {
-                val url = java.net.URL("https://v.yuafeng.cn/QEdge/update/changelog.php")
-                val connection = url.openConnection() as java.net.HttpURLConnection
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                connection.requestMethod = "GET"
-
-                val reader = java.io.BufferedReader(
-                    java.io.InputStreamReader(connection.inputStream, "UTF-8")
-                )
-                val response = java.lang.StringBuilder()
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    response.append(line)
-                }
-                reader.close()
-
-                val json = org.json.JSONObject(response.toString())
-                if (json.getInt("code") == 200) {
-                    val data = json.getJSONObject("data")
-                    val changelog = data.getJSONArray("changelog")
-                    val sb = StringBuilder()
-                    for (i in 0 until changelog.length()) {
-                        val entry = changelog.getJSONObject(i)
-                        sb.append("v${entry.getString("version")} (${entry.getString("date")})\n")
-                        val items = entry.getJSONArray("items")
-                        for (j in 0 until items.length()) {
-                            sb.append("• ${items.getString(j)}\n")
-                        }
-                        if (i < changelog.length() - 1) {
-                            sb.append("\n")
-                        }
-                    }
-                    logText = sb.toString()
-                } else {
-                    logText = "获取失败"
-                }
-            } catch (e: Exception) {
-                logText = "获取失败: ${e.message}"
-            }
-        }.start()
-    }
-
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(colors.cardBackground)
-                .padding(20.dp)
-        ) {
-            Text(
-                "更新日志",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            ComposeBox(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    logText,
-                    fontSize = 14.sp,
-                    color = colors.textSecondary,
-                    lineHeight = 20.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                ComposeBox(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onDismiss
-                        )
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("关闭", fontSize = 14.sp, color = colors.textPrimary)
-                }
-            }
-        }
-    }
-}
-
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
 private fun JavaPluginsPage(
@@ -1210,22 +935,22 @@ private fun JavaPluginsPage(
                 val forward = targetState > initialState
                 if (forward) {
                     slideInHorizontally(
-                        animationSpec = tween(220),
+                        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                         initialOffsetX = { it / 2 }
                     ) + fadeIn(animationSpec = tween(150)) togetherWith
                     slideOutHorizontally(
-                        animationSpec = tween(220),
+                        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                         targetOffsetX = { -it / 2 }
-                    ) + fadeOut(animationSpec = tween(150))
+                    ) + fadeOut(animationSpec = tween(120))
                 } else {
                     slideInHorizontally(
-                        animationSpec = tween(220),
+                        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                         initialOffsetX = { -it / 2 }
                     ) + fadeIn(animationSpec = tween(150)) togetherWith
                     slideOutHorizontally(
-                        animationSpec = tween(220),
+                        animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
                         targetOffsetX = { it / 2 }
-                    ) + fadeOut(animationSpec = tween(150))
+                    ) + fadeOut(animationSpec = tween(120))
                 }
             }
         ) { tab ->

@@ -189,7 +189,7 @@ public class KuGouHook {
 
         } catch (Throwable e) {
             LogUtils.e("KuGouHook", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -539,7 +539,7 @@ public class KuGouHook {
 
         } catch (Throwable e) {
             LogUtils.e("KuGouHook", "hookActivityStartActivity error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

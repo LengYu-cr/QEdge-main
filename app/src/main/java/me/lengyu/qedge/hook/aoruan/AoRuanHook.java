@@ -138,7 +138,7 @@ public class AoRuanHook {
 
         } catch (Throwable e) {
             LogUtils.e("hookVip", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

@@ -10,7 +10,7 @@ import me.lengyu.qedge.hook.base.Listener;
 import me.lengyu.qedge.utils.HookUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
-import me.lengyu.qedge.utils.DexKitCache;
+import me.lengyu.qedge.utils.dexkit.DexKitCache;
 
 import org.luckypray.dexkit.DexKitBridge;
 import org.luckypray.dexkit.query.FindClass;
@@ -89,7 +89,7 @@ public class OnReceiveMsg extends BaseApiHookItem<OnReceiveMsg.ReceiveMsgListene
 
         } catch (Throwable e) {
             LogUtils.e("OnReceiveMsg", "loadHook error: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -168,7 +168,7 @@ public class OnReceiveMsg extends BaseApiHookItem<OnReceiveMsg.ReceiveMsgListene
             }
         } catch (Throwable e) {
             LogUtils.e("OnReceiveMsg", "DexKit search failed: " + e.getMessage());
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return null;
     }

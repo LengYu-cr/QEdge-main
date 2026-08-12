@@ -1,7 +1,5 @@
 package me.lengyu.qedge.hook;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
@@ -19,6 +17,7 @@ import me.lengyu.qedge.ui.components.dialogs.UpdateDialog;
 import me.lengyu.qedge.ui.components.dialogs.WelcomeDialog;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
+import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 
@@ -82,10 +81,7 @@ public class HeartbeatManager {
             }
             
             if (currentUin == null || currentUin.isEmpty()) {
-                SharedPreferences prefs = getPreferences();
-                if (prefs != null) {
-                    currentUin = prefs.getString("current_uin", null);
-                }
+                currentUin = ModuleConfig.INSTANCE.getString("heartbeat_current_uin", null);
             }
             
             if (currentUin == null || currentUin.isEmpty()) {
@@ -137,12 +133,9 @@ public class HeartbeatManager {
                     String initialPassword = data.optString("initial_password", null);
                     if (initialPassword != null && !initialPassword.isEmpty()) {
                         lastInitialPassword = initialPassword;
-                        SharedPreferences prefs = getPreferences();
-                        boolean hasShownWelcome = prefs.getBoolean("has_shown_welcome_" + currentUin, false);
+                        boolean hasShownWelcome = ModuleConfig.INSTANCE.getBoolean("has_shown_welcome_" + currentUin, false);
                         
-                        prefs.edit()
-                                .putString("initial_password_" + currentUin, initialPassword)
-                                .apply();
+                        ModuleConfig.INSTANCE.putString("initial_password_" + currentUin, initialPassword);
                                 
                         if (!hasShownWelcome) {
                             showWelcomeDialog(initialPassword, currentUin);
@@ -158,7 +151,7 @@ public class HeartbeatManager {
                     String apkUrl = data.optString("apk", "");
                     
                     if (!version.isEmpty() && !apkUrl.isEmpty()) {
-                        String ignoredVersion = getPreferences().getString("ignored_version", "");
+                        String ignoredVersion = ModuleConfig.INSTANCE.getString("ignored_version", "");
                         if (!version.equals(ignoredVersion)) {
                             showUpdateDialog(version, updateLog, apkUrl);
                         }
@@ -181,9 +174,7 @@ public class HeartbeatManager {
                             updateLog,
                             apkUrl,
                             () -> {
-                                getPreferences().edit()
-                                        .putString("ignored_version", version)
-                                        .apply();
+                                ModuleConfig.INSTANCE.putString("ignored_version", version);
                             }
                     );
                     dialog.show();
@@ -202,9 +193,7 @@ public class HeartbeatManager {
                     WelcomeDialog dialog = new WelcomeDialog(activity, currentUin, initialPassword);
                     dialog.show();
 
-                    getPreferences().edit()
-                            .putBoolean("has_shown_welcome_" + currentUin, true)
-                            .apply();
+                    ModuleConfig.INSTANCE.putBoolean("has_shown_welcome_" + currentUin, true);
                 }
             } catch (Exception e) {
                 LogUtils.e("HeartbeatManager", "Show welcome dialog failed: " + e.getMessage());
@@ -222,14 +211,6 @@ public class HeartbeatManager {
             hexString.append(String.format("%02X", b));
         }
         return hexString.toString();
-    }
-
-    private SharedPreferences getPreferences() {
-        Context context = HostInfo.getHostContext();
-        if (context != null) {
-            return context.getSharedPreferences("QEdge_Heartbeat", Context.MODE_PRIVATE);
-        }
-        return null;
     }
 
     private void runOnMainThread(Runnable runnable) {

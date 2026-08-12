@@ -6,6 +6,7 @@ import java.util.regex.Pattern;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.ForbidInfo;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.qq.TroopTool;
@@ -48,16 +49,13 @@ public class GroupManagerFeature implements ColdRainFeature {
     public void handle(MsgData msgData, ColdRainCore core) {
         if (!core.isAdminOrSelf(msgData)) return;
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("GroupManagerFeature", () -> {
                 try {
                     handleGroupCommand(msgData, core);
                 } catch (Throwable e) {
                     core.reply(msgData, "群管操作失败: " + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private void handleGroupCommand(MsgData msgData, ColdRainCore core) {

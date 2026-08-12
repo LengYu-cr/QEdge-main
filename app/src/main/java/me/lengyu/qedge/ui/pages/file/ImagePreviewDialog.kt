@@ -46,6 +46,7 @@ import androidx.compose.ui.window.DialogProperties
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.LogUtils
 import java.io.File
 
 @Composable
@@ -83,7 +84,7 @@ fun ImagePreviewDialog(
                     isLoading = false
                 }
             } catch (e: Exception) {
-                e.printStackTrace()
+                LogUtils.e(e)
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     errorMessage = "加载失败: ${e.message}"
                     isLoading = false

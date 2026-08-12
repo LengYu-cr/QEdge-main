@@ -141,7 +141,7 @@ public class PluginCompiler {
             ReflectUtils.callStaticMethod(OnTroopShutUp.class, "registerListener", troopShutUpListener);
             ReflectUtils.callStaticMethod(OnPaiYiPai.class, "registerListener", paiYiPaiListener);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
 
         for (String item : msgMenuItem) {
@@ -167,7 +167,7 @@ public class PluginCompiler {
             ReflectUtils.callStaticMethod(OnTroopShutUp.class, "unregisterListener", troopShutUpListener);
             ReflectUtils.callStaticMethod(OnPaiYiPai.class, "unregisterListener", paiYiPaiListener);
         } catch (Throwable e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         OnMenuBuild.removeMenuListenersForItem(item -> {
             String[] args = item.split(",");

@@ -10,6 +10,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import me.lengyu.qedge.utils.LogUtils;
+
 public class JsonConfigUtils {
 
     public static void putString(String absoluteDir, String configName, String key, String value) {
@@ -82,7 +84,7 @@ public class JsonConfigUtils {
                 map.put(key, json.get(key));
             }
         } catch (JSONException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
         return map;
     }
@@ -97,7 +99,7 @@ public class JsonConfigUtils {
             json.put(key, value);
             saveConfig(absoluteDir, configName, json);
         } catch (JSONException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 
@@ -117,7 +119,7 @@ public class JsonConfigUtils {
             String content = contentBuilder.toString();
             return new JSONObject(new JSONTokener(content));
         } catch (IOException | JSONException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
             return new JSONObject();
         }
     }
@@ -127,7 +129,7 @@ public class JsonConfigUtils {
         try (FileWriter writer = new FileWriter(configFile)) {
             writer.write(json.toString(4));
         } catch (IOException | org.json.JSONException e) {
-            e.printStackTrace();
+            LogUtils.e(e);
         }
     }
 

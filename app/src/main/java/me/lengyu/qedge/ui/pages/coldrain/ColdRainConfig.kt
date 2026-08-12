@@ -3,6 +3,7 @@ package me.lengyu.qedge.ui.pages.coldrain
 import android.content.Context
 import java.io.File
 import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.LogUtils
 
 object ColdRainConfig {
     private const val TAG = "ColdRainConfig"
@@ -22,7 +23,7 @@ object ColdRainConfig {
             isInitialized = true
             return true
         } catch (e: Exception) {
-            e.printStackTrace()
+            LogUtils.e(e)
             return false
         }
     }

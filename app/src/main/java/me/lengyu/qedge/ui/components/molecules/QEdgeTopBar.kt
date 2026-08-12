@@ -68,7 +68,12 @@ fun QEdgeTopBar(
                 onClick = onBackClick
             ) {
                 Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                    Text("←", fontSize = 22.sp, color = colors.textPrimary)
+                    Icon(
+                        painterResource(R.drawable.ic_chevron_right),
+                        "返回",
+                        Modifier.size(24.dp).rotate(180f),
+                        colors.textPrimary
+                    )
                 }
             }
             Spacer(modifier = Modifier.width(12.dp))

@@ -10,6 +10,7 @@ import java.util.regex.Pattern;
 
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.hook.api.OnTroopJoin;
 import me.lengyu.qedge.hook.api.OnTroopShutUp;
 import me.lengyu.qedge.plugin.bean.MsgData;
@@ -32,16 +33,13 @@ public class BlackWhiteListFeature implements ColdRainFeature {
     public void handle(MsgData msgData, ColdRainCore core) {
         if (!core.isAdminOrSelf(msgData)) return;
 
-        new Thread(new Runnable() {
-            @Override
-            public void run() {
+        ModuleScope.launchIOJava("BlackWhiteListFeature", () -> {
                 try {
                     handleCommand(msgData, core);
                 } catch (Throwable e) {
                     core.reply(msgData, "黑白名单操作失败: " + e.getMessage());
                 }
-            }
-        }).start();
+        });
     }
 
     private void handleCommand(MsgData msgData, ColdRainCore core) {

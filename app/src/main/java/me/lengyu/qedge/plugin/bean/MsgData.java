@@ -5,6 +5,7 @@ import com.tencent.qqnt.kernel.nativeinterface.MsgRecord;
 import com.tencent.qqnt.kernelpublic.nativeinterface.Contact;
 import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.FriendTool;
+import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.QQCurrentEnv;
 
 import java.io.File;
@@ -235,7 +236,7 @@ public class MsgData {
                     }
                 }
             } catch (Throwable e) {
-                e.printStackTrace();
+                LogUtils.e(e);
             }
         }
         msg = msgBuilder.toString();
