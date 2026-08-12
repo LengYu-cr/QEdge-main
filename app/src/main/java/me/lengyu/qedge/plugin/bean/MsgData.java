@@ -174,7 +174,11 @@ public class MsgData {
                             if (videoPath != null && !videoPath.isEmpty() && new File(videoPath).exists()) {
                                 path = videoPath;
                             } else {
-                                path = getVideoPath(videoElement.originVideoMd5 != null ? videoElement.originVideoMd5 : videoElement.videoMd5);
+                                if (videoElement.originVideoMd5 != null && !videoElement.originVideoMd5.isEmpty()) {
+                                    path = getVideoPath(videoElement.originVideoMd5);
+                                } else if (videoElement.videoMd5 != null && !videoElement.videoMd5.isEmpty()) {
+                                    path = getVideoPath(videoElement.videoMd5);
+                                }
                             }
                             if (path != null && !path.isEmpty()) {
                                 videoList.add(path);
