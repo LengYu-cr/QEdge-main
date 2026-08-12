@@ -169,12 +169,12 @@ public class MsgData {
                     }
                     case 5: {
                         com.tencent.qqnt.kernel.nativeinterface.VideoElement videoElement = element.videoElement;
-                        if (videoElement != null && videoElement.originVideoMd5 != null) {
+                        if (videoElement != null && (videoElement.originVideoMd5 != null || videoElement.videoMd5 != null)) {
                             String videoPath = videoElement.filePath;
                             if (videoPath != null && !videoPath.isEmpty() && new File(videoPath).exists()) {
                                 path = videoPath;
                             } else {
-                                path = getVideoPath(videoElement.originVideoMd5);
+                                path = getVideoPath(videoElement.originVideoMd5 != null ? videoElement.originVideoMd5 : videoElement.videoMd5);
                             }
                             if (path != null && !path.isEmpty()) {
                                 videoList.add(path);

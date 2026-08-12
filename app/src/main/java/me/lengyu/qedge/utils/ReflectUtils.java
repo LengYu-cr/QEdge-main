@@ -2,6 +2,7 @@ package me.lengyu.qedge.utils;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.lang.reflect.Constructor;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.HybridClassLoader;
 
@@ -126,6 +127,46 @@ public class ReflectUtils {
                             method.setAccessible(true);
                             return method;
                         }
+                    }
+                }
+            }
+        } catch (Throwable e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    public static Constructor<?> findConstructor(Class<?> clazz, Class<?>... parameterTypes) {
+        try {
+            for (Constructor<?> constructor : clazz.getDeclaredConstructors()) {
+                Class<?>[] types = constructor.getParameterTypes();
+                if (types.length == parameterTypes.length) {
+                    boolean match = true;
+                    for (int i = 0; i < types.length; i++) {
+                        if (!isTypeCompatible(types[i], parameterTypes[i])) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) {
+                        constructor.setAccessible(true);
+                        return constructor;
+                    }
+                }
+            }
+            for (Constructor<?> constructor : clazz.getConstructors()) {
+                Class<?>[] types = constructor.getParameterTypes();
+                if (types.length == parameterTypes.length) {
+                    boolean match = true;
+                    for (int i = 0; i < types.length; i++) {
+                        if (!isTypeCompatible(types[i], parameterTypes[i])) {
+                            match = false;
+                            break;
+                        }
+                    }
+                    if (match) {
+                        constructor.setAccessible(true);
+                        return constructor;
                     }
                 }
             }

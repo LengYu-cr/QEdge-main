@@ -23,7 +23,7 @@ import java.io.OutputStream
 import java.lang.reflect.Field
 import java.lang.reflect.Method
 
-@HookItemAnnotation(value = "透明头像", category = "api")
+@HookItemAnnotation(value = "透明头像", category = "item")
 object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarListener>(), DexKitTask {
 
     const val TAG = "TransparentAvatar"

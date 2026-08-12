@@ -12,7 +12,7 @@ import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.qq.MsgTool
 import java.util.ArrayList
 
-@HookItemAnnotation(value = "视频转泡泡消息", category = "api")
+@HookItemAnnotation(value = "视频转泡泡消息", category = "item")
 object VideoToBubble : BaseApiHookItem<VideoToBubble.VideoToBubbleListener>() {
 
     private const val TAG = "VideoToBubble"

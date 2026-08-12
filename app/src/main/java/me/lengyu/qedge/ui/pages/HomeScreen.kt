@@ -98,6 +98,7 @@ fun HomeScreen(
     var qzoneAutoComment by remember { mutableStateOf(ModuleConfig.getBoolean("qzone_auto_comment", false)) }
     var qzoneCommentText by remember { mutableStateOf(ModuleConfig.getString("qzone_comment_text", "我来暖说说啦！")) }
     var flashPicBypass by remember { mutableStateOf(ModuleConfig.getBoolean("flash_pic_bypass", false)) }
+    var removeLinkInfo by remember { mutableStateOf(ModuleConfig.getBoolean("remove_linkinfo", false)) }
     var downloadEmotion by remember { mutableStateOf(ModuleConfig.getBoolean("download_emotion", false)) }
     var transparentAvatar by remember { mutableStateOf(ModuleConfig.getBoolean("transparent_avatar", false)) }
     var videoToBubble by remember { mutableStateOf(ModuleConfig.getBoolean("video_to_bubble", false)) }
@@ -255,6 +256,7 @@ fun HomeScreen(
                         qzoneAutoComment = qzoneAutoComment,
                         commentText = qzoneCommentText,
                         flashPicBypass = flashPicBypass,
+                        removeLinkInfo = removeLinkInfo,
                         downloadEmotion = downloadEmotion,
                         transparentAvatar = transparentAvatar,
                         videoToBubble = videoToBubble,
@@ -281,6 +283,10 @@ fun HomeScreen(
                         onFlashPicToggle = {
                             flashPicBypass = it
                             Thread { ModuleConfig.putBoolean("flash_pic_bypass", it) }.start()
+                        },
+                        onRemoveLinkInfoToggle = {
+                            removeLinkInfo = it
+                            Thread { ModuleConfig.putBoolean("remove_linkinfo", it) }.start()
                         },
                         onDownloadEmotionToggle = {
                             downloadEmotion = it
@@ -443,6 +449,7 @@ private fun HomePage(
     qzoneAutoComment: Boolean,
     commentText: String,
     flashPicBypass: Boolean,
+    removeLinkInfo: Boolean,
     downloadEmotion: Boolean,
     transparentAvatar: Boolean,
     videoToBubble: Boolean,
@@ -461,6 +468,7 @@ private fun HomePage(
     onCommentToggle: (Boolean) -> Unit,
     onCommentTextClick: () -> Unit,
     onFlashPicToggle: (Boolean) -> Unit,
+    onRemoveLinkInfoToggle: (Boolean) -> Unit,
     onDownloadEmotionToggle: (Boolean) -> Unit,
     onTransparentAvatarToggle: (Boolean) -> Unit,
     onVideoToBubbleToggle: (Boolean) -> Unit,
@@ -576,6 +584,15 @@ private fun HomePage(
                     subtitle = "长按消息保存到相册",
                     checked = downloadEmotion,
                     onCheckedChange = onDownloadEmotionToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "屏蔽链接信息卡片",
+                    subtitle = "收到链接时，自动屏蔽",
+                    checked = removeLinkInfo,
+                    onCheckedChange = onRemoveLinkInfoToggle
                 )
 
                 if (HostInfo.isQQ) {

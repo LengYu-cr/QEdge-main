@@ -37,6 +37,7 @@ import me.lengyu.qedge.utils.QQCurrentEnv;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.hook.entry.QQSettingInject;
 import me.lengyu.qedge.coldrain.ColdRainCore;
+import me.lengyu.qedge.hook.item.RemoveLinkInfo;
 
 import java.util.List;
 
@@ -63,7 +64,8 @@ public class MainHook {
         HookRegistry.register(AutoLikeBack.INSTANCE);
         HookRegistry.register(KeepAliveHook.INSTANCE);
         HookRegistry.register(QZoneSchedule.INSTANCE);
-        HookRegistry.register(QQPlusInject.getInstance());
+        HookRegistry.register(QQPlusInject.INSTANCE);
+        HookRegistry.register(RemoveLinkInfo.INSTANCE);
         HookRegistry.register(QQSettingInject.INSTANCE);
     }
 

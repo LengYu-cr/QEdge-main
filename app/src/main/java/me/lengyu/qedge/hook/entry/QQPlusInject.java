@@ -20,7 +20,7 @@ import me.lengyu.qedge.utils.ReflectUtils;
 @HookItemAnnotation(category = "entry", process = "All", value = "QQ加号入口")
 public class QQPlusInject extends BaseApiHookItem {
 
-    private static final QQPlusInject INSTANCE = new QQPlusInject();
+    public static final QQPlusInject INSTANCE = new QQPlusInject();
 
     public static QQPlusInject getInstance() {
         return INSTANCE;
