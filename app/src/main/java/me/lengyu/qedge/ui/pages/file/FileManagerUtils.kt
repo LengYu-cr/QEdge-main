@@ -1,7 +1,6 @@
 package me.lengyu.qedge.ui.pages.file
 
-import android.content.Context
-import android.content.SharedPreferences
+import me.lengyu.qedge.utils.ModuleConfig
 import java.io.File
 import java.io.FileInputStream
 import java.io.FileOutputStream
@@ -15,18 +14,15 @@ import me.lengyu.qedge.utils.QQCurrentEnv
 
 object FileManagerUtils {
 
-    private const val PREFS_NAME = "file_manager_prefs"
-    private const val KEY_HOME_PATH = "home_path"
+    private const val KEY_HOME_PATH = "file_manager_home_path"
     private val DEFAULT_QQ_PATH = QQCurrentEnv.getLocalPath() + "Android/data/" + HostInfo.packageName + "/"
 
-    fun getHomePath(context: Context): String {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        return prefs.getString(KEY_HOME_PATH, DEFAULT_QQ_PATH) ?: DEFAULT_QQ_PATH
+    fun getHomePath(): String {
+        return ModuleConfig.getString(KEY_HOME_PATH, DEFAULT_QQ_PATH)
     }
 
-    fun setHomePath(context: Context, path: String) {
-        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putString(KEY_HOME_PATH, path).apply()
+    fun setHomePath(path: String) {
+        ModuleConfig.putString(KEY_HOME_PATH, path)
     }
 
     fun getDefaultQQPath(): String = DEFAULT_QQ_PATH

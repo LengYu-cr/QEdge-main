@@ -9,15 +9,12 @@ import me.lengyu.qedge.utils.LogUtils;
 
 public class FixClassLoader extends ClassLoader {
     private final List<ClassLoader> classLoaders = new ArrayList<>();
-    private ClassLoader hostClassLoader;
+    private final ClassLoader hostClassLoader;
 
     public FixClassLoader() {
-        try {
-            hostClassLoader = (ClassLoader) me.lengyu.qedge.utils.reflect.ClassUtils.class
-                    .getDeclaredField("hostClassLoader").get(null);
-        } catch (Exception e) {
-            LogUtils.e(e);
-        }
+        hostClassLoader = me.lengyu.qedge.utils.ReflectUtils.hostClassLoader;
+        // 添加模块自身的 ClassLoader，确保 BeanShell 等模块类可被加载
+        classLoaders.add(getClass().getClassLoader());
     }
 
     public void addClassLoader(ClassLoader loader) {

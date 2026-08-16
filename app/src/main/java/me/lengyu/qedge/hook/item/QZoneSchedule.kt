@@ -8,13 +8,11 @@ import me.lengyu.qedge.utils.HttpUtils
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.QQCurrentEnv
-import me.lengyu.qedge.utils.json.ProtoData
 import me.lengyu.qedge.utils.proto.PacketHelper
 import me.lengyu.qedge.utils.proto.packetListener
 import me.lengyu.qedge.utils.qq.CookieTool
 import me.lengyu.qedge.utils.qq.ExtraTool
 import me.lengyu.qedge.utils.qq.FriendTool
-import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
 import java.util.Date

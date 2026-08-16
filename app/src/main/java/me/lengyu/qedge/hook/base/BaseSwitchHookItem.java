@@ -1,11 +1,8 @@
 package me.lengyu.qedge.hook.base;
 
-import android.content.Context;
-import android.content.SharedPreferences;
 import me.lengyu.qedge.hook.annotation.HookCategory;
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
-import me.lengyu.qedge.utils.HostInfo;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.ModuleConfig;
 
 public abstract class BaseSwitchHookItem extends BaseHookItem {
 
@@ -57,21 +54,11 @@ public abstract class BaseSwitchHookItem extends BaseHookItem {
     protected void saveData() {
     }
 
-    protected static SharedPreferences getPrefs() {
-        Context context = HostInfo.getHostContext();
-        if (context == null) return null;
-        return context.getSharedPreferences("QEdge_Config_" + QQCurrentEnv.getCurrentUin(), Context.MODE_MULTI_PROCESS);
-    }
-
     protected boolean getBoolean(String key, boolean defaultValue) {
-        SharedPreferences prefs = getPrefs();
-        return prefs != null && prefs.getBoolean(key, defaultValue);
+        return ModuleConfig.getBoolean(key, defaultValue);
     }
 
     protected void putBoolean(String key, boolean value) {
-        SharedPreferences prefs = getPrefs();
-        if (prefs != null) {
-            prefs.edit().putBoolean(key, value).apply();
-        }
+        ModuleConfig.putBoolean(key, value);
     }
 }

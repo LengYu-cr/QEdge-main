@@ -9,9 +9,6 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.EnterTransition
-import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -29,7 +26,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -53,7 +49,7 @@ import me.lengyu.qedge.ui.pages.coldrain.ColdRainConfig
 import me.lengyu.qedge.ui.core.compatibility.QEdgeCenterDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.services.OnlinePluginService
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.LogUtils
 import java.io.File
 import java.lang.reflect.Method
@@ -91,9 +87,7 @@ class SettingActivity : ComponentActivity() {
     }
 
     private fun setupTheme() {
-        val prefs = getSharedPreferences("QEdge_Theme", MODE_PRIVATE)
-        val userTheme = prefs.getInt("theme", -1)
-        
+        val userTheme = ModuleConfig.getInt("theme", -1)
         if (userTheme == -1) {
             isDarkTheme = (resources.configuration.uiMode and
                     android.content.res.Configuration.UI_MODE_NIGHT_MASK) ==
@@ -104,18 +98,15 @@ class SettingActivity : ComponentActivity() {
     }
 
     private fun saveTheme(dark: Boolean) {
-        val prefs = getSharedPreferences("QEdge_Theme", MODE_PRIVATE)
-        prefs.edit().putInt("theme", if (dark) 1 else 0).apply()
+        ModuleConfig.putInt("theme", if (dark) 1 else 0)
     }
     
     private fun saveCurrentPage(page: String) {
-        val prefs = getSharedPreferences("QEdge_Theme", MODE_PRIVATE)
-        prefs.edit().putString("current_page", page).apply()
+        ModuleConfig.putString("current_page", page)
     }
     
     private fun getSavedPage(): String {
-        val prefs = getSharedPreferences("QEdge_Theme", MODE_PRIVATE)
-        return prefs.getString("current_page", "plugin") ?: "plugin"
+        return ModuleConfig.getString("current_page", "plugin")
     }
 
     private fun callMainHookMethod(methodName: String, vararg args: Any?): Any? {

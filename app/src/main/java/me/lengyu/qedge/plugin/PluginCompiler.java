@@ -134,12 +134,12 @@ public class PluginCompiler {
         paiYiPaiListener = callback.getPaiYiPaiListener();
 
         try {
-            ReflectUtils.callStaticMethod(OnReceiveMsg.class, "registerListener", receiveMsgListener);
-            ReflectUtils.callStaticMethod(OnSendMsg.class, "registerListener", sendMsgListener);
-            ReflectUtils.callStaticMethod(OnTroopJoin.class, "registerListener", troopJoinListener);
-            ReflectUtils.callStaticMethod(OnTroopQuit.class, "registerListener", troopQuitListener);
-            ReflectUtils.callStaticMethod(OnTroopShutUp.class, "registerListener", troopShutUpListener);
-            ReflectUtils.callStaticMethod(OnPaiYiPai.class, "registerListener", paiYiPaiListener);
+            OnReceiveMsg.registerListener(receiveMsgListener);
+            OnSendMsg.registerListener(sendMsgListener);
+            OnTroopJoin.registerListener(troopJoinListener);
+            OnTroopQuit.registerListener(troopQuitListener);
+            OnTroopShutUp.registerListener(troopShutUpListener);
+            OnPaiYiPai.registerListener(paiYiPaiListener);
         } catch (Throwable e) {
             LogUtils.e(e);
         }
@@ -160,12 +160,12 @@ public class PluginCompiler {
 
      private void removeCallbacks() {
         try {
-            ReflectUtils.callStaticMethod(OnReceiveMsg.class, "unregisterListener", receiveMsgListener);
-            ReflectUtils.callStaticMethod(OnSendMsg.class, "unregisterListener", sendMsgListener);
-            ReflectUtils.callStaticMethod(OnTroopJoin.class, "unregisterListener", troopJoinListener);
-            ReflectUtils.callStaticMethod(OnTroopQuit.class, "unregisterListener", troopQuitListener);
-            ReflectUtils.callStaticMethod(OnTroopShutUp.class, "unregisterListener", troopShutUpListener);
-            ReflectUtils.callStaticMethod(OnPaiYiPai.class, "unregisterListener", paiYiPaiListener);
+            OnReceiveMsg.unregisterListener(receiveMsgListener);
+            OnSendMsg.unregisterListener(sendMsgListener);
+            OnTroopJoin.unregisterListener(troopJoinListener);
+            OnTroopQuit.unregisterListener(troopQuitListener);
+            OnTroopShutUp.unregisterListener(troopShutUpListener);
+            OnPaiYiPai.unregisterListener(paiYiPaiListener);
         } catch (Throwable e) {
             LogUtils.e(e);
         }

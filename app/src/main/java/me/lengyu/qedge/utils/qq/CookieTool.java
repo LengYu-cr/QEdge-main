@@ -11,13 +11,10 @@ public class CookieTool {
         try {
             Object appRuntime = QQCurrentEnv.getAppRuntime();
             if (appRuntime != null) {
-                Object manager = ReflectUtils.callMethod(appRuntime, "getManager", new Object[]{2});
-                if (manager != null) return manager;
-
                 try {
                     Method getManagerMethod = ReflectUtils.findMethod(appRuntime.getClass(), "getManager", int.class);
                     if (getManagerMethod != null) {
-                        manager = getManagerMethod.invoke(appRuntime, 2);
+                        Object manager = getManagerMethod.invoke(appRuntime, 2);
                         if (manager != null) return manager;
                     }
                 } catch (Throwable ignored) {}

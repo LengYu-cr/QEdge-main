@@ -6,9 +6,12 @@ import org.json.JSONTokener;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 
 import me.lengyu.qedge.utils.LogUtils;
 
@@ -109,27 +112,108 @@ public class JsonConfigUtils {
             return new JSONObject();
         }
 
-        StringBuilder contentBuilder = new StringBuilder();
-        try (FileReader fileReader = new FileReader(configFile);
-             BufferedReader reader = new BufferedReader(fileReader)) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                contentBuilder.append(line);
+        String content = readFileContent(configFile);
+        if (content == null || content.trim().isEmpty()) {
+            // 文件为空或损坏，尝试从备份恢复
+            LogUtils.e("JsonConfigUtils", "config file empty/corrupt: " + configFile.getAbsolutePath());
+            File backupFile = new File(configFile.getParentFile(), configName + ".json.bak");
+            if (backupFile.exists()) {
+                String backupContent = readFileContent(backupFile);
+                if (backupContent != null && !backupContent.trim().isEmpty()) {
+                    try {
+                        JSONObject recovered = new JSONObject(new JSONTokener(backupContent));
+                        // 恢复成功，把备份写回主文件
+                        saveConfigInternal(configFile, recovered);
+                        LogUtils.e("JsonConfigUtils", "recovered from backup: " + backupFile.getAbsolutePath());
+                        return recovered;
+                    } catch (JSONException e) {
+                        LogUtils.e(e);
+                    }
+                }
             }
-            String content = contentBuilder.toString();
+            return new JSONObject();
+        }
+
+        try {
             return new JSONObject(new JSONTokener(content));
-        } catch (IOException | JSONException e) {
+        } catch (JSONException e) {
             LogUtils.e(e);
+            // 解析失败，尝试从备份恢复
+            File backupFile = new File(configFile.getParentFile(), configName + ".json.bak");
+            if (backupFile.exists()) {
+                String backupContent = readFileContent(backupFile);
+                if (backupContent != null && !backupContent.trim().isEmpty()) {
+                    try {
+                        JSONObject recovered = new JSONObject(new JSONTokener(backupContent));
+                        saveConfigInternal(configFile, recovered);
+                        LogUtils.e("JsonConfigUtils", "recovered from backup after parse error");
+                        return recovered;
+                    } catch (JSONException ex) {
+                        LogUtils.e(ex);
+                    }
+                }
+            }
             return new JSONObject();
         }
     }
 
+    /** 读取文件全部内容，失败返回 null */
+    private static String readFileContent(File file) {
+        StringBuilder contentBuilder = new StringBuilder();
+        try (FileInputStream fis = new FileInputStream(file);
+             InputStreamReader isr = new InputStreamReader(fis, StandardCharsets.UTF_8);
+             BufferedReader reader = new BufferedReader(isr)) {
+            String line;
+            while ((line = reader.readLine()) != null) {
+                contentBuilder.append(line);
+            }
+            return contentBuilder.toString();
+        } catch (IOException e) {
+            LogUtils.e(e);
+            return null;
+        }
+    }
+
+    /** 原子写入：先写临时文件，再 rename，避免进程被杀导致文件变空 */
     private static void saveConfig(String absoluteDir, String configName, JSONObject json) {
         File configFile = getConfigFile(absoluteDir, configName);
-        try (FileWriter writer = new FileWriter(configFile)) {
-            writer.write(json.toString(4));
-        } catch (IOException | org.json.JSONException e) {
+        saveConfigInternal(configFile, json);
+        // 写入成功后更新备份
+        File backupFile = new File(configFile.getParentFile(), configName + ".json.bak");
+        try {
+            String content = json.toString(4);
+            try (FileOutputStream fos = new FileOutputStream(backupFile);
+                 OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
+                writer.write(content);
+            }
+        } catch (IOException | JSONException e) {
             LogUtils.e(e);
+        }
+    }
+
+    /** 直接写入指定文件（原子操作） */
+    private static void saveConfigInternal(File configFile, JSONObject json) {
+        File tempFile = new File(configFile.getParentFile(), configFile.getName() + ".tmp");
+        try {
+            String content = json.toString(4);
+            try (FileOutputStream fos = new FileOutputStream(tempFile);
+                 OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
+                writer.write(content);
+                writer.flush();
+                fos.getFD().sync();  // 确保数据落盘
+            }
+            // 原子替换
+            if (!tempFile.renameTo(configFile)) {
+                // rename 失败时回退到直接覆盖
+                LogUtils.e("JsonConfigUtils", "rename failed, fallback to direct write");
+                try (FileOutputStream fos = new FileOutputStream(configFile);
+                     OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
+                    writer.write(content);
+                }
+            }
+        } catch (IOException | JSONException e) {
+            LogUtils.e(e);
+            tempFile.delete();
         }
     }
 

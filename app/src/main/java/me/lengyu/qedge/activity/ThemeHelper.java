@@ -19,7 +19,7 @@ public class ThemeHelper {
     }
 
     public static void setNightMode(boolean isDark) {
-        // 可以保存到SharedPreferences
+        // 主题设置已通过 ModuleConfig 持久化
     }
 
     public static void setNightModeForApp(Context context, boolean isDark) {

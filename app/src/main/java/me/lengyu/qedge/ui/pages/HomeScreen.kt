@@ -113,6 +113,7 @@ fun HomeScreen(
     var transparentAvatar by remember { mutableStateOf(ModuleConfig.getBoolean("transparent_avatar", false)) }
     var videoToBubble by remember { mutableStateOf(ModuleConfig.getBoolean("video_to_bubble", false)) }
     var antiPokeDelay by remember { mutableStateOf(ModuleConfig.getBoolean("anti_poke_delay", false)) }
+    var preventRecall by remember { mutableStateOf(ModuleConfig.getBoolean("prevent_recall", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, false)) }
@@ -272,8 +273,9 @@ fun HomeScreen(
                         transparentAvatar = transparentAvatar,
                         videoToBubble = videoToBubble,
                         antiPokeDelay = antiPokeDelay,
-                        timArkCardBypass = timArkCardBypass,
-                        profileAutoLikeBack = profileAutoLikeBack,
+                    timArkCardBypass = timArkCardBypass,
+                    profileAutoLikeBack = profileAutoLikeBack,
+                    preventRecall = preventRecall,
                         qzoneCheckinEnabled = qzoneCheckinEnabled,
                         dailySignEnabled = dailySignEnabled,
                         bigVipCheckinEnabled = bigVipCheckinEnabled,
@@ -314,6 +316,10 @@ fun HomeScreen(
                         onAntiPokeDelayToggle = {
                             antiPokeDelay = it
                             Thread { ModuleConfig.putBoolean("anti_poke_delay", it) }.start()
+                        },
+                        onPreventRecallToggle = {
+                            preventRecall = it
+                            Thread { ModuleConfig.putBoolean("prevent_recall", it) }.start()
                         },
                         onTimArkCardBypassToggle = {
                             timArkCardBypass = it
@@ -472,6 +478,7 @@ private fun HomePage(
     antiPokeDelay: Boolean,
     timArkCardBypass: Boolean,
     profileAutoLikeBack: Boolean,
+    preventRecall: Boolean,
     qzoneCheckinEnabled: Boolean,
     dailySignEnabled: Boolean,
     bigVipCheckinEnabled: Boolean,
@@ -491,6 +498,7 @@ private fun HomePage(
     onAntiPokeDelayToggle: (Boolean) -> Unit,
     onTimArkCardBypassToggle: (Boolean) -> Unit,
     onProfileAutoLikeBackToggle: (Boolean) -> Unit,
+    onPreventRecallToggle: (Boolean) -> Unit,
     onCheckinToggle: (Boolean) -> Unit,
     onDailySignToggle: (Boolean) -> Unit,
     onBigVipCheckinToggle: (Boolean) -> Unit,
@@ -631,6 +639,15 @@ private fun HomePage(
                     subtitle = "解除拍一拍时间限制",
                     checked = antiPokeDelay,
                     onCheckedChange = onAntiPokeDelayToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "防撤回",
+                    subtitle = "拦截QQ消息撤回，已撤回的消息依然可见",
+                    checked = preventRecall,
+                    onCheckedChange = onPreventRecallToggle
                 )
 
                 if (HostInfo.isTIM) {

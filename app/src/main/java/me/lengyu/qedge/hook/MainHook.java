@@ -39,6 +39,7 @@ import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.hook.entry.QQSettingInject;
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.hook.item.RemoveLinkInfo;
+import me.lengyu.qedge.hook.item.PreventRecall;
 
 import java.util.List;
 
@@ -68,6 +69,7 @@ public class MainHook {
         HookRegistry.register(QQPlusInject.INSTANCE);
         HookRegistry.register(RemoveLinkInfo.INSTANCE);
         HookRegistry.register(QQSettingInject.INSTANCE);
+        HookRegistry.register(new PreventRecall());
     }
 
     private static long lastPluginLoadTime = 0;
