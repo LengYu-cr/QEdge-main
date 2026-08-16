@@ -64,8 +64,7 @@ class MainActivity : ComponentActivity() {
                     onTGClick = { openUrl(TELEGRAM_URL) },
                     onUserBackendClick = { openUrl(USER_BACKEND_URL) },
                     onUpdateLogClick = ::showUpdateLogDialog,
-                    onCheckUpdateClick = { checkUpdate(showToast = true) },
-                    onLaunchQQClick = ::launchQQ
+                    onCheckUpdateClick = { checkUpdate(showToast = true) }
                 )
             }
         }

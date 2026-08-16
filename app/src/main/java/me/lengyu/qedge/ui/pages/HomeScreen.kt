@@ -114,6 +114,8 @@ fun HomeScreen(
     var videoToBubble by remember { mutableStateOf(ModuleConfig.getBoolean("video_to_bubble", false)) }
     var antiPokeDelay by remember { mutableStateOf(ModuleConfig.getBoolean("anti_poke_delay", false)) }
     var preventRecall by remember { mutableStateOf(ModuleConfig.getBoolean("prevent_recall", false)) }
+    var copyArkMessage by remember { mutableStateOf(ModuleConfig.getBoolean("copy_ark_message", false)) }
+    var longClickSendCard by remember { mutableStateOf(ModuleConfig.getBoolean("long_click_send_card", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, false)) }
@@ -276,6 +278,8 @@ fun HomeScreen(
                     timArkCardBypass = timArkCardBypass,
                     profileAutoLikeBack = profileAutoLikeBack,
                     preventRecall = preventRecall,
+                        copyArkMessage = copyArkMessage,
+                        longClickSendCard = longClickSendCard,
                         qzoneCheckinEnabled = qzoneCheckinEnabled,
                         dailySignEnabled = dailySignEnabled,
                         bigVipCheckinEnabled = bigVipCheckinEnabled,
@@ -320,6 +324,14 @@ fun HomeScreen(
                         onPreventRecallToggle = {
                             preventRecall = it
                             Thread { ModuleConfig.putBoolean("prevent_recall", it) }.start()
+                        },
+                        onCopyArkMessageToggle = {
+                            copyArkMessage = it
+                            Thread { ModuleConfig.putBoolean("copy_ark_message", it) }.start()
+                        },
+                        onLongClickSendCardToggle = {
+                            longClickSendCard = it
+                            Thread { ModuleConfig.putBoolean("long_click_send_card", it) }.start()
                         },
                         onTimArkCardBypassToggle = {
                             timArkCardBypass = it
@@ -479,6 +491,8 @@ private fun HomePage(
     timArkCardBypass: Boolean,
     profileAutoLikeBack: Boolean,
     preventRecall: Boolean,
+    copyArkMessage: Boolean,
+    longClickSendCard: Boolean,
     qzoneCheckinEnabled: Boolean,
     dailySignEnabled: Boolean,
     bigVipCheckinEnabled: Boolean,
@@ -499,6 +513,8 @@ private fun HomePage(
     onTimArkCardBypassToggle: (Boolean) -> Unit,
     onProfileAutoLikeBackToggle: (Boolean) -> Unit,
     onPreventRecallToggle: (Boolean) -> Unit,
+    onCopyArkMessageToggle: (Boolean) -> Unit,
+    onLongClickSendCardToggle: (Boolean) -> Unit,
     onCheckinToggle: (Boolean) -> Unit,
     onDailySignToggle: (Boolean) -> Unit,
     onBigVipCheckinToggle: (Boolean) -> Unit,
@@ -648,6 +664,24 @@ private fun HomePage(
                     subtitle = "拦截QQ消息撤回，已撤回的消息依然可见",
                     checked = preventRecall,
                     onCheckedChange = onPreventRecallToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "复制卡片消息",
+                    subtitle = "卡片消息下方显示长按复制按钮，可复制JSON数据",
+                    checked = copyArkMessage,
+                    onCheckedChange = onCopyArkMessageToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "长按发送发卡片",
+                    subtitle = "长按发送按钮将输入框内JSON作为卡片消息发送",
+                    checked = longClickSendCard,
+                    onCheckedChange = onLongClickSendCardToggle
                 )
 
                 if (HostInfo.isTIM) {

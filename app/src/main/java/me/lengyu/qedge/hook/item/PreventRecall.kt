@@ -19,6 +19,8 @@ import me.lengyu.qedge.utils.qq.FriendTool
 import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 /**
  * 防撤回 — 基于 QStory PreventRetractingMessageCore 逻辑
@@ -59,6 +61,9 @@ class PreventRecall : BaseSwitchHookItem() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
     private var currentAIOAdapter: WeakReference<Any>? = null
+    private val recallExecutor = Executors.newSingleThreadExecutor { r ->
+        Thread(r, "PreventRecall").apply { isDaemon = true }
+    }
 
     override fun onInit(): Boolean {
         return true
@@ -116,24 +121,31 @@ class PreventRecall : BaseSwitchHookItem() {
     /**
      * 处理 InfoSyncPush：移除 syncInfoBody 中的撤回消息条目
      * 使用原始字节操作（与 QStory 一致），避免 ProtoData 重编码改变字段顺序
+     * 重处理在线程池中执行
      */
     private fun handleInfoSyncPush(buffer: ByteArray, param: XC_MethodHook.MethodHookParam) {
-        val syncInfoBodyStart = findSyncInfoBody(buffer) ?: return
-        val syncInfoBodyEnd = findFieldEnd(buffer, syncInfoBodyStart) ?: return
-
-        val tagKey = readVarInt(buffer, syncInfoBodyStart) ?: return
-        val payloadStart = skipVarInt(buffer, tagKey.nextIndex) ?: return
-        val payloadBytes = buffer.copyOfRange(payloadStart, syncInfoBodyEnd)
-
-        val newPayload = rewriteSyncInfoBody(payloadBytes) ?: return
-
-        val output = ByteArrayOutputStream(buffer.size + newPayload.size - payloadBytes.size)
-        output.write(buffer, 0, payloadStart)
-        writeVarInt(output, newPayload.size)
-        output.write(newPayload)
-        output.write(buffer, syncInfoBodyEnd, buffer.size - syncInfoBodyEnd)
-
-        param.args[1] = output.toByteArray()
+        val future = recallExecutor.submit<ByteArray?> {
+            val syncInfoBodyStart = findSyncInfoBody(buffer) ?: return@submit null
+            val syncInfoBodyEnd = findFieldEnd(buffer, syncInfoBodyStart) ?: return@submit null
+            val tagKey = readVarInt(buffer, syncInfoBodyStart) ?: return@submit null
+            val payloadStart = skipVarInt(buffer, tagKey.nextIndex) ?: return@submit null
+            val payloadBytes = buffer.copyOfRange(payloadStart, syncInfoBodyEnd)
+            val newPayload = rewriteSyncInfoBody(payloadBytes) ?: return@submit null
+            val output = ByteArrayOutputStream(buffer.size + newPayload.size - payloadBytes.size)
+            output.write(buffer, 0, payloadStart)
+            writeVarInt(output, newPayload.size)
+            output.write(newPayload)
+            output.write(buffer, syncInfoBodyEnd, buffer.size - syncInfoBodyEnd)
+            output.toByteArray()
+        }
+        val newBuffer = try {
+            future.get(500, TimeUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            null
+        }
+        if (newBuffer != null) {
+            param.args[1] = newBuffer
+        }
     }
 
     /**
@@ -350,16 +362,32 @@ class PreventRecall : BaseSwitchHookItem() {
 
     /**
      * 处理 MsgPush：将撤回操作中的 msgSeq 改为非法值 1，使撤回失效
+     * 重处理在线程池中执行，避免阻塞调用线程
      */
     private fun handleMsgPush(buffer: ByteArray, param: XC_MethodHook.MethodHookParam) {
-        val result = rewriteMsgPush(buffer) ?: return
+        val future = recallExecutor.submit<RewriteResult?> { rewriteMsgPush(buffer) }
+        val result = try {
+            future.get(500, TimeUnit.MILLISECONDS)
+        } catch (e: Exception) {
+            null
+        } ?: return
+
         if (result.buffer != null) {
             param.args[1] = result.buffer
-            
         }
         if (result.recallMeta != null) {
             recallMetaMap[result.recallMeta.key] = result.recallMeta
-            mainHandler.postDelayed({ triggerAIORefresh() }, 200)
+            mainHandler.postDelayed({
+                if (currentAIOAdapter?.get() == null) {
+                    // adapter 未缓存，等待视图绑定后再刷新
+                    recallExecutor.execute {
+                        try { Thread.sleep(150) } catch (_: Exception) {}
+                        mainHandler.post { triggerAIORefresh() }
+                    }
+                } else {
+                    triggerAIORefresh()
+                }
+            }, 200)
         }
     }
 
@@ -880,6 +908,7 @@ class PreventRecall : BaseSwitchHookItem() {
     private fun onAIOMsgUpdate(param: XC_MethodHook.MethodHookParam) {
         try {
             if (!isEnabled()) return
+            if (recallMetaMap.isEmpty()) return
 
             val thisObject = param.thisObject
 
@@ -887,10 +916,10 @@ class PreventRecall : BaseSwitchHookItem() {
             val itemView = getVBView(thisObject) ?: return
             val rootView = itemView as? ViewGroup ?: return
 
-            // 捕获当前 AIO Adapter 引用（用于实时刷新）
-            captureAIOAdapter(rootView)
-
-            if (recallMetaMap.isEmpty()) return
+            // 仅在 adapter 未缓存时尝试捕获（避免每次消息更新都遍历视图树）
+            if (currentAIOAdapter?.get() == null) {
+                captureAIOAdapter(rootView)
+            }
 
             // 获取 AIOMsgItem 字段
             val aioMsgItem = findFirstFieldOfType(
@@ -898,34 +927,21 @@ class PreventRecall : BaseSwitchHookItem() {
                 "com.tencent.mobileqq.aio.msg.AIOMsgItem"
             )
             if (aioMsgItem == null) {
-                LogUtils.e(TAG, "onAIOMsgUpdate: AIOMsgItem not found in ${thisObject.javaClass.simpleName}")
                 return
             }
 
             // 获取 msgRecord
-            val msgRecord = ReflectUtils.callMethod(aioMsgItem, "getMsgRecord")
-            if (msgRecord == null) {
-                LogUtils.e(TAG, "onAIOMsgUpdate: getMsgRecord returned null")
-                return
-            }
+            val msgRecord = ReflectUtils.callMethod(aioMsgItem, "getMsgRecord") ?: return
 
             // 获取 peerUid 和 msgSeq
             val peerUinLong = ReflectUtils.callMethod(msgRecord, "getPeerUin") as? Long
             val msgSeqLong = ReflectUtils.callMethod(msgRecord, "getMsgSeq") as? Long
-            if (peerUinLong == null || msgSeqLong == null) {
-                LogUtils.e(TAG, "onAIOMsgUpdate: peerUin=$peerUinLong, msgSeq=$msgSeqLong")
-                return
-            }
+            if (peerUinLong == null || msgSeqLong == null) return
             val peerUin = peerUinLong.toString()
             val msgSeq = msgSeqLong.toInt()
 
             val lookupKey = "${peerUin}_$msgSeq"
-            // 在内存索引中查找撤回元数据
-            val meta = recallMetaMap[lookupKey]
-            if (meta == null) {
-                LogUtils.e(TAG, "onAIOMsgUpdate: key mismatch, lookup=$lookupKey, available=${recallMetaMap.keys.joinToString(",")}")
-                return
-            }
+            val meta = recallMetaMap[lookupKey] ?: return
 
             // 防止重复添加
             if (rootView.findViewById<View?>(RECALL_PROMPT_VIEW_ID) != null) return

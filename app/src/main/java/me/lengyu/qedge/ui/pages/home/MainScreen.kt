@@ -27,7 +27,6 @@ fun MainScreen(
     onUserBackendClick: () -> Unit,
     onUpdateLogClick: () -> Unit,
     onCheckUpdateClick: () -> Unit,
-    onLaunchQQClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     var showSupportDialog by rememberSaveable { mutableStateOf(false) }
@@ -67,13 +66,13 @@ fun MainScreen(
         HomeScaffold(
             currentTime = currentTime,
             actions = railActions
-        ) {
+        ) { toggleDrawer ->
             HomeContentPanel(
                 versionName = versionName,
                 updateStatus = updateStatus,
                 currentTime = currentTime,
-                onCheckUpdateClick = onCheckUpdateClick,
-                onLaunchQQClick = onLaunchQQClick
+                onMenuClick = toggleDrawer,
+                onCheckUpdateClick = onCheckUpdateClick
             )
         }
 

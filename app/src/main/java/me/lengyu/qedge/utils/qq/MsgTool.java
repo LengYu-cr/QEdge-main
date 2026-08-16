@@ -130,9 +130,12 @@ public class MsgTool {
 
     private static long generateMsgUniqueId(Object msgService, int chatType) {
         try {
-            Object result = ReflectUtils.callMethod(msgService, "generateMsgUniqueId", chatType);
-            if (result instanceof Long) {
-                return ((Long) result).longValue();
+            Method generateMethod = ReflectUtils.findMethod(msgService.getClass(), "generateMsgUniqueId", int.class);
+            if (generateMethod != null) {
+                Object result = generateMethod.invoke(msgService, chatType);
+                if (result instanceof Long) {
+                    return ((Long) result).longValue();
+                }
             }
             return System.currentTimeMillis();
         } catch (Throwable e) {
