@@ -266,135 +266,139 @@ fun HomeScreen(
             ) { tab ->
                 when (tab) {
                     0 -> HomePage(
-                        qzoneAutoLike = qzoneAutoLike,
-                        qzoneAutoComment = qzoneAutoComment,
-                        commentText = qzoneCommentText,
-                        flashPicBypass = flashPicBypass,
-                        removeLinkInfo = removeLinkInfo,
-                        downloadEmotion = downloadEmotion,
-                        transparentAvatar = transparentAvatar,
-                        videoToBubble = videoToBubble,
-                        antiPokeDelay = antiPokeDelay,
-                    timArkCardBypass = timArkCardBypass,
-                    profileAutoLikeBack = profileAutoLikeBack,
-                    preventRecall = preventRecall,
-                        copyArkMessage = copyArkMessage,
-                        longClickSendCard = longClickSendCard,
-                        qzoneCheckinEnabled = qzoneCheckinEnabled,
-                        dailySignEnabled = dailySignEnabled,
-                        bigVipCheckinEnabled = bigVipCheckinEnabled,
-                        levelBoostEnabled = levelBoostEnabled,
-                        spaceBrowseEnabled = spaceBrowseEnabled,
-                        moodEnabled = moodEnabled,
-                        moodTime = moodTime,
-                        moodText = moodText,
-                        onLikeToggle = {
-                            qzoneAutoLike = it
-                            Thread { ModuleConfig.putBoolean("qzone_auto_like", it) }.start()
-                        },
-                        onCommentToggle = {
-                            qzoneAutoComment = it
-                            Thread { ModuleConfig.putBoolean("qzone_auto_comment", it) }.start()
-                        },
-                        onCommentTextClick = { showCommentDialog = true },
-                        onFlashPicToggle = {
-                            flashPicBypass = it
-                            Thread { ModuleConfig.putBoolean("flash_pic_bypass", it) }.start()
-                        },
-                        onRemoveLinkInfoToggle = {
-                            removeLinkInfo = it
-                            Thread { ModuleConfig.putBoolean("remove_linkinfo", it) }.start()
-                        },
-                        onDownloadEmotionToggle = {
-                            downloadEmotion = it
-                            Thread { ModuleConfig.putBoolean("download_emotion", it) }.start()
-                        },
-                        onTransparentAvatarToggle = {
-                            transparentAvatar = it
-                            Thread { ModuleConfig.putBoolean("transparent_avatar", it) }.start()
-                        },
-                        onVideoToBubbleToggle = {
-                            videoToBubble = it
-                            Thread { ModuleConfig.putBoolean("video_to_bubble", it) }.start()
-                        },
-                        onAntiPokeDelayToggle = {
-                            antiPokeDelay = it
-                            Thread { ModuleConfig.putBoolean("anti_poke_delay", it) }.start()
-                        },
-                        onPreventRecallToggle = {
-                            preventRecall = it
-                            Thread { ModuleConfig.putBoolean("prevent_recall", it) }.start()
-                        },
-                        onCopyArkMessageToggle = {
-                            copyArkMessage = it
-                            Thread { ModuleConfig.putBoolean("copy_ark_message", it) }.start()
-                        },
-                        onLongClickSendCardToggle = {
-                            longClickSendCard = it
-                            Thread { ModuleConfig.putBoolean("long_click_send_card", it) }.start()
-                        },
-                        onTimArkCardBypassToggle = {
-                            timArkCardBypass = it
-                            Thread { ModuleConfig.putBoolean("tim_ark_card_bypass", it) }.start()
-                        },
-                        onProfileAutoLikeBackToggle = {
-                            profileAutoLikeBack = it
-                            Thread { ModuleConfig.putBoolean("profile_auto_like_back", it) }.start()
-                        },
-                        onCheckinToggle = {
-                            qzoneCheckinEnabled = it
-                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, it) }.start()
-                        },
-                        onDailySignToggle = {
-                            dailySignEnabled = it
-                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_DAILY_SIGN_ENABLED, it) }.start()
-                        },
-                        onBigVipCheckinToggle = {
-                            bigVipCheckinEnabled = it
-                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, it) }.start()
-                        },
-                        onLevelBoostToggle = {
-                            levelBoostEnabled = it
-                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_LEVEL_BOOST_ENABLED, it) }.start()
-                        },
-                        onSpaceBrowseToggle = {
-                            spaceBrowseEnabled = it
-                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_SPACE_BROWSE_ENABLED, it) }.start()
-                        },
-                        onMoodToggle = {
-                            moodEnabled = it
-                            Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_MOOD_ENABLED, it) }.start()
-                        },
-                        onMoodConfigClick = { showMoodConfigDialog = true },
-                        keepAlivePixel = keepAlivePixel,
-                        keepAliveForeground = keepAliveForeground,
-                        keepAliveBackground = keepAliveBackground,
-                        onKeepAlivePixelToggle = {
-                            keepAlivePixel = it
-                            Thread {
-                                ModuleConfig.putBoolean(KeepAliveHook.SP_PIXEL, it)
-                                KeepAliveHook.refresh()
-                            }.start()
-                        },
-                        onKeepAliveForegroundToggle = {
-                            keepAliveForeground = it
-                            Thread {
-                                ModuleConfig.putBoolean(KeepAliveHook.SP_FOREGROUND, it)
-                                KeepAliveHook.refresh()
-                            }.start()
-                        },
-                        onKeepAliveBackgroundToggle = {
-                            keepAliveBackground = it
-                            Thread {
-                                ModuleConfig.putBoolean(KeepAliveHook.SP_BACKGROUND, it)
-                                KeepAliveHook.refresh()
-                            }.start()
-                        },
-                        chatSettingEntry = chatSettingEntry,
-                        onChatSettingEntryChange = { newValue ->
-                            chatSettingEntry = newValue
-                            Thread { ModuleConfig.putString("chat_setting_entry", newValue) }.start()
-                        }
+                        state = HomePageState(
+                            qzoneAutoLike = qzoneAutoLike,
+                            qzoneAutoComment = qzoneAutoComment,
+                            commentText = qzoneCommentText,
+                            flashPicBypass = flashPicBypass,
+                            removeLinkInfo = removeLinkInfo,
+                            downloadEmotion = downloadEmotion,
+                            transparentAvatar = transparentAvatar,
+                            videoToBubble = videoToBubble,
+                            antiPokeDelay = antiPokeDelay,
+                            timArkCardBypass = timArkCardBypass,
+                            profileAutoLikeBack = profileAutoLikeBack,
+                            preventRecall = preventRecall,
+                            copyArkMessage = copyArkMessage,
+                            longClickSendCard = longClickSendCard,
+                            qzoneCheckinEnabled = qzoneCheckinEnabled,
+                            dailySignEnabled = dailySignEnabled,
+                            bigVipCheckinEnabled = bigVipCheckinEnabled,
+                            levelBoostEnabled = levelBoostEnabled,
+                            spaceBrowseEnabled = spaceBrowseEnabled,
+                            moodEnabled = moodEnabled,
+                            moodTime = moodTime,
+                            moodText = moodText,
+                            keepAlivePixel = keepAlivePixel,
+                            keepAliveForeground = keepAliveForeground,
+                            keepAliveBackground = keepAliveBackground,
+                            chatSettingEntry = chatSettingEntry
+                        ),
+                        callbacks = HomePageCallbacks(
+                            onLikeToggle = {
+                                qzoneAutoLike = it
+                                Thread { ModuleConfig.putBoolean("qzone_auto_like", it) }.start()
+                            },
+                            onCommentToggle = {
+                                qzoneAutoComment = it
+                                Thread { ModuleConfig.putBoolean("qzone_auto_comment", it) }.start()
+                            },
+                            onCommentTextClick = { showCommentDialog = true },
+                            onFlashPicToggle = {
+                                flashPicBypass = it
+                                Thread { ModuleConfig.putBoolean("flash_pic_bypass", it) }.start()
+                            },
+                            onRemoveLinkInfoToggle = {
+                                removeLinkInfo = it
+                                Thread { ModuleConfig.putBoolean("remove_linkinfo", it) }.start()
+                            },
+                            onDownloadEmotionToggle = {
+                                downloadEmotion = it
+                                Thread { ModuleConfig.putBoolean("download_emotion", it) }.start()
+                            },
+                            onTransparentAvatarToggle = {
+                                transparentAvatar = it
+                                Thread { ModuleConfig.putBoolean("transparent_avatar", it) }.start()
+                            },
+                            onVideoToBubbleToggle = {
+                                videoToBubble = it
+                                Thread { ModuleConfig.putBoolean("video_to_bubble", it) }.start()
+                            },
+                            onAntiPokeDelayToggle = {
+                                antiPokeDelay = it
+                                Thread { ModuleConfig.putBoolean("anti_poke_delay", it) }.start()
+                            },
+                            onPreventRecallToggle = {
+                                preventRecall = it
+                                Thread { ModuleConfig.putBoolean("prevent_recall", it) }.start()
+                            },
+                            onCopyArkMessageToggle = {
+                                copyArkMessage = it
+                                Thread { ModuleConfig.putBoolean("copy_ark_message", it) }.start()
+                            },
+                            onLongClickSendCardToggle = {
+                                longClickSendCard = it
+                                Thread { ModuleConfig.putBoolean("long_click_send_card", it) }.start()
+                            },
+                            onTimArkCardBypassToggle = {
+                                timArkCardBypass = it
+                                Thread { ModuleConfig.putBoolean("tim_ark_card_bypass", it) }.start()
+                            },
+                            onProfileAutoLikeBackToggle = {
+                                profileAutoLikeBack = it
+                                Thread { ModuleConfig.putBoolean("profile_auto_like_back", it) }.start()
+                            },
+                            onCheckinToggle = {
+                                qzoneCheckinEnabled = it
+                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, it) }.start()
+                            },
+                            onDailySignToggle = {
+                                dailySignEnabled = it
+                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_DAILY_SIGN_ENABLED, it) }.start()
+                            },
+                            onBigVipCheckinToggle = {
+                                bigVipCheckinEnabled = it
+                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, it) }.start()
+                            },
+                            onLevelBoostToggle = {
+                                levelBoostEnabled = it
+                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_LEVEL_BOOST_ENABLED, it) }.start()
+                            },
+                            onSpaceBrowseToggle = {
+                                spaceBrowseEnabled = it
+                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_SPACE_BROWSE_ENABLED, it) }.start()
+                            },
+                            onMoodToggle = {
+                                moodEnabled = it
+                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_MOOD_ENABLED, it) }.start()
+                            },
+                            onMoodConfigClick = { showMoodConfigDialog = true },
+                            onKeepAlivePixelToggle = {
+                                keepAlivePixel = it
+                                Thread {
+                                    ModuleConfig.putBoolean(KeepAliveHook.SP_PIXEL, it)
+                                    KeepAliveHook.refresh()
+                                }.start()
+                            },
+                            onKeepAliveForegroundToggle = {
+                                keepAliveForeground = it
+                                Thread {
+                                    ModuleConfig.putBoolean(KeepAliveHook.SP_FOREGROUND, it)
+                                    KeepAliveHook.refresh()
+                                }.start()
+                            },
+                            onKeepAliveBackgroundToggle = {
+                                keepAliveBackground = it
+                                Thread {
+                                    ModuleConfig.putBoolean(KeepAliveHook.SP_BACKGROUND, it)
+                                    KeepAliveHook.refresh()
+                                }.start()
+                            },
+                            onChatSettingEntryChange = { newValue ->
+                                chatSettingEntry = newValue
+                                Thread { ModuleConfig.putString("chat_setting_entry", newValue) }.start()
+                            }
+                        )
                     )
                     1 -> JavaPluginsPage(
                         plugins = plugins,
@@ -477,59 +481,67 @@ private fun HomeTabBar(
     }
 }
 
+data class HomePageState(
+    val qzoneAutoLike: Boolean,
+    val qzoneAutoComment: Boolean,
+    val commentText: String,
+    val flashPicBypass: Boolean,
+    val removeLinkInfo: Boolean,
+    val downloadEmotion: Boolean,
+    val transparentAvatar: Boolean,
+    val videoToBubble: Boolean,
+    val antiPokeDelay: Boolean,
+    val timArkCardBypass: Boolean,
+    val profileAutoLikeBack: Boolean,
+    val preventRecall: Boolean,
+    val copyArkMessage: Boolean,
+    val longClickSendCard: Boolean,
+    val qzoneCheckinEnabled: Boolean,
+    val dailySignEnabled: Boolean,
+    val bigVipCheckinEnabled: Boolean,
+    val levelBoostEnabled: Boolean,
+    val spaceBrowseEnabled: Boolean,
+    val moodEnabled: Boolean,
+    val moodTime: String,
+    val moodText: String,
+    val keepAlivePixel: Boolean,
+    val keepAliveForeground: Boolean,
+    val keepAliveBackground: Boolean,
+    val chatSettingEntry: String
+)
+
+class HomePageCallbacks(
+    val onLikeToggle: (Boolean) -> Unit,
+    val onCommentToggle: (Boolean) -> Unit,
+    val onCommentTextClick: () -> Unit,
+    val onFlashPicToggle: (Boolean) -> Unit,
+    val onRemoveLinkInfoToggle: (Boolean) -> Unit,
+    val onDownloadEmotionToggle: (Boolean) -> Unit,
+    val onTransparentAvatarToggle: (Boolean) -> Unit,
+    val onVideoToBubbleToggle: (Boolean) -> Unit,
+    val onAntiPokeDelayToggle: (Boolean) -> Unit,
+    val onTimArkCardBypassToggle: (Boolean) -> Unit,
+    val onProfileAutoLikeBackToggle: (Boolean) -> Unit,
+    val onPreventRecallToggle: (Boolean) -> Unit,
+    val onCopyArkMessageToggle: (Boolean) -> Unit,
+    val onLongClickSendCardToggle: (Boolean) -> Unit,
+    val onCheckinToggle: (Boolean) -> Unit,
+    val onDailySignToggle: (Boolean) -> Unit,
+    val onBigVipCheckinToggle: (Boolean) -> Unit,
+    val onLevelBoostToggle: (Boolean) -> Unit,
+    val onSpaceBrowseToggle: (Boolean) -> Unit,
+    val onMoodToggle: (Boolean) -> Unit,
+    val onMoodConfigClick: () -> Unit,
+    val onKeepAlivePixelToggle: (Boolean) -> Unit,
+    val onKeepAliveForegroundToggle: (Boolean) -> Unit,
+    val onKeepAliveBackgroundToggle: (Boolean) -> Unit,
+    val onChatSettingEntryChange: (String) -> Unit
+)
+
 @Composable
 private fun HomePage(
-    qzoneAutoLike: Boolean,
-    qzoneAutoComment: Boolean,
-    commentText: String,
-    flashPicBypass: Boolean,
-    removeLinkInfo: Boolean,
-    downloadEmotion: Boolean,
-    transparentAvatar: Boolean,
-    videoToBubble: Boolean,
-    antiPokeDelay: Boolean,
-    timArkCardBypass: Boolean,
-    profileAutoLikeBack: Boolean,
-    preventRecall: Boolean,
-    copyArkMessage: Boolean,
-    longClickSendCard: Boolean,
-    qzoneCheckinEnabled: Boolean,
-    dailySignEnabled: Boolean,
-    bigVipCheckinEnabled: Boolean,
-    levelBoostEnabled: Boolean,
-    spaceBrowseEnabled: Boolean,
-    moodEnabled: Boolean,
-    moodTime: String,
-    moodText: String,
-    onLikeToggle: (Boolean) -> Unit,
-    onCommentToggle: (Boolean) -> Unit,
-    onCommentTextClick: () -> Unit,
-    onFlashPicToggle: (Boolean) -> Unit,
-    onRemoveLinkInfoToggle: (Boolean) -> Unit,
-    onDownloadEmotionToggle: (Boolean) -> Unit,
-    onTransparentAvatarToggle: (Boolean) -> Unit,
-    onVideoToBubbleToggle: (Boolean) -> Unit,
-    onAntiPokeDelayToggle: (Boolean) -> Unit,
-    onTimArkCardBypassToggle: (Boolean) -> Unit,
-    onProfileAutoLikeBackToggle: (Boolean) -> Unit,
-    onPreventRecallToggle: (Boolean) -> Unit,
-    onCopyArkMessageToggle: (Boolean) -> Unit,
-    onLongClickSendCardToggle: (Boolean) -> Unit,
-    onCheckinToggle: (Boolean) -> Unit,
-    onDailySignToggle: (Boolean) -> Unit,
-    onBigVipCheckinToggle: (Boolean) -> Unit,
-    onLevelBoostToggle: (Boolean) -> Unit,
-    onSpaceBrowseToggle: (Boolean) -> Unit,
-    onMoodToggle: (Boolean) -> Unit,
-    onMoodConfigClick: () -> Unit,
-    keepAlivePixel: Boolean,
-    keepAliveForeground: Boolean,
-    keepAliveBackground: Boolean,
-    onKeepAlivePixelToggle: (Boolean) -> Unit,
-    onKeepAliveForegroundToggle: (Boolean) -> Unit,
-    onKeepAliveBackgroundToggle: (Boolean) -> Unit,
-    chatSettingEntry: String,
-    onChatSettingEntryChange: (String) -> Unit
+    state: HomePageState,
+    callbacks: HomePageCallbacks
 ) {
     val colors = QEdgeTheme.colors
 
@@ -563,18 +575,18 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "空间秒赞",
                     subtitle = "收到好友动态自动点赞(确保在前台运行)",
-                    checked = qzoneAutoLike,
-                    onCheckedChange = onLikeToggle
+                    checked = state.qzoneAutoLike,
+                    onCheckedChange = callbacks.onLikeToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingSwitchItem(
                     title = "空间秒评",
-                    subtitle = commentText,
-                    checked = qzoneAutoComment,
-                    onCheckedChange = onCommentToggle,
-                    onClick = onCommentTextClick
+                    subtitle = state.commentText,
+                    checked = state.qzoneAutoComment,
+                    onCheckedChange = callbacks.onCommentToggle,
+                    onClick = callbacks.onCommentTextClick
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -582,12 +594,12 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "定时发说说 +0.5天",
                     subtitle = run {
-                        val preview = if (moodText.length > 18) moodText.take(18) + "…" else moodText
-                        "$moodTime · $preview"
+                        val preview = if (state.moodText.length > 18) state.moodText.take(18) + "…" else state.moodText
+                        "${state.moodTime} · $preview"
                     },
-                    checked = moodEnabled,
-                    onCheckedChange = onMoodToggle,
-                    onClick = onMoodConfigClick
+                    checked = state.moodEnabled,
+                    onCheckedChange = callbacks.onMoodToggle,
+                    onClick = callbacks.onMoodConfigClick
                 )
 
             }
@@ -615,8 +627,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "闪照破解",
                     subtitle = "闪照直接查看，无需长按",
-                    checked = flashPicBypass,
-                    onCheckedChange = onFlashPicToggle
+                    checked = state.flashPicBypass,
+                    onCheckedChange = callbacks.onFlashPicToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -624,8 +636,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "表情/泡泡/视频/语音下载",
                     subtitle = "长按消息保存到相册",
-                    checked = downloadEmotion,
-                    onCheckedChange = onDownloadEmotionToggle
+                    checked = state.downloadEmotion,
+                    onCheckedChange = callbacks.onDownloadEmotionToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -633,8 +645,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "屏蔽链接信息卡片",
                     subtitle = "收到链接时，自动屏蔽",
-                    checked = removeLinkInfo,
-                    onCheckedChange = onRemoveLinkInfoToggle
+                    checked = state.removeLinkInfo,
+                    onCheckedChange = callbacks.onRemoveLinkInfoToggle
                 )
 
                 if (HostInfo.isQQ) {
@@ -643,8 +655,8 @@ private fun HomePage(
                     SettingSwitchItem(
                         title = "视频转泡泡消息",
                         subtitle = "发送视频时，自动替换为泡泡",
-                        checked = videoToBubble,
-                        onCheckedChange = onVideoToBubbleToggle
+                        checked = state.videoToBubble,
+                        onCheckedChange = callbacks.onVideoToBubbleToggle
                     )
                 }
 
@@ -653,8 +665,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "取消拍一拍时间限制",
                     subtitle = "解除拍一拍时间限制",
-                    checked = antiPokeDelay,
-                    onCheckedChange = onAntiPokeDelayToggle
+                    checked = state.antiPokeDelay,
+                    onCheckedChange = callbacks.onAntiPokeDelayToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -662,8 +674,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "防撤回",
                     subtitle = "拦截QQ消息撤回，已撤回的消息依然可见",
-                    checked = preventRecall,
-                    onCheckedChange = onPreventRecallToggle
+                    checked = state.preventRecall,
+                    onCheckedChange = callbacks.onPreventRecallToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -671,8 +683,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "复制卡片消息",
                     subtitle = "卡片消息下方显示长按复制按钮，可复制JSON数据",
-                    checked = copyArkMessage,
-                    onCheckedChange = onCopyArkMessageToggle
+                    checked = state.copyArkMessage,
+                    onCheckedChange = callbacks.onCopyArkMessageToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -680,8 +692,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "长按发送发卡片",
                     subtitle = "长按发送按钮将输入框内JSON作为卡片消息发送",
-                    checked = longClickSendCard,
-                    onCheckedChange = onLongClickSendCardToggle
+                    checked = state.longClickSendCard,
+                    onCheckedChange = callbacks.onLongClickSendCardToggle
                 )
 
                 if (HostInfo.isTIM) {
@@ -689,8 +701,8 @@ private fun HomePage(
                     SettingSwitchItem(
                         title = "TIM卡片阻断绕过",
                         subtitle = "解除低版本TIM对Ark卡片跳转的限制",
-                        checked = timArkCardBypass,
-                        onCheckedChange = onTimArkCardBypassToggle
+                        checked = state.timArkCardBypass,
+                        onCheckedChange = callbacks.onTimArkCardBypassToggle
                     )
                 }
 
@@ -722,7 +734,7 @@ private fun HomePage(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         for ((key, label) in row) {
-                            val selected = chatSettingEntry == key
+                            val selected = state.chatSettingEntry == key
                             Box(
                                 modifier = Modifier
                                     .weight(1f)
@@ -730,7 +742,7 @@ private fun HomePage(
                                     .background(
                                         if (selected) AccentBlue else colors.background
                                     )
-                                    .clickable { onChatSettingEntryChange(key) }
+                                    .clickable { callbacks.onChatSettingEntryChange(key) }
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -774,8 +786,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "半透明头像上传",
                     subtitle = "可上传(群)头像、名片等，不用则关",
-                    checked = transparentAvatar,
-                    onCheckedChange = onTransparentAvatarToggle
+                    checked = state.transparentAvatar,
+                    onCheckedChange = callbacks.onTransparentAvatarToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -783,8 +795,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "名片自动回赞",
                     subtitle = "收到名片点赞自动回赞",
-                    checked = profileAutoLikeBack,
-                    onCheckedChange = onProfileAutoLikeBackToggle
+                    checked = state.profileAutoLikeBack,
+                    onCheckedChange = callbacks.onProfileAutoLikeBackToggle
                 )
             }
         }
@@ -811,8 +823,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "空间等级签到",
                     subtitle = "自动执行空间打卡 +0.5天",
-                    checked = qzoneCheckinEnabled,
-                    onCheckedChange = onCheckinToggle
+                    checked = state.qzoneCheckinEnabled,
+                    onCheckedChange = callbacks.onCheckinToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -820,8 +832,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "QQ 日签打卡",
                     subtitle = "自动执行日签打卡 +0.5天",
-                    checked = dailySignEnabled,
-                    onCheckedChange = onDailySignToggle
+                    checked = state.dailySignEnabled,
+                    onCheckedChange = callbacks.onDailySignToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -829,8 +841,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "大会员签到",
                     subtitle = "自动执行（无需开通大会员） +0.5天",
-                    checked = bigVipCheckinEnabled,
-                    onCheckedChange = onBigVipCheckinToggle
+                    checked = state.bigVipCheckinEnabled,
+                    onCheckedChange = callbacks.onBigVipCheckinToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -838,8 +850,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "自动加好友",
                     subtitle = "自动添加3个好友 +1.5天",
-                    checked = levelBoostEnabled,
-                    onCheckedChange = onLevelBoostToggle
+                    checked = state.levelBoostEnabled,
+                    onCheckedChange = callbacks.onLevelBoostToggle
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -847,8 +859,8 @@ private fun HomePage(
                 SettingSwitchItem(
                     title = "空间浏览",
                     subtitle = "浏览好友说说10条 +0.5天",
-                    checked = spaceBrowseEnabled,
-                    onCheckedChange = onSpaceBrowseToggle
+                    checked = state.spaceBrowseEnabled,
+                    onCheckedChange = callbacks.onSpaceBrowseToggle
                 )
             }
         }
@@ -881,7 +893,7 @@ private fun HomePage(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text("1x1透明悬浮窗，保持进程可见", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
-                    QEdgeSwitch(checked = keepAlivePixel, onCheckedChange = onKeepAlivePixelToggle)
+                    QEdgeSwitch(checked = state.keepAlivePixel, onCheckedChange = callbacks.onKeepAlivePixelToggle)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -895,7 +907,7 @@ private fun HomePage(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text("高优先级常驻通知，最高保活优先级", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
-                    QEdgeSwitch(checked = keepAliveForeground, onCheckedChange = onKeepAliveForegroundToggle)
+                    QEdgeSwitch(checked = state.keepAliveForeground, onCheckedChange = callbacks.onKeepAliveForegroundToggle)
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -909,7 +921,7 @@ private fun HomePage(
                         Spacer(modifier = Modifier.height(2.dp))
                         Text("低优先级通知，轻量保活", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
                     }
-                    QEdgeSwitch(checked = keepAliveBackground, onCheckedChange = onKeepAliveBackgroundToggle)
+                    QEdgeSwitch(checked = state.keepAliveBackground, onCheckedChange = callbacks.onKeepAliveBackgroundToggle)
                 }
             }
         }
