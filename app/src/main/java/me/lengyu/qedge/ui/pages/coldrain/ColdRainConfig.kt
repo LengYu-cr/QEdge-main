@@ -2,7 +2,7 @@ package me.lengyu.qedge.ui.pages.coldrain
 
 import android.content.Context
 import java.io.File
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.LogUtils
 
 object ColdRainConfig {

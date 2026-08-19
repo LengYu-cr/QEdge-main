@@ -46,7 +46,7 @@ import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.utils.qq.FriendTool
 import java.util.regex.Pattern

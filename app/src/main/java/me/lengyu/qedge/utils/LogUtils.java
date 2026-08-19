@@ -2,6 +2,8 @@ package me.lengyu.qedge.utils;
 
 import android.util.Log;
 
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
+
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;

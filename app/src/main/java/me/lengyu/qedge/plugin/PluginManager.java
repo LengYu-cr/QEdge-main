@@ -8,7 +8,7 @@ import java.util.HashMap;
 
 import me.lengyu.qedge.plugin.bean.PluginInfo;
 import me.lengyu.qedge.utils.LogUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.ObjectStore;
 
 public class PluginManager {

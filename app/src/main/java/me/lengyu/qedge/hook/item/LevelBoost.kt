@@ -7,7 +7,7 @@ import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.HttpUtils
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.proto.PacketHelper
 import me.lengyu.qedge.utils.proto.packetListener
 import me.lengyu.qedge.utils.qq.CookieTool
@@ -37,9 +37,9 @@ import java.util.regex.Pattern
  *  ③ 标记改为"发布成功后才写"
  */
 @HookItemAnnotation(value = "QZone 定时任务", category = "item")
-object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
+object LevelBoost : BaseApiHookItem<LevelBoost.Listener>() {
 
-    const val TAG = "QZoneSchedule"
+    const val TAG = "LevelBoost"
 
     /** 空间等级签到开关 */
     const val SP_CHECKIN_ENABLED = "qzone_daily_checkin_enabled"
@@ -378,8 +378,8 @@ object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
                 for (botUin in BOT_UINS) {
                     try {
                         if (FriendTool.isFriend(botUin)) {
-                            // LogUtils.d(TAG, "level boost: $botUin already friend, skip")
-                            continue
+                            FriendTool.deleteFriend(botUin)
+                            Thread.sleep(2000)
                         }
                         ExtraTool.addFriend(botUin, "", "")
                         addedCount++
@@ -390,7 +390,6 @@ object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
                 }
                 // 不管加了多少个都标记完成，避免反复触发
                 markDoneToday(SP_PREFIX_LEVEL_BOOST_DONE, today)
-                LogUtils.d(TAG, "level boost done: added $addedCount friends")
             }.onFailure { LogUtils.e(TAG, "runLevelBoost error: ${it.message}") }
             levelBoostRunning.set(false)
         }.start()
@@ -460,7 +459,7 @@ object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
                     runCatching {
                         val headers = HashMap<String, String>()
                         headers["Cookie"] = cookie
-                        headers["User-Agent"] = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+                        headers["User-Agent"] = "Mozilla/5.0 (Linux; Android 13; V2166BA Build/TP1A.220624.014; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/120.0.6099.193 Mobile Safari/537.36"
                         headers["Referer"] = "https://user.qzone.qq.com/"
                         HttpUtils.get(url, headers, 10000, 15000)
                         successCount++
@@ -481,7 +480,7 @@ object QZoneSchedule : BaseApiHookItem<QZoneSchedule.Listener>() {
         try {
             val matcher = MOOD_URL_PATTERN.matcher(json.toString())
             while (matcher.find()) {
-                val url = matcher.group().replace("\\/", "/")
+                val url = matcher.group().replace("\\/", "/").replace("http://", "https://")
                 if (seen.add(url)) result.add(url)
             }
         } catch (t: Throwable) {

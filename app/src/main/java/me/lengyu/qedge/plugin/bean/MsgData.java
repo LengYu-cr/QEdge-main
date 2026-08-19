@@ -6,7 +6,7 @@ import com.tencent.qqnt.kernelpublic.nativeinterface.Contact;
 import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.FriendTool;
 import me.lengyu.qedge.utils.LogUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
 import java.io.File;
 import java.util.ArrayList;

@@ -25,7 +25,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.plugin.bean.JointGroup;
 import me.lengyu.qedge.plugin.bean.BlackUser;

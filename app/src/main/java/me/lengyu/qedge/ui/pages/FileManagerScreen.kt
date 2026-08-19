@@ -3,6 +3,7 @@ package me.lengyu.qedge.ui.pages
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -69,7 +70,7 @@ fun FileManagerScreen(
 ) {
     val colors = QEdgeTheme.colors
     val context = androidx.compose.ui.platform.LocalContext.current
-    val defaultPath = me.lengyu.qedge.utils.QQCurrentEnv.getHostPath()
+    val defaultPath = QQCurrentEnv.getHostPath()
 
     var leftPath by remember { mutableStateOf(defaultPath) }
     var rightPath by remember { mutableStateOf(defaultPath) }

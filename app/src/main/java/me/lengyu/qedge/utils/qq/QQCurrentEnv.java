@@ -1,4 +1,4 @@
-package me.lengyu.qedge.utils;
+package me.lengyu.qedge.utils.qq;
 
 import android.app.Activity;
 import android.content.Context;
@@ -168,7 +168,6 @@ public class QQCurrentEnv {
             }
             if (currentUin == null || currentUin.isEmpty()) {
                 currentUin = "";
-                LogUtils.e("QEdge", "getCurrentUin: uin is null or empty");
             }
         } catch (Throwable e) {
             LogUtils.e("QEdge", "getCurrentUin: " + e.getMessage());

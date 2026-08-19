@@ -73,7 +73,7 @@ import me.lengyu.qedge.ui.pages.home.HomeUpdateLogDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
-import me.lengyu.qedge.hook.item.QZoneSchedule
+import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.hook.item.KeepAliveHook
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box as ComposeBox
@@ -118,14 +118,14 @@ fun HomeScreen(
     var longClickSendCard by remember { mutableStateOf(ModuleConfig.getBoolean("long_click_send_card", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
-    var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, false)) }
-    var dailySignEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_DAILY_SIGN_ENABLED, false)) }
-    var bigVipCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, false)) }
-    var levelBoostEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_LEVEL_BOOST_ENABLED, false)) }
-    var spaceBrowseEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_SPACE_BROWSE_ENABLED, false)) }
-    var moodEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(QZoneSchedule.SP_MOOD_ENABLED, false)) }
-    var moodTime by remember { mutableStateOf(QZoneSchedule.getMoodTime()) }
-    var moodText by remember { mutableStateOf(QZoneSchedule.getMoodText()) }
+    var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_CHECKIN_ENABLED, false)) }
+    var dailySignEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_DAILY_SIGN_ENABLED, false)) }
+    var bigVipCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_BIGVIP_CHECKIN_ENABLED, false)) }
+    var levelBoostEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_LEVEL_BOOST_ENABLED, false)) }
+    var spaceBrowseEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_SPACE_BROWSE_ENABLED, false)) }
+    var moodEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_MOOD_ENABLED, false)) }
+    var moodTime by remember { mutableStateOf(LevelBoost.getMoodTime()) }
+    var moodText by remember { mutableStateOf(LevelBoost.getMoodText()) }
     var showCommentDialog by remember { mutableStateOf(false) }
     var showMoodConfigDialog by remember { mutableStateOf(false) }
     var showUpdateLogDialog by remember { mutableStateOf(false) }
@@ -350,27 +350,27 @@ fun HomeScreen(
                             },
                             onCheckinToggle = {
                                 qzoneCheckinEnabled = it
-                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_CHECKIN_ENABLED, it) }.start()
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_CHECKIN_ENABLED, it) }.start()
                             },
                             onDailySignToggle = {
                                 dailySignEnabled = it
-                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_DAILY_SIGN_ENABLED, it) }.start()
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_DAILY_SIGN_ENABLED, it) }.start()
                             },
                             onBigVipCheckinToggle = {
                                 bigVipCheckinEnabled = it
-                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_BIGVIP_CHECKIN_ENABLED, it) }.start()
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_BIGVIP_CHECKIN_ENABLED, it) }.start()
                             },
                             onLevelBoostToggle = {
                                 levelBoostEnabled = it
-                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_LEVEL_BOOST_ENABLED, it) }.start()
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_LEVEL_BOOST_ENABLED, it) }.start()
                             },
                             onSpaceBrowseToggle = {
                                 spaceBrowseEnabled = it
-                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_SPACE_BROWSE_ENABLED, it) }.start()
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_SPACE_BROWSE_ENABLED, it) }.start()
                             },
                             onMoodToggle = {
                                 moodEnabled = it
-                                Thread { ModuleConfig.putBoolean(QZoneSchedule.SP_MOOD_ENABLED, it) }.start()
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_MOOD_ENABLED, it) }.start()
                             },
                             onMoodConfigClick = { showMoodConfigDialog = true },
                             onKeepAlivePixelToggle = {
@@ -439,11 +439,11 @@ fun HomeScreen(
             onDismiss = { showMoodConfigDialog = false },
             onConfirm = { t, txt ->
                 moodTime = t
-                moodText = txt.ifEmpty { QZoneSchedule.getMoodText() }
+                moodText = txt.ifEmpty { LevelBoost.getMoodText() }
                 showMoodConfigDialog = false
                 Thread {
-                    ModuleConfig.putString(QZoneSchedule.SP_MOOD_TIME, t)
-                    ModuleConfig.putString(QZoneSchedule.SP_MOOD_TEXT, txt)
+                    ModuleConfig.putString(LevelBoost.SP_MOOD_TIME, t)
+                    ModuleConfig.putString(LevelBoost.SP_MOOD_TEXT, txt)
                 }.start()
             }
         )

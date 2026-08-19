@@ -3,7 +3,7 @@ package me.lengyu.qedge.utils.qq;
 import java.lang.reflect.Method;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
 public class CookieTool {
 

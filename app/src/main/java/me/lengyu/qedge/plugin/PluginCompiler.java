@@ -22,7 +22,7 @@ import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.plugin.bean.PluginInfo;
 import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.LogUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.ReflectUtils;
 
 public class PluginCompiler {
@@ -209,7 +209,7 @@ public class PluginCompiler {
     }
 
     public Object getQqAppInterface() {
-        return me.lengyu.qedge.utils.QQCurrentEnv.getQQAppInterface();
+        return QQCurrentEnv.getQQAppInterface();
     }
 
     private void registerApiMethods(bsh.Interpreter interpreter) {

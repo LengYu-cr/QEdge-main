@@ -13,7 +13,7 @@ import me.lengyu.qedge.hook.base.BaseSwitchHookItem
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.json.ProtoData
 import me.lengyu.qedge.utils.qq.FriendTool
 import java.io.ByteArrayOutputStream
@@ -1075,7 +1075,6 @@ class PreventRecall : BaseSwitchHookItem() {
         try {
             val adapter = currentAIOAdapter?.get()
             if (adapter == null) {
-                LogUtils.e(TAG, "triggerAIORefresh: adapter is null, skip")
                 return
             }
             ReflectUtils.callMethod(adapter, "notifyDataSetChanged")

@@ -7,7 +7,7 @@ import com.tencent.mobileqq.qroute.QRoute;
 import com.tencent.mobileqq.app.QQAppInterface;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.LogUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import com.tencent.common.app.BaseApplicationImpl;
 
 public class QQServiceHelper {

@@ -15,7 +15,7 @@ import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.FriendTool;
 

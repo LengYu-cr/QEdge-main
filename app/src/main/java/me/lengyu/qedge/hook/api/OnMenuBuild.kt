@@ -9,7 +9,7 @@ import me.lengyu.qedge.hook.base.BaseApiHookItem
 import me.lengyu.qedge.hook.base.Listener
 import me.lengyu.qedge.plugin.bean.MsgData
 import me.lengyu.qedge.utils.HostInfo
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.dexkit.DexKitTask
 import me.lengyu.qedge.utils.hook.hookBefore
 import me.lengyu.qedge.utils.hook.hookReplace

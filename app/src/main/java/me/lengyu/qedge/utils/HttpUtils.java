@@ -38,8 +38,7 @@ public class HttpUtils {
                 }
                 return true;
             }
-        } catch (IOException e) {
-            LogUtils.e(e);
+        } catch (IOException ignored) {
         }
         return false;
     }
@@ -140,8 +139,7 @@ public class HttpUtils {
                 }
                 return saveFile.getAbsolutePath();
             }
-        } catch (IOException e) {
-            LogUtils.e(e);
+        } catch (IOException ignored) {
         } finally {
             if (connection != null) {
                 connection.disconnect();
@@ -214,8 +212,7 @@ public class HttpUtils {
                     return sb.toString();
                 }
             }
-        } catch (IOException e) {
-            LogUtils.e(e);
+        } catch (IOException ignored) {
         }
         return null;
     }
@@ -254,8 +251,7 @@ public class HttpUtils {
                     return sb.toString();
                 }
             }
-        } catch (IOException e) {
-            LogUtils.e(e);
+        } catch (IOException ignored) {
         }
         return null;
     }
@@ -292,8 +288,7 @@ public class HttpUtils {
                     return sb.toString();
                 }
             }
-        } catch (IOException e) {
-            LogUtils.e(e);
+        } catch (IOException ignored) {
         }
         return null;
     }
@@ -331,8 +326,7 @@ public class HttpUtils {
                     return sb.toString();
                 }
             }
-        } catch (IOException e) {
-            LogUtils.e(e);
+        } catch (IOException ignored) {
         }
         return null;
     }
@@ -369,8 +363,7 @@ public class HttpUtils {
                     return sb.toString();
                 }
             }
-        } catch (IOException e) {
-            LogUtils.e(e);
+        } catch (IOException ignored) {
         }
         return null;
     }

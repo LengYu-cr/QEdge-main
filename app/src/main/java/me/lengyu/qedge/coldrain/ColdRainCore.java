@@ -42,7 +42,7 @@ import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.Toasts;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.MsgTool;
@@ -608,7 +608,7 @@ public class ColdRainCore {
 
     public String getMyUin() {
         try {
-            return me.lengyu.qedge.utils.QQCurrentEnv.getCurrentUin();
+            return QQCurrentEnv.getCurrentUin();
         } catch (Throwable e) {
             return "";
         }

@@ -32,7 +32,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
-import me.lengyu.qedge.hook.item.QZoneSchedule
+import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.ui.core.theme.AccentGreen
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import org.json.JSONObject
@@ -140,7 +140,7 @@ fun HomeMoodScheduleDialog(
     val colors = QEdgeTheme.colors
     var time by remember(initialTime) { mutableStateOf(initialTime) }
     var text by remember(initialText) { mutableStateOf(initialText) }
-    val timeOk = QZoneSchedule.HH_MM_REGEX.matches(time.trim())
+    val timeOk = LevelBoost.HH_MM_REGEX.matches(time.trim())
     val canConfirm = timeOk
 
     Dialog(onDismissRequest = onDismiss) {

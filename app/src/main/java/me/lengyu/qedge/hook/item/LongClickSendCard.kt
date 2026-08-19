@@ -12,7 +12,7 @@ import me.lengyu.qedge.hook.base.BaseSwitchHookItem
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.utils.qq.MsgTool
@@ -163,7 +163,7 @@ class LongClickSendCard : BaseSwitchHookItem() {
         }
 
         if (editText != null && sendBtn != null) {
-            setupLongClick(sendBtn!!, editText!!)
+            setupLongClick(sendBtn, editText)
         }
     }
 

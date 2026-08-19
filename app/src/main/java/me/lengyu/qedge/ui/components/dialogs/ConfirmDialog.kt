@@ -1,6 +1,8 @@
 package me.lengyu.qedge.ui.components.dialogs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -43,6 +45,7 @@ fun ConfirmDialog(
                 .clip(RoundedCornerShape(16.dp))
                 .background(colors.cardBackground)
                 .padding(24.dp)
+                .verticalScroll(rememberScrollState())
         ) {
             Text(
                 title,

@@ -4,6 +4,8 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
+
 import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;

@@ -12,7 +12,7 @@ import com.tencent.relation.common.api.IRelationNTUinAndUidApi;
 import me.lengyu.qedge.plugin.bean.FriendInfo;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
 public class FriendTool {
 

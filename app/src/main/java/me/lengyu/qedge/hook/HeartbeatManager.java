@@ -19,7 +19,7 @@ import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.HostInfo;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
 
 

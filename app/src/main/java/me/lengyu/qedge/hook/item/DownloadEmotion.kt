@@ -10,7 +10,7 @@ import me.lengyu.qedge.plugin.bean.MsgData
 import me.lengyu.qedge.utils.HttpUtils
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.Toasts
 import java.io.File
 import java.io.FileInputStream

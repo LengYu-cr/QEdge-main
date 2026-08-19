@@ -10,7 +10,7 @@ import java.util.zip.ZipEntry
 import java.util.zip.ZipInputStream
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
-import me.lengyu.qedge.utils.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 
 object FileManagerUtils {
 

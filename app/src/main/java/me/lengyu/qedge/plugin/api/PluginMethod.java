@@ -25,7 +25,7 @@ import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.FriendTool;
 import me.lengyu.qedge.utils.qq.MsgTool;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.qq.TroopTool;
 import me.lengyu.qedge.utils.qq.ExtraTool;
 import me.lengyu.qedge.utils.json.ProtoData;

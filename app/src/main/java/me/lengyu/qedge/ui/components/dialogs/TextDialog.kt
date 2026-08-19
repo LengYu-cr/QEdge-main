@@ -105,6 +105,7 @@ private fun TextDialogContent(
                         .clip(RoundedCornerShape(24.dp))
                         .background(colors.cardBackground)
                         .padding(vertical = 24.dp)
+                        .verticalScroll(rememberScrollState())
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null

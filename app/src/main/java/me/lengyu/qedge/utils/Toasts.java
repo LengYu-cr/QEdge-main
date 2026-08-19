@@ -9,7 +9,7 @@ import android.widget.Toast;
 import com.tencent.util.QQToastUtil;
 
 import me.lengyu.qedge.utils.LogUtils;
-import me.lengyu.qedge.utils.QQCurrentEnv;
+import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
 public class Toasts {
 
