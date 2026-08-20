@@ -6,6 +6,15 @@ import java.util.Set;
 public abstract class BaseApiHookItem<T extends Listener> extends BaseHookItem {
 
     private Set<T> listenerSet;
+    private boolean hookLoaded = false;
+
+    public boolean isHookLoaded() {
+        return hookLoaded;
+    }
+
+    public void setHookLoaded(boolean loaded) {
+        hookLoaded = loaded;
+    }
 
     protected Set<T> getListenerSet() {
         if (listenerSet == null) {

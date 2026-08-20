@@ -1,5 +1,7 @@
 package me.lengyu.qedge.utils;
 
+import android.util.Log;
+
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
@@ -8,6 +10,7 @@ import me.lengyu.qedge.utils.HybridClassLoader;
 
 public class ReflectUtils {
 
+    private static final String TAG = "ReflectUtils";
     public static ClassLoader hostClassLoader;
 
     public static void initClassLoader(ClassLoader loader) {
@@ -131,7 +134,7 @@ public class ReflectUtils {
                 }
             }
         } catch (Throwable e) {
-            LogUtils.e(e);
+            Log.e(TAG, "findMethod by return type error: " + e.getMessage());
         }
         return null;
     }
@@ -221,7 +224,7 @@ public class ReflectUtils {
                 return field.get(obj);
             }
         } catch (Throwable e) {
-            LogUtils.e(e);
+            Log.e(TAG, "getFieldValue error: " + e.getMessage());
         }
         return null;
     }
@@ -233,7 +236,7 @@ public class ReflectUtils {
                 field.set(obj, value);
             }
         } catch (Throwable e) {
-            LogUtils.e(e);
+            Log.e(TAG, "setFieldValue error: " + e.getMessage());
         }
     }
 
@@ -248,7 +251,7 @@ public class ReflectUtils {
                 return method.invoke(obj, args);
             }
         } catch (Throwable e) {
-            LogUtils.e(e);
+            Log.e(TAG, "callMethod error: " + e.getMessage());
         }
         return null;
     }
@@ -260,7 +263,7 @@ public class ReflectUtils {
                 return method.invoke(obj, (Object[]) null);
             }
         } catch (Throwable e) {
-            LogUtils.e(e);
+            Log.e(TAG, "callMethod error: " + e.getMessage());
         }
         return null;
     }
@@ -289,7 +292,7 @@ public class ReflectUtils {
                 return method.invoke(null, args);
             }
         } catch (Throwable e) {
-            LogUtils.e(e);
+            Log.e(TAG, "callStaticMethod error: " + e.getMessage());
         }
         return null;
     }

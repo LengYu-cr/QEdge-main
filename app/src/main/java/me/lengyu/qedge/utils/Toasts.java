@@ -2,8 +2,14 @@ package me.lengyu.qedge.utils;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.Gravity;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import com.tencent.util.QQToastUtil;
@@ -49,5 +55,39 @@ public class Toasts {
 
     public static void showToast(String message) {
         toast(message);
+    }
+
+    public static void showCustomToast(String message) {
+        mainHandler.post(() -> {
+            Context context = getContext();
+            if (context == null) return;
+
+            GradientDrawable bg = new GradientDrawable();
+            bg.setColor(Color.argb(180, 255, 255, 255));
+            bg.setCornerRadius(24f);
+
+            TextView textView = new TextView(context);
+            textView.setText(message);
+            textView.setTextColor(Color.BLACK);
+            textView.setTextSize(14f);
+            textView.setPadding(40, 24, 40, 24);
+            textView.setBackground(bg);
+            textView.setGravity(Gravity.CENTER);
+
+            FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT
+            );
+            params.gravity = Gravity.CENTER;
+            textView.setLayoutParams(params);
+
+            FrameLayout container = new FrameLayout(context);
+            container.addView(textView);
+
+            Toast toast = new Toast(context);
+            toast.setDuration(Toast.LENGTH_LONG);
+            toast.setView(container);
+            toast.show();
+        });
     }
 }

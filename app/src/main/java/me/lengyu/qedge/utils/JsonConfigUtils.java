@@ -202,10 +202,12 @@ public class JsonConfigUtils {
                 writer.flush();
                 fos.getFD().sync();  // 确保数据落盘
             }
-            // 原子替换
+            // 原子替换：先删目标文件避免 rename 失败
+            configFile.delete();
             if (!tempFile.renameTo(configFile)) {
-                // rename 失败时回退到直接覆盖
+                // rename 仍失败时回退到直接覆盖
                 LogUtils.e("JsonConfigUtils", "rename failed, fallback to direct write");
+                configFile.delete();
                 try (FileOutputStream fos = new FileOutputStream(configFile);
                      OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
                     writer.write(content);

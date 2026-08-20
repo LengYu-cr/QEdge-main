@@ -17,7 +17,7 @@ import com.tencent.qqnt.kernel.nativeinterface.MarkdownElement;
 import com.tencent.mobileqq.paiyipai.PaiYiPaiHandler;
 import com.tencent.mobileqq.app.CardHandler;
 import com.tencent.mobileqq.qroute.QRoute;
-import com.tencent.qqnt.aio.adapter.api.IAIOPttApi;
+import com.tencent.mobileqq.ptt.impl.QQRecorderUtilsImpl;
 
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
@@ -130,7 +130,7 @@ public class MsgTool {
 
     private static long generateMsgUniqueId(Object msgService, int chatType) {
         try {
-            Method generateMethod = ReflectUtils.findMethod(msgService.getClass(), "generateMsgUniqueId", int.class);
+            Method generateMethod = ReflectUtils.findMethod(msgService.getClass(), "generateMsgUniqueId", 1);
             if (generateMethod != null) {
                 Object result = generateMethod.invoke(msgService, chatType);
                 if (result instanceof Long) {
@@ -253,37 +253,27 @@ public class MsgTool {
                         byList.add(b[i]);
                     }
                     int duration = 1000;
-                    try {
-                        IAIOPttApi pttApi = QRoute.api(IAIOPttApi.class);
-                        duration = (int) pttApi.getPttFileDuration(pttPath);
-                    } catch (Throwable e) {
-                        LogUtils.e("MsgTool", "IAIOPttApi获取ptt时长失败: " + pttPath);
-                    }
-                    
-                    if (duration <= 0) {
-                        if (pttPath.toLowerCase().endsWith(".silk")) {
+
+                    if (pttPath.toLowerCase().endsWith(".silk") || pttPath.toLowerCase().endsWith(".amr")) {
+                        QQRecorderUtilsImpl qqRecorderUtilsImpl = new QQRecorderUtilsImpl();
+                        duration = qqRecorderUtilsImpl.getFilePlayTime(pttPath);
+                    } else {
+                        android.media.MediaPlayer mp = new android.media.MediaPlayer();
+                        try {
+                            mp.setDataSource(pttPath);
+                            mp.prepare();
+                            duration = mp.getDuration() * 1000;
+
+                        } catch (Throwable e) {
+                            LogUtils.e("MsgTool", "MediaPlayer获取ptt时长失败: " + pttPath);
                             long fileSize = pttFile.length();
-                            duration = (int) (fileSize / 1200) * 1000;
+                            duration = (int) (fileSize / 1000) * 1000;
                             if (duration < 1000) duration = 1000;
-                            if (duration > 60000) duration = 60000;
-                            // LogUtils.d("MsgTool", "silk文件伪造时长: " + duration + "ms, size: " + fileSize);
-                        } else {
-                            android.media.MediaPlayer mp = new android.media.MediaPlayer();
-                            try {
-                                mp.setDataSource(pttPath);
-                                mp.prepare();
-                                duration = mp.getDuration() * 1000;
-                                // LogUtils.d("MsgTool", "MediaPlayer获取时长: " + duration + "ms");
-                            } catch (Throwable e) {
-                                LogUtils.e("MsgTool", "MediaPlayer获取ptt时长失败: " + pttPath);
-                                long fileSize = pttFile.length();
-                                duration = (int) (fileSize / 1000) * 1000;
-                                if (duration < 1000) duration = 1000;
-                            } finally {
-                                try { mp.release(); } catch (Throwable ignored) {}
-                            }
+                        } finally {
+                            try { mp.release(); } catch (Throwable ignored) {}
                         }
                     }
+                    
                     MsgElement msgElements = msgUtilApiImpl.createPttElement(pttPath, 0);   
                     PttElement pttElement = msgElements.getPttElement();
                     pttElement.waveAmplitudes = byList;

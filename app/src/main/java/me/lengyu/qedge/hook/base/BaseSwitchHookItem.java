@@ -7,6 +7,7 @@ import me.lengyu.qedge.utils.ModuleConfig;
 public abstract class BaseSwitchHookItem extends BaseHookItem {
 
     protected boolean isAvailable = false;
+    private boolean initialized = false;
 
     public String getTag() {
         HookItemAnnotation annotation = getAnnotation();
@@ -28,13 +29,25 @@ public abstract class BaseSwitchHookItem extends BaseHookItem {
     }
 
     public void init() {
+        if (initialized) return;
+        initialized = true;
         try {
             isAvailable = onInit();
+        } catch (Throwable t) {
+            isAvailable = false;
+        }
+        try {
             if (isAvailable && isInTargetProcess()) {
                 if (this instanceof BaseClickableHookItem) {
-                    ((BaseClickableHookItem<?>) this).initData();
+                    try {
+                        ((BaseClickableHookItem<?>) this).initData();
+                    } catch (Throwable ignored) {
+                    }
                 }
-                onHook();
+                try {
+                    onHook();
+                } catch (Throwable ignored) {
+                }
             }
         } catch (Throwable t) {
             isAvailable = false;

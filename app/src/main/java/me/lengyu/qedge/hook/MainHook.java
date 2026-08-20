@@ -92,11 +92,26 @@ public class MainHook {
             LogUtils.e("MainHook", "Check ban status failed: " + e.getMessage());
         }
 
-        registerHookItems();
-        FromServiceMsgDispatcher.loadHook();
+        try {
+            registerHookItems();
+        } catch (Throwable e) {
+            LogUtils.e("MainHook", "registerHookItems failed: " + e.getMessage());
+        }
+
+        try {
+            FromServiceMsgDispatcher.loadHook();
+        } catch (Throwable e) {
+            LogUtils.e("MainHook", "FromServiceMsgDispatcher.loadHook failed: " + e.getMessage());
+        }
+
         loadApiHook();
         initSwitchHookItem();
-        hookAccountChange();
+
+        try {
+            hookAccountChange();
+        } catch (Throwable e) {
+            LogUtils.e("MainHook", "hookAccountChange failed: " + e.getMessage());
+        }
 
         try {
             ChatSettingLoader.loadHook();
@@ -132,8 +147,9 @@ public class MainHook {
         List<BaseApiHookItem> apiHookItemList = HookRegistry.getHookItemsByClass(BaseApiHookItem.class);
         for (BaseApiHookItem item : apiHookItemList) {
             try {
-                if (item.isInTargetProcess()) {
+                if (item.isInTargetProcess() && !item.isHookLoaded()) {
                     item.loadHook();
+                    item.setHookLoaded(true);
                 }
             } catch (Throwable t) {
                 LogUtils.e(item.getClass().getSimpleName(), t);
