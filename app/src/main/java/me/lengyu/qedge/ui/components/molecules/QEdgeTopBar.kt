@@ -46,6 +46,8 @@ fun QEdgeTopBar(
     onDocClick: () -> Unit = {},
     showUpdateLogButton: Boolean = false,
     onUpdateLogClick: () -> Unit = {},
+    showSponsorButton: Boolean = false,
+    onSponsorClick: () -> Unit = {},
     actions: @Composable () -> Unit = {}
 ) {
     val colors = QEdgeTheme.colors
@@ -140,6 +142,24 @@ fun QEdgeTopBar(
                     contentAlignment = Alignment.Center
                 ) {
                     Text("📝", fontSize = 18.sp)
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+
+            if (showSponsorButton) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(colors.cardBackground)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(color = colors.ripple),
+                            onClick = onSponsorClick
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("☕", fontSize = 18.sp)
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }

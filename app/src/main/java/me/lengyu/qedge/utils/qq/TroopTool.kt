@@ -4,7 +4,6 @@ import me.lengyu.qedge.plugin.bean.ForbidInfo
 import me.lengyu.qedge.plugin.bean.GroupInfo
 import me.lengyu.qedge.plugin.bean.MemberInfo
 import me.lengyu.qedge.utils.reflect.ClassUtils
-import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.dexkit.DexKitTask
 import me.lengyu.qedge.utils.proto.PacketHelper
@@ -13,12 +12,13 @@ import me.lengyu.qedge.utils.reflect.findMethod
 import me.lengyu.qedge.utils.reflect.findMethodOrNull
 import org.json.JSONObject
 import org.luckypray.dexkit.query.FindClass
-import org.luckypray.dexkit.query.matchers.MethodMatcher
 import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Proxy
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
 import com.tencent.mobileqq.data.troop.TroopInfo
+import com.tencent.mobileqq.data.troop.TroopMemberInfo
+import com.tencent.mobileqq.data.troop.TroopMemberCardInfo
 import com.tencent.mobileqq.troop.api.ITroopInfoService
 
 @Suppress("DEPRECATION")
@@ -44,6 +44,10 @@ object TroopTool : DexKitTask {
         }
     }
 
+    private val troopMemberInfoClass by lazy {
+        Class.forName("com.tencent.mobileqq.data.troop.TroopMemberInfo")
+    }
+
     private val shutUp by lazy {
         val handler = Class.forName("com.tencent.mobileqq.troop.membersetting.handler.MemberSettingHandler")
         handler.findMethodOrNull {
@@ -59,21 +63,6 @@ object TroopTool : DexKitTask {
         requireClass("setting").findMethod {
             returnType = void
             paramTypes(byte, string, string)
-        }
-    }
-
-    private val setGroupMemberTitle by lazy {
-        val editActivity = Class.forName("com.tencent.biz.troop.EditUniqueTitleActivity")
-        editActivity.findMethodOrNull {
-            returnType = void
-            paramTypes(
-                Class.forName("com.tencent.mobileqq.app.QQAppInterface"),
-                string, string, string,
-                Class.forName("mqq.observer.BusinessObserver")
-            )
-        } ?: editActivity.findMethod {
-            returnType = void
-            paramTypes(string, string, string)
         }
     }
 
@@ -99,29 +88,25 @@ object TroopTool : DexKitTask {
         )
     }
 
+    @Suppress("UNCHECKED_CAST")
     fun getGroupList(): List<GroupInfo> {
         val groupInfoList = mutableListOf<GroupInfo>()
         try {
             val service = QQServiceHelper.getApi(Class.forName("com.tencent.qqnt.troop.ITroopListRepoApi"))
-            if (service == null) return groupInfoList
+                ?: return groupInfoList
 
+            // 直接强转为 List<TroopInfo>，随后全部直接访问字段/方法
             val troopList = me.lengyu.qedge.utils.ReflectUtils.callMethod(service, "getSortedJoinedTroopInfoFromCache")
-            if (troopList is Iterable<*>) {
-                for (troop in troopList) {
-                    try {
-                        var troopUin = me.lengyu.qedge.utils.ReflectUtils.callMethod(troop, "getTroopUin") as String?
-                        if (troopUin == null) {
-                            troopUin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troop, "troopuin") as String?
-                        }
-                        val troopName = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troop, "troopNameFromNT") as String?
-                            ?: troopUin
-                        val troopOwnerUin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troop, "troopowneruin") as String?
-                        if (troopUin != null) {
-                            groupInfoList.add(GroupInfo(troopUin, troopName ?: troopUin, troopOwnerUin ?: "", troop))
-                        }
-                    } catch (e: Throwable) {
-                        LogUtils.e(e)
-                    }
+                as? List<TroopInfo> ?: return groupInfoList
+
+            for (troop in troopList) {
+                try {
+                    val troopUin = troop.troopuin ?: continue
+                    val troopName = troop.troopNameFromNT ?: troopUin
+                    val troopOwnerUin = troop.troopowneruin ?: ""
+                    groupInfoList.add(GroupInfo(troopUin, troopName, troopOwnerUin, troop))
+                } catch (e: Throwable) {
+                    LogUtils.e(e)
                 }
             }
         } catch (e: Throwable) {
@@ -130,18 +115,14 @@ object TroopTool : DexKitTask {
         return groupInfoList
     }
 
-    fun getGroupInfo(troopUin: String): TroopInfo? {
-        try {
-            val app = QQServiceHelper.getRuntime()
-            if (app == null) return TroopInfo()
-            val service = app.getRuntimeService(ITroopInfoService::class.java, "")
-            if (service != null) {
-                return service.getTroopInfo(troopUin)
-            }
+    fun getGroupInfo(troopUin: String): TroopInfo {
+        return try {
+            val app = QQServiceHelper.getRuntime() ?: return TroopInfo()
+            app.getRuntimeService(ITroopInfoService::class.java, "")?.getTroopInfo(troopUin) ?: TroopInfo()
         } catch (e: Throwable) {
             LogUtils.e(e)
+            TroopInfo()
         }
-        return TroopInfo()
     }
 
     fun shutUpAll(troopUin: String, enable: Boolean) {
@@ -192,15 +173,15 @@ object TroopTool : DexKitTask {
         })
     }
 
-
     fun changeMemberName(troopUin: String, uin: String, name: String) {
-        val cardInfoClass = Class.forName("com.tencent.mobileqq.data.troop.TroopMemberCardInfo")
-        val cardInfo = cardInfoClass.newInstance()
-        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "colorNick", "")
-        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "colorNickId", 0)
-        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "memberuin", uin)
-        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "name", name)
-        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(cardInfo, "troopuin", troopUin)
+        // 直接 new + 直接赋值，不再走反射
+        val cardInfo = TroopMemberCardInfo().apply {
+            colorNick = ""
+            colorNickId = 0
+            memberuin = uin
+            this.name = name
+            this.troopuin = troopUin
+        }
         changeMemberName.invoke(
             QQServiceHelper.getHandler(Class.forName("com.tencent.mobileqq.troop.handler.TroopMemberCardHandler")),
             troopUin, arrayListOf(cardInfo), arrayListOf(1)
@@ -208,32 +189,32 @@ object TroopTool : DexKitTask {
     }
 
     fun isShutUp(troopUin: String): Boolean {
-        val info = getGroupInfo(troopUin) ?: return false
-        val dwGagTimeStamp = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(info, "dwGagTimeStamp") as Long
-        val dwGagTimeStamp_me = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(info, "dwGagTimeStamp_me") as Long
-        return !(dwGagTimeStamp == 0L && dwGagTimeStamp_me == 0L)
+        val info = getGroupInfo(troopUin)
+        return !(info.dwGagTimeStamp == 0L && info.dwGagTimeStamp_me == 0L)
     }
 
-    private fun processMemberInfo(troopMemberInfo: Any): MemberInfo {
-        val troopNick = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "troopnick") as String?
+
+    private fun processMemberInfo(troopMemberInfo: TroopMemberInfo): MemberInfo {
+        val troopNick = troopMemberInfo.troopnick
         val uinName = if (troopNick.isNullOrEmpty()) {
-            me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "friendnick") as String?
+            troopMemberInfo.friendnick
         } else {
             troopNick
         }
-
-        val joinTime = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "join_time") as Long
-        val lastActiveTime = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "last_active_time") as Long
-        val uin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "memberuin") as String? ?: ""
-        val realLevel = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "realLevel") as Int
-        val role = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(troopMemberInfo, "role").toString()
-
-        return MemberInfo(joinTime, lastActiveTime, uin, realLevel, uinName ?: "", role, troopMemberInfo)
+        return MemberInfo(
+            troopMemberInfo.join_time,
+            troopMemberInfo.last_active_time,
+            troopMemberInfo.memberuin ?: "",
+            troopMemberInfo.realLevel,
+            uinName ?: "",
+            troopMemberInfo.role.toString(),
+            troopMemberInfo
+        )
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun getMemberInfoList(troopUin: String): List<Any> {
-        val completableFuture = CompletableFuture<ArrayList<Any>>()
+    private fun getMemberInfoList(troopUin: String): List<TroopMemberInfo> {
+        val completableFuture = CompletableFuture<ArrayList<TroopMemberInfo>>()
         val callback = Proxy.newProxyInstance(
             ClassUtils.hostClassLoader,
             arrayOf(fetchTroopMemberList.parameterTypes[4])
@@ -244,7 +225,7 @@ object TroopTool : DexKitTask {
                     args[1] is ArrayList<*> -> args[1]
                     else -> emptyList<Any>()
                 }
-                completableFuture.complete(list as ArrayList<Any>)
+                completableFuture.complete(list as ArrayList<TroopMemberInfo>)
             }
             0
         }
@@ -256,13 +237,13 @@ object TroopTool : DexKitTask {
     }
 
     fun getMemberInfo(troopUin: String, uin: String): MemberInfo {
-        val completableFuture = CompletableFuture<Any>()
+        val completableFuture = CompletableFuture<TroopMemberInfo>()
         val callback = Proxy.newProxyInstance(
             ClassUtils.hostClassLoader,
             arrayOf(fetchTroopMemberInfo.parameterTypes[5])
         ) { _, method, args ->
-            if (method.returnType == Void.TYPE && method.parameterTypes[0] == Class.forName("com.tencent.mobileqq.data.troop.TroopMemberInfo")) {
-                completableFuture.complete(args[0])
+            if (method.returnType == Void.TYPE && method.parameterTypes[0] == troopMemberInfoClass) {
+                completableFuture.complete(args[0] as TroopMemberInfo)
             }
             0
         }
@@ -270,8 +251,7 @@ object TroopTool : DexKitTask {
             QQServiceHelper.getApi(Class.forName("com.tencent.qqnt.troopmemberlist.ITroopMemberListRepoApi")),
             troopUin, uin, true, null, "", callback
         )
-        val troopMemberInfo = completableFuture.get(5, TimeUnit.SECONDS)
-        return processMemberInfo(troopMemberInfo)
+        return processMemberInfo(completableFuture.get(5, TimeUnit.SECONDS))
     }
 
     fun getGroupMemberList(troopUin: String): List<MemberInfo> {
@@ -289,18 +269,14 @@ object TroopTool : DexKitTask {
     fun getForbidInfo(troopUin: String): List<ForbidInfo> {
         val forbidList = ArrayList<ForbidInfo>()
         try {
-            getMemberInfoList(troopUin).forEach {
-                val gagTime = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "gagTimeStamp") as Long
-                val troopNick = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "troopnick") as String?
-                val time = gagTime - System.currentTimeMillis() / 1000
-                val userName = if (troopNick.isNullOrEmpty()) {
-                    me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "friendnick") as String?
-                } else {
-                    troopNick
-                }
+            val now = System.currentTimeMillis() / 1000
+            getMemberInfoList(troopUin).forEach { member ->
+                // gagTimeStamp 是 int，直接访问并转 Long
+                val time = member.gagTimeStamp.toLong() - now
                 if (time > 0) {
-                    val uin = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(it, "memberuin") as String? ?: ""
-                    forbidList.add(ForbidInfo(uin, userName ?: "", time))
+                    val troopNick = member.troopnick
+                    val userName = if (troopNick.isNullOrEmpty()) member.friendnick else troopNick
+                    forbidList.add(ForbidInfo(member.memberuin ?: "", userName ?: "", time))
                 }
             }
         } catch (e: Throwable) {

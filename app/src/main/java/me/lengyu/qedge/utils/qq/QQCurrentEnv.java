@@ -15,7 +15,9 @@ import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import mqq.app.MobileQQ;
-import com.tencent.qqnt.kernel.nativeinterface.IKernelMsgService;
+import com.tencent.qqnt.kernel.api.impl.MsgService;
+import com.tencent.qqnt.kernel.api.impl.KernelServiceImpl;
+
    
 
 public class QQCurrentEnv {
@@ -24,7 +26,7 @@ public class QQCurrentEnv {
     public static String currentUid;
     public static String currentNickname;
 
-    public static Object kernelMsgService;
+    public static MsgService kernelMsgService;
     public static QQAppInterface qqAppInterface;
 
     public static QQAppInterface getQQAppInterface() {
@@ -85,32 +87,28 @@ public class QQCurrentEnv {
         return null;
     }
 
-    public static Object getKernelMsgService() {
+    public static MsgService getKernelMsgService() {
         if (kernelMsgService != null) {
             return kernelMsgService;
         }
         try {
-            Object appRuntime = getAppRuntime();
-            if (appRuntime != null) {
-                Class<?> iKernelServiceClass = Class.forName("com.tencent.qqnt.kernel.api.IKernelService");
-                Object kernelService = ReflectUtils.callMethod(appRuntime, "getRuntimeService", iKernelServiceClass, "");
-                if (kernelService != null) {
-                    Object msgServiceField = ReflectUtils.getFieldValue(kernelService, "msgService");
-                    if (msgServiceField != null) {
-                        Object msgService = ReflectUtils.callMethod(msgServiceField, "getValue");
-                        if (msgService != null) {
-                            kernelMsgService = msgService;
-                            return kernelMsgService;
-                        }
-                    }
-                }
+            QQAppInterface appInterface = getQQAppInterface();
+            if (appInterface == null) {
+                return null;
             }
-            return null;
+            // 从运行时取 QQ 已创建的内核服务，不是 new
+            KernelServiceImpl kernelService = (KernelServiceImpl)
+            appInterface.getRuntimeService(IKernelService.class, "");
+            kernelMsgService = kernelService.getMsgService(); // 或 kernelService.msgService.getValue()
+
+            // kernelMsgService = kernelService.getMsgService();
+            return kernelMsgService;
         } catch (Throwable e) {
             LogUtils.e("QQCurrentEnv", "[getKernelMsgService] error: " + e.getMessage());
             return null;
         }
     }
+
 
     public static Activity getActivity() {
         try {
@@ -135,6 +133,8 @@ public class QQCurrentEnv {
         }
         return null;
     }
+
+    
 
     public static String getCurrentUin() {
         if (currentUin != null) {

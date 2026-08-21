@@ -18,7 +18,7 @@ import com.tencent.mobileqq.paiyipai.PaiYiPaiHandler;
 import com.tencent.mobileqq.app.CardHandler;
 import com.tencent.mobileqq.qroute.QRoute;
 import com.tencent.mobileqq.ptt.impl.QQRecorderUtilsImpl;
-
+import com.tencent.qqnt.kernel.nativeinterface.IForwardOperateCallback;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
@@ -27,9 +27,9 @@ import kotlin.math.MathKt;
 
 public class MsgTool {
 
-    private static MsgUtilApiImpl msgUtilApiImpl;
+    public static MsgUtilApiImpl msgUtilApiImpl;
 
-    private static MsgUtilApiImpl getMsgUtilApi() {
+    public static MsgUtilApiImpl getMsgUtilApi() {
         if (msgUtilApiImpl == null) {
             try {
                 msgUtilApiImpl = new MsgUtilApiImpl();
@@ -40,7 +40,7 @@ public class MsgTool {
         return msgUtilApiImpl;
     }
 
-    private static Method sendPaiMethod;
+    public static Method sendPaiMethod;
 
     static {
         try {
@@ -76,7 +76,7 @@ public class MsgTool {
         sendMsgInternal(makeContact(peerUin, chatType), elements);
     }
 
-    private static void sendMsgInternal(Contact contact, ArrayList<MsgElement> elements) {
+    public static void sendMsgInternal(Contact contact, ArrayList<MsgElement> elements) {
         if (elements == null || elements.isEmpty()) {
             return;
         }
@@ -105,7 +105,42 @@ public class MsgTool {
         }
     }
 
-    private static Object getMsgServiceViaReflection() {
+    public static void forwardMsg(Contact contact, ArrayList<MsgElement> elements) {
+        if (elements == null || elements.isEmpty()) {
+            return;
+        }
+        try {
+            Object msgService = getMsgServiceViaReflection();
+            if (msgService == null) {
+                throw new RuntimeException("未获取到msgService");
+            }
+
+            long msgId = generateMsgUniqueId(msgService, contact.chatType);
+
+            java.util.ArrayList<Long> forwardIds = new java.util.ArrayList<Long>();
+            forwardIds.add(msgId);
+
+            java.util.ArrayList<Contact> contacts = new java.util.ArrayList<Contact>();
+            contacts.add(contact);
+            
+            Method forwardMsgMethod = ReflectUtils.findMethod(msgService.getClass(), "forwardMsg", 5);
+            if (forwardMsgMethod != null) {
+                forwardMsgMethod.invoke(msgService, forwardIds, contact, contacts, elements, new IForwardOperateCallback() {
+                    @Override
+                    public void onResult(int i, String str, HashMap<Long, Integer> hashMap) {
+                        LogUtils.d("MsgTool", "[forwardMsg] onResult: " + i + ", " + str + ", " + hashMap);
+                    }
+                });
+            } else {
+                LogUtils.e("MsgTool", "[forwardMsg] forwardMsg method not found");
+            }
+        } catch (Throwable e) {
+            LogUtils.e("MsgTool", "[forwardMsg] error: " + e.getMessage());
+        }
+    }
+
+
+     public static Object getMsgServiceViaReflection() {
         try {
             Object appInterface = QQCurrentEnv.getQQAppInterface();
             if (appInterface == null) {
@@ -128,7 +163,7 @@ public class MsgTool {
         }
     }
 
-    private static long generateMsgUniqueId(Object msgService, int chatType) {
+     public static long generateMsgUniqueId(Object msgService, int chatType) {
         try {
             Method generateMethod = ReflectUtils.findMethod(msgService.getClass(), "generateMsgUniqueId", 1);
             if (generateMethod != null) {
@@ -210,11 +245,11 @@ public class MsgTool {
         sendReplyMsg(makeContact(peerUin, chatType), replyMsgId, msg);
     }
 
-    private static void sendMsgByType(String peerUin, int chatType, String value, String type) {
+     public static void sendMsgByType(String peerUin, int chatType, String value, String type) {
         sendMsgByType(makeContact(peerUin, chatType), value, type);
     }
 
-    private static void sendMsgByType(Contact contact, String value, String type) {
+     public static void sendMsgByType(Contact contact, String value, String type) {
         try {
             MsgUtilApiImpl msgUtilApiImpl = getMsgUtilApi();
             if (msgUtilApiImpl == null) {
@@ -337,7 +372,7 @@ public class MsgTool {
         }
     }
 
-    private static String handlePicPath(String path) {
+     public static String handlePicPath(String path) {
         if (path.startsWith("http")) {
             String savePath = QQCurrentEnv.getCurrentDir() + "cache/images/" ;
 
@@ -351,7 +386,7 @@ public class MsgTool {
         return new File(path).exists() ? path : null;
     }
 
-     private static String handlePttPath(String path) {
+     public static String handlePttPath(String path) {
         if (path.startsWith("http")) {
             String savePath = QQCurrentEnv.getCurrentDir() + "cache/ptt/" ;
 
@@ -365,7 +400,7 @@ public class MsgTool {
         return new File(path).exists() ? path : null;
     }
 
-    private static String handleVideoPath(String path) {
+     public static String handleVideoPath(String path) {
         if (path.startsWith("http")) {
             String savePath = QQCurrentEnv.getCurrentDir() + "cache/video/" ;
 
@@ -379,7 +414,7 @@ public class MsgTool {
         return new File(path).exists() ? path : null;
     }
 
-    private static String handleFilePath(String path) {
+     public static String handleFilePath(String path) {
         if (path.startsWith("http")) {
             String savePath = QQCurrentEnv.getCurrentDir() + "cache/file/" ;
 
@@ -438,7 +473,7 @@ public class MsgTool {
         return elements;
     }
 
-    private static List<Pair<String, String>> processMessageParts(String input) {
+     public static List<Pair<String, String>> processMessageParts(String input) {
         List<Pair<String, String>> result = new ArrayList<>();
         int lastEnd = 0;
 

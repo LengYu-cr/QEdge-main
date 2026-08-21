@@ -16,6 +16,7 @@ import com.tencent.util.QQToastUtil;
 
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
+import me.lengyu.qedge.utils.HostInfo;
 
 public class Toasts {
 
@@ -62,13 +63,17 @@ public class Toasts {
             Context context = getContext();
             if (context == null) return;
 
+            boolean isDark = HostInfo.isDarkTheme();
+
             GradientDrawable bg = new GradientDrawable();
-            bg.setColor(Color.argb(180, 255, 255, 255));
+            bg.setColor(isDark
+                    ? Color.argb(180, 40, 40, 42)
+                    : Color.argb(180, 255, 255, 255));
             bg.setCornerRadius(24f);
 
             TextView textView = new TextView(context);
             textView.setText(message);
-            textView.setTextColor(Color.BLACK);
+            textView.setTextColor(isDark ? Color.WHITE : Color.BLACK);
             textView.setTextSize(14f);
             textView.setPadding(40, 24, 40, 24);
             textView.setBackground(bg);

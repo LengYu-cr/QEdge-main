@@ -2,8 +2,6 @@ package me.lengyu.qedge.utils;
 
 import android.util.Log;
 
-import me.lengyu.qedge.utils.qq.QQCurrentEnv;
-
 import java.io.File;
 import java.io.FileWriter;
 import java.io.PrintWriter;
@@ -20,7 +18,7 @@ public class LogUtils {
     private static final Object LOCK = new Object();
 
     private static File getLogFile() {
-        File dir = new File(QQCurrentEnv.getCurrentDir(), "log");
+        File dir = new File(HostInfo.getModuleDataPath(), "log");
         if (!dir.exists()) dir.mkdirs();
         return new File(dir, DATE_FMT.format(new Date()) + ".log");
     }

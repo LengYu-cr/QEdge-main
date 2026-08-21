@@ -42,6 +42,7 @@ import me.lengyu.qedge.hook.item.RemoveLinkInfo;
 import me.lengyu.qedge.hook.item.PreventRecall;
 import me.lengyu.qedge.hook.item.CopyArkMessage;
 import me.lengyu.qedge.hook.item.LongClickSendCard;
+import me.lengyu.qedge.hook.item.RepeatMsg;
 
 import java.util.List;
 
@@ -74,10 +75,12 @@ public class MainHook {
         HookRegistry.register(new PreventRecall());
         HookRegistry.register(new CopyArkMessage());
         HookRegistry.register(new LongClickSendCard());
+        HookRegistry.register(new RepeatMsg());
     }
 
     private static long lastPluginLoadTime = 0;
     private static final long PLUGIN_LOAD_INTERVAL = 10000;
+    private static final long HOOK_STAGGER_DELAY_MS = 200;
 
     public static void loadHook() {
         if (initialized) return;
@@ -104,6 +107,7 @@ public class MainHook {
             LogUtils.e("MainHook", "FromServiceMsgDispatcher.loadHook failed: " + e.getMessage());
         }
 
+        // 错峰加载：每个 Hook 间隔 200ms 在 IO 线程执行，避免集中阻塞主线程
         loadApiHook();
         initSwitchHookItem();
 
@@ -113,13 +117,17 @@ public class MainHook {
             LogUtils.e("MainHook", "hookAccountChange failed: " + e.getMessage());
         }
 
-        try {
-            ChatSettingLoader.loadHook();
-        } catch (Throwable e) {
-            LogUtils.e("MainHook", "Failed to load ChatSettingLoader: " + e.getMessage());
-        }
+        // ChatSettingLoader 等基础 Hook 加载完后再执行
+        ModuleScope.launchDelayedIO("ChatSettingLoader", 3000, () -> {
+            try {
+                ChatSettingLoader.loadHook();
+            } catch (Throwable e) {
+                LogUtils.e("MainHook", "Failed to load ChatSettingLoader: " + e.getMessage());
+            }
+        });
 
-        ModuleScope.launchDelayedIO("Plugin-AutoLoad", 2000, () -> {
+        // 插件和冷雨在所有 Hook 加载完成后执行
+        ModuleScope.launchDelayedIO("Plugin-AutoLoad", 5000, () -> {
             try {
                 loadPluginsIfNeeded();
             } catch (Throwable e) {
@@ -145,22 +153,28 @@ public class MainHook {
 
     private static void loadApiHook() {
         List<BaseApiHookItem> apiHookItemList = HookRegistry.getHookItemsByClass(BaseApiHookItem.class);
-        for (BaseApiHookItem item : apiHookItemList) {
-            try {
-                if (item.isInTargetProcess() && !item.isHookLoaded()) {
-                    item.loadHook();
-                    item.setHookLoaded(true);
+        for (int i = 0; i < apiHookItemList.size(); i++) {
+            final BaseApiHookItem item = apiHookItemList.get(i);
+            final long delay = i * HOOK_STAGGER_DELAY_MS;
+            ModuleScope.launchDelayedIO("ApiHook", delay, () -> {
+                try {
+                    if (item.isInTargetProcess() && !item.isHookLoaded()) {
+                        item.loadHook();
+                        item.setHookLoaded(true);
+                    }
+                } catch (Throwable t) {
+                    LogUtils.e(item.getClass().getSimpleName(), t);
                 }
-            } catch (Throwable t) {
-                LogUtils.e(item.getClass().getSimpleName(), t);
-            }
+            });
         }
     }
 
     private static void initSwitchHookItem() {
         List<BaseSwitchHookItem> switchHookItemList = HookRegistry.getHookItemsByClass(BaseSwitchHookItem.class);
-        for (BaseSwitchHookItem item : switchHookItemList) {
-            item.init();
+        for (int i = 0; i < switchHookItemList.size(); i++) {
+            final BaseSwitchHookItem item = switchHookItemList.get(i);
+            final long delay = i * HOOK_STAGGER_DELAY_MS;
+            ModuleScope.launchDelayedIO("SwitchHook", delay, () -> item.init());
         }
     }
 

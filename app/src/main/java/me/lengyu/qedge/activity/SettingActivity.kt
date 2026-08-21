@@ -51,6 +51,7 @@ import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.services.OnlinePluginService
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.LogUtils
+import me.lengyu.qedge.utils.HostInfo
 import java.io.File
 import java.lang.reflect.Method
 

@@ -2,7 +2,6 @@ package me.lengyu.qedge.ui.core.theme
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -11,6 +10,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
+import me.lengyu.qedge.utils.HostInfo
 
 private val LightColorScheme = lightColorScheme(
     primary = AccentBlue, onPrimary = Color.White,
@@ -62,7 +62,7 @@ val LocalQEdgeColors = staticCompositionLocalOf {
 }
 
 @Composable
-fun QEdgeTheme(darkTheme: Boolean = isSystemInDarkTheme(), content: @Composable () -> Unit) {
+fun QEdgeTheme(darkTheme: Boolean = HostInfo.isDarkTheme(), content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     @Composable

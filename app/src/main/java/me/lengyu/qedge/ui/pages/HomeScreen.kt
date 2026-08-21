@@ -77,6 +77,16 @@ import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.hook.item.KeepAliveHook
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box as ComposeBox
+import androidx.compose.foundation.Image
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import androidx.compose.material3.CircularProgressIndicator
+import android.graphics.BitmapFactory
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.URL
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -116,6 +126,7 @@ fun HomeScreen(
     var preventRecall by remember { mutableStateOf(ModuleConfig.getBoolean("prevent_recall", false)) }
     var copyArkMessage by remember { mutableStateOf(ModuleConfig.getBoolean("copy_ark_message", false)) }
     var longClickSendCard by remember { mutableStateOf(ModuleConfig.getBoolean("long_click_send_card", false)) }
+    var repeatMsg by remember { mutableStateOf(ModuleConfig.getBoolean("repeat_msg", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_CHECKIN_ENABLED, false)) }
@@ -129,6 +140,7 @@ fun HomeScreen(
     var showCommentDialog by remember { mutableStateOf(false) }
     var showMoodConfigDialog by remember { mutableStateOf(false) }
     var showUpdateLogDialog by remember { mutableStateOf(false) }
+    var showSponsorDialog by remember { mutableStateOf(false) }
     var keepAlivePixel by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_PIXEL, false)) }
     var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
     var keepAliveBackground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_BACKGROUND, false)) }
@@ -226,6 +238,8 @@ fun HomeScreen(
                 onDocClick = onDocClick,
                 showUpdateLogButton = true,
                 onUpdateLogClick = { showUpdateLogDialog = true },
+                showSponsorButton = true,
+                onSponsorClick = { showSponsorDialog = true },
                 actions = {}
             )
 
@@ -281,6 +295,7 @@ fun HomeScreen(
                             preventRecall = preventRecall,
                             copyArkMessage = copyArkMessage,
                             longClickSendCard = longClickSendCard,
+                            repeatMsg = repeatMsg,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
                             dailySignEnabled = dailySignEnabled,
                             bigVipCheckinEnabled = bigVipCheckinEnabled,
@@ -339,6 +354,10 @@ fun HomeScreen(
                             onLongClickSendCardToggle = {
                                 longClickSendCard = it
                                 Thread { ModuleConfig.putBoolean("long_click_send_card", it) }.start()
+                            },
+                            onRepeatMsgToggle = {
+                                repeatMsg = it
+                                Thread { ModuleConfig.putBoolean("repeat_msg", it) }.start()
                             },
                             onTimArkCardBypassToggle = {
                                 timArkCardBypass = it
@@ -452,6 +471,11 @@ fun HomeScreen(
             show = showUpdateLogDialog,
             onDismiss = { showUpdateLogDialog = false }
         )
+
+        SponsorDialog(
+            show = showSponsorDialog,
+            onDismiss = { showSponsorDialog = false }
+        )
     }
 }
 
@@ -496,6 +520,7 @@ data class HomePageState(
     val preventRecall: Boolean,
     val copyArkMessage: Boolean,
     val longClickSendCard: Boolean,
+    val repeatMsg: Boolean,
     val qzoneCheckinEnabled: Boolean,
     val dailySignEnabled: Boolean,
     val bigVipCheckinEnabled: Boolean,
@@ -525,6 +550,7 @@ class HomePageCallbacks(
     val onPreventRecallToggle: (Boolean) -> Unit,
     val onCopyArkMessageToggle: (Boolean) -> Unit,
     val onLongClickSendCardToggle: (Boolean) -> Unit,
+    val onRepeatMsgToggle: (Boolean) -> Unit,
     val onCheckinToggle: (Boolean) -> Unit,
     val onDailySignToggle: (Boolean) -> Unit,
     val onBigVipCheckinToggle: (Boolean) -> Unit,
@@ -694,6 +720,15 @@ private fun HomePage(
                     subtitle = "长按发送按钮将输入框内JSON作为卡片消息发送",
                     checked = state.longClickSendCard,
                     onCheckedChange = callbacks.onLongClickSendCardToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "消息复读",
+                    subtitle = "在消息旁显示复读按钮，点击快速复读消息",
+                    checked = state.repeatMsg,
+                    onCheckedChange = callbacks.onRepeatMsgToggle
                 )
 
                 if (HostInfo.isTIM) {
@@ -1490,5 +1525,105 @@ private fun PluginCardActions(onDelete: () -> Unit, onReload: () -> Unit, onUplo
         ActionButton("重载", onReload, style = me.lengyu.qedge.ui.components.atoms.ActionButtonStyle.Primary)
         Spacer(modifier = Modifier.width(Dimens.PaddingSmall))
         ActionButton("上传", onUpload, style = me.lengyu.qedge.ui.components.atoms.ActionButtonStyle.Success)
+    }
+}
+
+@Composable
+private fun SponsorDialog(show: Boolean, onDismiss: () -> Unit) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    var isLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            try {
+                val url = URL("https://cdn.yuafeng.cn/ly/wx.png")
+                val connection = url.openConnection()
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                bitmap = BitmapFactory.decodeStream(connection.getInputStream())
+            } catch (_: Throwable) {
+            } finally {
+                isLoading = false
+            }
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.85f)
+                .clip(RoundedCornerShape(24.dp))
+                .background(colors.cardBackground)
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                "赞助作者",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Text(
+                "感谢你的支持！",
+                fontSize = 14.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            if (isLoading) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(48.dp),
+                    color = AccentBlue
+                )
+            } else if (bitmap != null) {
+                Image(
+                    bitmap = bitmap!!.asImageBitmap(),
+                    contentDescription = "微信赞赏码",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                )
+            } else {
+                Text(
+                    "加载失败",
+                    fontSize = 14.sp,
+                    color = colors.textSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(colors.accentBlue)
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onDismiss
+                    )
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    "关闭",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color.White
+                )
+            }
+        }
     }
 }
