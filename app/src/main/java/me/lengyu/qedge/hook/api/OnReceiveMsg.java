@@ -137,7 +137,10 @@ public class OnReceiveMsg extends BaseApiHookItem<OnReceiveMsg.ReceiveMsgListene
                 return null;
             }
 
-            System.loadLibrary("dexkit");
+            if (!me.lengyu.qedge.utils.dexkit.DexKitManager.ensureLibrary()) {
+                LogUtils.w("OnReceiveMsg", "dexkit lib unavailable, skip DexKit");
+                return null;
+            }
 
             try (DexKitBridge bridge = DexKitBridge.create(sourceDir)) {
                 if (bridge == null) {
@@ -161,6 +164,8 @@ public class OnReceiveMsg extends BaseApiHookItem<OnReceiveMsg.ReceiveMsgListene
                     ClassData classData = result.get(0);
                     String descriptor = classData.getDescriptor();
                     DexKitCache.put(CACHE_KEY, descriptor);
+                    // 落盘，避免每次启动都重新全量扫描（此前每次耗时 5~6 秒）
+                    DexKitCache.saveCache();
 
                     Class<?> clazz = new DexClass(descriptor).getInstance(classLoader);
                     return clazz;

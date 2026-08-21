@@ -43,7 +43,9 @@ object DexKitFinder {
 
     @JvmStatic
     fun doFind() {
-        System.loadLibrary("dexkit")
+        // System.loadLibrary 是同步的原生加载，放到主线程会阻塞宿主启动。
+        // dexkit so 只在 startFind() 的 IO 协程里才真正用到（DexKitBridge.create），
+        // 因此这里不再预加载，改由 startFind() 在后台线程按需加载。
         me.lengyu.qedge.hook.MainHook.registerHookItems()
         showFindDialog()
     }
@@ -100,6 +102,15 @@ object DexKitFinder {
 
     private fun startFind() {
         ModuleScope.launchIO(TAG) {
+            // 在后台线程加载 dexkit so，避免阻塞宿主主线程启动。
+            // 通过 DexKitManager 兜底：寄生 ClassLoader 下 loadLibrary 会失败，需绝对路径加载。
+            if (!DexKitManager.ensureLibrary()) {
+                LogUtils.e(TAG, "dexkit lib unavailable, abort find")
+                progressText = "libdexkit.so 加载失败"
+                Handler(Looper.getMainLooper()).post { dialogRef?.dismiss() }
+                return@launchIO
+            }
+
             val tasks = HookRegistry.getHookItems().filterIsInstance<DexKitTask>().toMutableList().apply {
                 add(TroopTool)
                 add(QZoneLikeTool)

@@ -30,6 +30,7 @@ public class MessageTool {
     public static void init(String sourceDir, ClassLoader classLoader) {
         if (inited) return;
         try {
+            if (!me.lengyu.qedge.utils.dexkit.DexKitManager.ensureLibrary()) return;
             DexKitBridge bridge = DexKitBridge.create(sourceDir);
             if (bridge == null) return;
 

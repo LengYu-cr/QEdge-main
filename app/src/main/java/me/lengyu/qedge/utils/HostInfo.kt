@@ -43,6 +43,10 @@ object HostInfo {
     @JvmField
     var versionName: String = ""
 
+    /** 模块自身 APK 的 native 库目录，用于用绝对路径加载 so（寄生 ClassLoader 下无法 loadLibrary）。 */
+    @JvmField
+    var moduleNativeLibraryDir: String = ""
+
     @JvmStatic
     fun init(context: Context) {
         _hostContext = context
@@ -66,6 +70,10 @@ object HostInfo {
                 else
                     moduleInfo.versionCode.toLong()
             moduleVersionName = moduleInfo.versionName.orEmpty()
+
+            // 记录模块 APK 的 native 库目录，供 DexKitManager 用绝对路径加载 libdexkit.so
+            moduleNativeLibraryDir =
+                pm.getApplicationInfo("me.lengyu.qedge", 0).nativeLibraryDir.orEmpty()
         }
 
         val externalDir = context.getExternalFilesDir(null)?.parentFile

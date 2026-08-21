@@ -74,8 +74,7 @@ object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListe
         // 2. 实时 DexKit 扫 APK: 直接用字符串 updateTimArkClickWhiteList 定位类
         try {
             val sourceDir = HostInfo.getHostContext()?.applicationInfo?.sourceDir
-            if (sourceDir != null) {
-                try { System.loadLibrary("dexkit") } catch (_: Throwable) { }
+            if (sourceDir != null && me.lengyu.qedge.utils.dexkit.DexKitManager.ensureLibrary()) {
                 val bridge = DexKitBridge.create(sourceDir)
                     try {
                         val hits = bridge.findClass(FindClass().apply {

@@ -571,14 +571,16 @@ private fun HomePage(
 ) {
     val colors = QEdgeTheme.colors
 
-    Column(
+    // 用 LazyColumn 替代 Column(verticalScroll)：首帧只组合可见的卡片，
+    // 屏幕外的卡片滚动到才构建，避免首次进入时一次性布局全部卡片导致的卡顿。
+    LazyColumn(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 16.dp)
-            .padding(bottom = 24.dp),
+            .padding(horizontal = 16.dp),
+        contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item(key = "card_qzone") {
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -630,7 +632,9 @@ private fun HomePage(
 
             }
         }
+        }
 
+        item(key = "card_chat") {
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -798,7 +802,9 @@ private fun HomePage(
                 }
             }
         }
+        }
 
+        item(key = "card_profile") {
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -835,7 +841,9 @@ private fun HomePage(
                 )
             }
         }
+        }
 
+        item(key = "card_level") {
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -899,7 +907,9 @@ private fun HomePage(
                 )
             }
         }
+        }
 
+        item(key = "card_keepalive") {
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 Text(
@@ -959,6 +969,7 @@ private fun HomePage(
                     QEdgeSwitch(checked = state.keepAliveBackground, onCheckedChange = callbacks.onKeepAliveBackgroundToggle)
                 }
             }
+        }
         }
     }
 }

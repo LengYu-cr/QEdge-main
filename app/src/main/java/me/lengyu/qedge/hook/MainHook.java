@@ -80,7 +80,9 @@ public class MainHook {
 
     private static long lastPluginLoadTime = 0;
     private static final long PLUGIN_LOAD_INTERVAL = 10000;
-    private static final long HOOK_STAGGER_DELAY_MS = 200;
+    // 错峰延迟：配合受限并发调度器（最多 2 并发）+ 配置内存缓存后，单个 init 已很轻，
+    // 无需靠大延迟摊平，缩短到 20ms 只为避免瞬时全部提交。
+    private static final long HOOK_STAGGER_DELAY_MS = 20;
 
     public static void loadHook() {
         if (initialized) return;
@@ -107,7 +109,7 @@ public class MainHook {
             LogUtils.e("MainHook", "FromServiceMsgDispatcher.loadHook failed: " + e.getMessage());
         }
 
-        // 错峰加载：每个 Hook 间隔 200ms 在 IO 线程执行，避免集中阻塞主线程
+        // 错峰加载：每个 Hook 在受限并发调度器上执行，避免集中阻塞主线程
         loadApiHook();
         initSwitchHookItem();
 
@@ -156,7 +158,7 @@ public class MainHook {
         for (int i = 0; i < apiHookItemList.size(); i++) {
             final BaseApiHookItem item = apiHookItemList.get(i);
             final long delay = i * HOOK_STAGGER_DELAY_MS;
-            ModuleScope.launchDelayedIO("ApiHook", delay, () -> {
+            ModuleScope.launchDelayedHook("ApiHook", delay, () -> {
                 try {
                     if (item.isInTargetProcess() && !item.isHookLoaded()) {
                         item.loadHook();
@@ -174,7 +176,7 @@ public class MainHook {
         for (int i = 0; i < switchHookItemList.size(); i++) {
             final BaseSwitchHookItem item = switchHookItemList.get(i);
             final long delay = i * HOOK_STAGGER_DELAY_MS;
-            ModuleScope.launchDelayedIO("SwitchHook", delay, () -> item.init());
+            ModuleScope.launchDelayedHook("SwitchHook", delay, () -> item.init());
         }
     }
 

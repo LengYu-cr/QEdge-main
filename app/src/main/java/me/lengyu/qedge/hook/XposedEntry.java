@@ -139,7 +139,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
                             Parasitics.initForStubActivity(hostContext);
-                            
+
                             boolean cacheValid = DexKitCache.initCache();
                             if (cacheValid && DexKitCache.validateAllTasks()) {
                                 MainHook.loadHook();
