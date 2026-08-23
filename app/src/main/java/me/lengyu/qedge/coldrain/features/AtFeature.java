@@ -30,7 +30,7 @@ public class AtFeature implements ColdRainFeature {
         
         // 被艾特时触发
         String qq = ColdRainCore.getInstance().getMyUin();
-        if (msgData.atList != null && msgData.atList.contains(qq)) {
+        if (msgData.atList != null && msgData.atList.contains(qq) && msgData.type == 2) {
             return true;
         }
         
@@ -204,7 +204,10 @@ public class AtFeature implements ColdRainFeature {
                     }
 
                     // ========== 被艾特时的处理 ==========
-                    if (msgData.atList != null && msgData.atList.contains(qq)) {
+                    // 被艾特触发的自动行为(回复/禁言/提醒/管家禁言)仅在已开机的群生效；
+                    // 上方的管理员指令与「艾特处理」菜单不受此限制。
+                    boolean groupEnabled = msgData.type != 2 || core.isGroupMasterEnabled(qun);
+                    if (groupEnabled && msgData.atList != null && msgData.atList.contains(qq)) {
                         // 艾特回复
                         if ("1".equals(core.getConfigString("global_艾特回复_开关", "0"))) {
                             String replyContent = core.getConfigString("global_艾特回复_内容", "");
@@ -241,7 +244,7 @@ public class AtFeature implements ColdRainFeature {
                     }
 
                     // ========== 艾特管家禁言 ==========
-                    if ("1".equals(core.getConfigString("global_艾特管家禁言_开关", "0"))) {
+                    if (groupEnabled && "1".equals(core.getConfigString("global_艾特管家禁言_开关", "0"))) {
                         if (uin.equals("2854196310") && text.endsWith("嗨~，我是Q群管家，可以发送入群欢迎和定时消息，暂时还不能和你对话哦。")) {
                             if (msgData.atList != null && !msgData.atList.isEmpty()) {
                                 String atUin = msgData.atList.get(0);

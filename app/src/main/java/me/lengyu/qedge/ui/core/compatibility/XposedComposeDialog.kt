@@ -80,6 +80,9 @@ abstract class XposedComposeDialog(
             setDimAmount(0.5f)
             setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
             clearFlags(WindowManager.LayoutParams.FLAG_ALT_FOCUSABLE_IM)
+            // 状态栏/导航栏透明，避免窗口默认系统栏底色在状态栏处出现暗线
+            statusBarColor = Color.TRANSPARENT
+            navigationBarColor = Color.TRANSPARENT
         }
     }
 

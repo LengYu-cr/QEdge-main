@@ -15,15 +15,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
@@ -38,12 +40,29 @@ import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.ui.core.compatibility.XposedComposeDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 
-class TextDialog(
+/**
+ * 一个操作项：显示标题、可选副标题，点击回调。
+ */
+data class RepeatMsgAction(
+    val title: String,
+    val subtitle: String? = null,
+    val onClick: () -> Unit
+)
+
+/**
+ * 消息复读长按后弹出的操作列表弹窗（Compose，运行在宿主 QQ 进程）。
+ * 通过传入的 actions 动态渲染，调用方按 picList/videoList/pttList 决定包含哪些项。
+ *
+ * 注意：操作项的 onClick 会在本弹窗完全关闭之后再执行（通过 pendingAction 延后），
+ * 避免"旧弹窗还未 dismiss 就 show 新弹窗"造成的 window token 冲突导致闪退。
+ */
+class RepeatMsgActionDialog(
     context: Context,
     private val title: String,
-    private val message: String,
-    private val buttonText: String = "我知道了"
+    private val actions: List<RepeatMsgAction>
 ) : XposedComposeDialog(context) {
+
+    private val handler = android.os.Handler(context.mainLooper)
 
     override fun configureWindow() {
         super.configureWindow()
@@ -51,32 +70,42 @@ class TextDialog(
             setGravity(Gravity.CENTER)
             setLayout(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT)
             setBackgroundDrawable(android.graphics.drawable.ColorDrawable(android.graphics.Color.TRANSPARENT))
-            // 不使用暗色遮罩背景
+            // 不使用暗色遮罩背景（状态栏透明由基类统一处理）
             setDimAmount(0f)
         }
+    }
+
+    /**
+     * 关闭本弹窗，并在其完全 dismiss 之后再执行操作。
+     * dismissWithAnimation 有约 200ms 的关闭动画，这里延迟 260ms 再执行，
+     * 确保旧弹窗 window 已分离，避免 show 新弹窗时的 token 冲突闪退。
+     */
+    private fun dismissThen(action: () -> Unit) {
+        dismissWithAnimation()
+        handler.postDelayed({ runCatching { action() } }, 260)
     }
 
     @Composable
     override fun DialogContent() {
         QEdgeTheme {
-            TextDialogContent(
+            RepeatMsgActionContent(
                 visible = isVisible,
                 title = title,
-                message = message,
-                buttonText = buttonText,
-                onDismiss = ::dismissWithAnimation
+                actions = actions,
+                onDismiss = ::dismissWithAnimation,
+                onActionClick = { action -> dismissThen(action) }
             )
         }
     }
 }
 
 @Composable
-private fun TextDialogContent(
+private fun RepeatMsgActionContent(
     visible: Boolean,
     title: String,
-    message: String,
-    buttonText: String,
-    onDismiss: () -> Unit
+    actions: List<RepeatMsgAction>,
+    onDismiss: () -> Unit,
+    onActionClick: (() -> Unit) -> Unit
 ) {
     val colors = QEdgeTheme.colors
 
@@ -102,10 +131,10 @@ private fun TextDialogContent(
             ) {
                 Column(
                     modifier = Modifier
-                        .fillMaxWidth(0.88f)
+                        .fillMaxWidth(0.86f)
                         .clip(RoundedCornerShape(24.dp))
                         .background(colors.cardBackground)
-                        .padding(vertical = 24.dp)
+                        .padding(vertical = 20.dp)
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null
@@ -113,7 +142,7 @@ private fun TextDialogContent(
                 ) {
                     Text(
                         text = title,
-                        fontSize = 20.sp,
+                        fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = colors.textPrimary,
                         textAlign = TextAlign.Center,
@@ -122,21 +151,34 @@ private fun TextDialogContent(
                             .padding(horizontal = 24.dp)
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                    Text(
-                        text = message,
-                        fontSize = 14.sp,
-                        color = colors.textSecondary,
-                        lineHeight = 20.sp,
+                    LazyColumn(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .heightIn(max = 420.dp)
-                            .verticalScroll(rememberScrollState())
-                            .padding(horizontal = 24.dp)
-                    )
+                            .heightIn(max = 360.dp)
+                    ) {
+                        itemsIndexed(actions) { index, action ->
+                            if (index > 0) {
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(horizontal = 20.dp),
+                                    thickness = 0.5.dp,
+                                    color = colors.textSecondary.copy(alpha = 0.15f)
+                                )
+                            }
+                            ActionRow(
+                                action = action,
+                                titleColor = colors.textPrimary,
+                                subtitleColor = colors.textSecondary,
+                                onClick = {
+                                    // 关闭当前弹窗后再执行操作，避免弹窗叠弹窗导致闪退
+                                    onActionClick(action.onClick)
+                                }
+                            )
+                        }
+                    }
 
-                    Spacer(modifier = Modifier.height(24.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Box(
                         modifier = Modifier
@@ -149,17 +191,51 @@ private fun TextDialogContent(
                                 indication = null,
                                 onClick = onDismiss
                             )
-                            .padding(vertical = 14.dp),
+                            .padding(vertical = 13.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = buttonText,
+                            text = "取消",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Medium,
                             color = Color.White
                         )
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActionRow(
+    action: RepeatMsgAction,
+    titleColor: Color,
+    subtitleColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp, vertical = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.Start
+    ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = action.title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = titleColor
+            )
+            if (!action.subtitle.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = action.subtitle,
+                    fontSize = 12.sp,
+                    color = subtitleColor
+                )
             }
         }
     }

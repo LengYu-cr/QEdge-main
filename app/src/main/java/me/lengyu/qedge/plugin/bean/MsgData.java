@@ -290,4 +290,37 @@ public class MsgData {
         return sb.toString();
     }
 
+    public String toMainString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("MsgData{");
+        sb.append("type=").append(type);
+        sb.append(", msgType=").append(msgType);
+        sb.append(", subMsgType=").append(subMsgType);
+        sb.append(", sendType=").append(sendType);
+        sb.append(", sendStatus=").append(sendStatus);
+        sb.append(", editable=").append(editable);
+        sb.append(", peerUin='").append(peerUin).append("'");
+        sb.append(", peerUid='").append(peerUid).append("'");
+        sb.append(", userUin='").append(userUin).append("'");
+        sb.append(", userUid='").append(userUid).append("'");
+        sb.append(", userName='").append(userName).append("'");
+        sb.append(", peerName='").append(peerName).append("'");
+        sb.append(", time=").append(time);
+        sb.append(", msgId=").append(msgId);
+        sb.append(", msgSeq=").append(msgSeq);
+        sb.append(", msgRandom=").append(msgRandom);
+        sb.append(", guildId='").append(guildId).append("'");
+        sb.append(", channelId='").append(channelId).append("'");
+        sb.append(", contact=").append(contact);
+        sb.append(", msg='").append(msg).append("'");
+        sb.append(", atList=").append(atList);
+        sb.append(", atMap=").append(atMap);
+        sb.append(", picList=").append(picList);
+        sb.append(", videoList=").append(videoList);
+        sb.append(", pttList=").append(pttList);
+        sb.append(", path='").append(path).append("'");
+        sb.append("}");
+        return sb.toString();
+    }
+
 }

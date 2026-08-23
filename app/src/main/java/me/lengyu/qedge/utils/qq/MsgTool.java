@@ -520,9 +520,7 @@ public class MsgTool {
         try {
             Object service = QQCurrentEnv.getKernelMsgService();
             if (service != null) {
-                ArrayList<Long> msgIds = new ArrayList<>();
-                msgIds.add(msgId);
-                ReflectUtils.callMethod(service, "recallMsg", contact, msgIds, null);
+                ReflectUtils.callMethod(service, "recallMsg", contact, msgId, null);
             }
         } catch (Throwable e) {
             LogUtils.e(e);

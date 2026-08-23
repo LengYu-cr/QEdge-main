@@ -839,7 +839,6 @@ public class ColdRainCore {
                 return;
             }
             String pic = getString("image_mode_bg", "");
-            String textcolor = getString("image_mode_color", "#000000");
             text = text.replace("𝒥𝒶𝓋𝒶", "JAVA");
             text = text.replace("╰┅━ 赞助作者 ━┅╯", "赞助作者");
             text = text.replace("║", "");

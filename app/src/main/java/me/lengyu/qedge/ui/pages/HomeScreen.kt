@@ -712,7 +712,7 @@ private fun HomePage(
 
                 SettingSwitchItem(
                     title = "复制卡片消息",
-                    subtitle = "卡片消息下方显示长按复制按钮，可复制JSON数据",
+                    subtitle = "在卡片上方显示长按复制按钮，长按复制JSON",
                     checked = state.copyArkMessage,
                     onCheckedChange = callbacks.onCopyArkMessageToggle
                 )
@@ -730,7 +730,7 @@ private fun HomePage(
 
                 SettingSwitchItem(
                     title = "消息复读",
-                    subtitle = "在消息旁显示复读按钮，点击快速复读消息",
+                    subtitle = "点击复读，长按可复制图链、查看原始消息",
                     checked = state.repeatMsg,
                     onCheckedChange = callbacks.onRepeatMsgToggle
                 )
