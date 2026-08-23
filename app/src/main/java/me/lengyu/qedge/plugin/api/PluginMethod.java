@@ -31,7 +31,10 @@ import me.lengyu.qedge.utils.qq.ExtraTool;
 import me.lengyu.qedge.utils.json.ProtoData;
 import me.lengyu.qedge.plugin.bean.BlackUser;
 import me.lengyu.qedge.plugin.bean.JointGroup;
-
+/**
+ * @Author 冷雨
+ * @Description Java插件方法类
+ */
 public class PluginMethod {
     private final PluginCompiler compiler;
 

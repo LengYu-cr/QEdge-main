@@ -1,5 +1,9 @@
 package me.lengyu.qedge.utils;
 
+/**
+ * @Author 冷雨
+ * @Description 模块路径工具类
+ */
 public class ModulePathHolder {
     private static String modulePath;
 

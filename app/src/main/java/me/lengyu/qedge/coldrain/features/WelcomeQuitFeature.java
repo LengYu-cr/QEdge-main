@@ -10,7 +10,10 @@ import me.lengyu.qedge.hook.api.OnTroopQuit;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 退群欢迎系统处理
+ */
 public class WelcomeQuitFeature implements ColdRainFeature {
 
     private static boolean listenerRegistered = false;

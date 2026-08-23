@@ -3,7 +3,10 @@ package me.lengyu.qedge.coldrain.features;
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.plugin.bean.MsgData;
-
+/**
+ * @Author 冷雨
+ * @Description 菜单处理
+ */
 public class MenuFeature implements ColdRainFeature {
     @Override
     public boolean shouldHandle(MsgData msgData) {

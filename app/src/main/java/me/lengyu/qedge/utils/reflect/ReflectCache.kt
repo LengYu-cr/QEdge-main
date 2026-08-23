@@ -5,6 +5,10 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.util.concurrent.ConcurrentHashMap
 
+/**
+ * @Author 冷雨
+ * @Description 反射缓存工具类
+ */
 internal object ReflectCache {
 
     private val NOT_FOUND = Any()

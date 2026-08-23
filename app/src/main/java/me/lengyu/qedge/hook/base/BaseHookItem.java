@@ -2,7 +2,10 @@ package me.lengyu.qedge.hook.base;
 
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
 import me.lengyu.qedge.utils.HostInfo;
-
+/**
+ * @Author 冷雨
+ * @Description 基础钩子项
+ */
 public abstract class BaseHookItem {
 
     protected boolean isEnable = true;

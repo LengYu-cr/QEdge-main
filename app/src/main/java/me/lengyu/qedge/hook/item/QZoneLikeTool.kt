@@ -13,6 +13,10 @@ import java.io.InputStreamReader
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+/**
+ * @Author 冷雨
+ * @Description QZone点赞工具
+ */
 @HookItemAnnotation(value = "QZone点赞工具", category = "item")
 object QZoneLikeTool : DexKitTask {
 

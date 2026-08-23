@@ -21,7 +21,10 @@ import me.lengyu.qedge.hook.kk.KKHook;
 import me.lengyu.qedge.hook.kugou.KuGouHook;
 import me.lengyu.qedge.hook.aoruan.AoRuanHook;
 
-
+/**
+ * @Author 冷雨
+ * @Description Xposed 入口类
+ */
 public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteInit {
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
     private static String modulePath = null;

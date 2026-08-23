@@ -30,7 +30,10 @@ import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 图片处理
+ */
 public class ImageFeature implements ColdRainFeature {
 
     private static final String MY_WEB = "https://api.yuafeng.cn/API/ly/";

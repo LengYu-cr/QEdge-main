@@ -4,7 +4,10 @@ import java.lang.reflect.Method;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
-
+/**
+ * @Author 冷雨
+ * @Description Cookie 工具类
+ */
 public class CookieTool {
 
     private static Object getTicketManager() {

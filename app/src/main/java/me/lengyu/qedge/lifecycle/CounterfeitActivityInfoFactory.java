@@ -7,7 +7,10 @@ import android.content.pm.PackageManager;
 import android.os.Build;
 
 import me.lengyu.qedge.utils.HostInfo;
-
+/**
+ * @Author 冷雨
+ * @Description 伪活动信息工厂类
+ */
 public class CounterfeitActivityInfoFactory {
 
     public static ActivityInfo makeProxyActivityInfo(String className, long flags) {

@@ -13,6 +13,10 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * @Author 冷雨
+ * @Description 对象存储工具类
+ */
 public class ObjectStore {
 
     private static File getDir(String dir) {

@@ -326,6 +326,8 @@ object ChatSettingLoader {
             Parasitics.ensureInitialized(activity)
             runCatching { Parasitics.injectModuleResources(activity.resources) }
             val intent = Intent(activity, SettingActivity::class.java)
+            // 直接跳转到 Java 脚本页面（HomeScreen），不受上次停留页面影响
+            intent.putExtra("page", "plugin")
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
             intent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)

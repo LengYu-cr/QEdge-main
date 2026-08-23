@@ -25,6 +25,10 @@ import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.ReflectUtils;
 
+/**
+ * @Author 冷雨
+ * @Description 插件编译器
+ */
 public class PluginCompiler {
     public final PluginInfo info;
     private Interpreter interpreter;

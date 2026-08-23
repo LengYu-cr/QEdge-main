@@ -21,9 +21,9 @@ import java.util.Timer
 import java.util.TimerTask
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.regex.Pattern
-
 /**
- * QZone 定时任务 + 等级加速类每日签到
+ * @Author 冷雨
+ * @Description QZone 定时任务 + 等级加速类每日签到
  * 【等级加速·凌晨 00:00 触发】
  *  ① 空间等级签到（qzoneClockIn）
  *  ② QQ 日签打卡（dailySign，ti.qq.com）

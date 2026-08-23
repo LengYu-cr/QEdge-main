@@ -17,7 +17,10 @@ import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.ExtraTool;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 音乐菜单处理
+ */
 public class MusicMenuFeature implements ColdRainFeature {
 
     private static final String MY_WEB = "https://api.yuafeng.cn/API/ly/";

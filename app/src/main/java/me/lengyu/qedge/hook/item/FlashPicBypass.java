@@ -11,7 +11,10 @@ import me.lengyu.qedge.hook.base.Listener;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.ReflectUtils;
-
+/**
+ * @Author 冷雨
+ * @Description 闪照破解
+ */
 @HookItemAnnotation(value = "闪照破解", category = "item")
 public class FlashPicBypass extends BaseApiHookItem<FlashPicBypass.FlashPicListener> {
 

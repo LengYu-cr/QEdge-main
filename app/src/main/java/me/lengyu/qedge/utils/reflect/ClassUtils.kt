@@ -2,6 +2,10 @@ package me.lengyu.qedge.utils.reflect
 
 import me.lengyu.qedge.utils.HostInfo
 
+/**
+ * @Author 冷雨
+ * @Description 类工具类
+ */
 object ClassUtils {
     private var _hostClassLoader: ClassLoader? = null
 

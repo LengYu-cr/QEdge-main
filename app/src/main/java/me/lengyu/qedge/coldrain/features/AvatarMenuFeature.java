@@ -10,7 +10,10 @@ import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.qq.ExtraTool;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 头像菜单处理
+ */
 public class AvatarMenuFeature implements ColdRainFeature {
 
     @Override

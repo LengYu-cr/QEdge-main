@@ -8,6 +8,10 @@ import android.os.Environment
 
 @Suppress("DEPRECATION")
 @SuppressLint("StaticFieldLeak")
+/**
+ * @Author 冷雨
+ * @Description 主进程信息工具类
+ */
 object HostInfo {
     const val PACKAGE_NAME_QQ = "com.tencent.mobileqq"
     const val PACKAGE_NAME_TIM = "com.tencent.tim"

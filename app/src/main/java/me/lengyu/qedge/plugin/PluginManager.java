@@ -10,7 +10,14 @@ import me.lengyu.qedge.plugin.bean.PluginInfo;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.ObjectStore;
+import me.lengyu.qedge.utils.Toasts;
 
+
+
+/**
+ * @Author 冷雨
+ * @Description 插件管理器
+ */
 public class PluginManager {
     public static final List<PluginInfo> plugins = new ArrayList<>();
     public static final List<String> autoLoadList = new ArrayList<>();
@@ -69,8 +76,10 @@ public class PluginManager {
             runningCompilers.put(plugin.getId(), plugin.getCompiler());
             return true;
         } catch (Exception e) {
-            LogUtils.e("[DEBUG-PLUGIN]", "DP-003 ERROR: " + e.getMessage());
-            LogUtils.e("[DEBUG-PLUGIN]", e);
+            // LogUtils.e("[DEBUG-PLUGIN]", "DP-003 ERROR: " + e.getMessage());
+            // LogUtils.e("[DEBUG-PLUGIN]", e);
+            Toasts.showCustomToast("QEdge：Java插件" + plugin.getName() + "加载异常：请检查日志");
+            e.printStackTrace();
             PluginError.evalError(e, plugin);
             return false;
         }

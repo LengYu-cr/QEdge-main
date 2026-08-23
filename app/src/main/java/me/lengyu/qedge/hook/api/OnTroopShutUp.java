@@ -8,6 +8,10 @@ import me.lengyu.qedge.utils.qq.FriendTool;
 
 import org.json.JSONObject;
 
+/**
+ * @Author 冷雨
+ * @Description 监听群禁言
+ */
 @HookItemAnnotation(value = "监听群禁言", category = "api")
 public class OnTroopShutUp extends BaseApiHookItem<OnTroopShutUp.TroopShutUpListener> {
 

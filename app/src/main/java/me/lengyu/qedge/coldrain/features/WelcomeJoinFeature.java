@@ -10,7 +10,10 @@ import me.lengyu.qedge.hook.api.OnTroopJoin;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 进群欢迎系统处理
+ */
 public class WelcomeJoinFeature implements ColdRainFeature {
 
     private static boolean listenerRegistered = false;

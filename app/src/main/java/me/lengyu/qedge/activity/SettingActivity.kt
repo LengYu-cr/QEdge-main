@@ -54,7 +54,10 @@ import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.HostInfo
 import java.io.File
 import java.lang.reflect.Method
-
+/**
+ * @Author 冷雨
+ * @Description 设置活动
+ */
 class SettingActivity : ComponentActivity() {
 
     private var isDarkTheme = false

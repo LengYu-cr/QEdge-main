@@ -7,6 +7,10 @@ import de.robv.android.xposed.XposedHelpers;
 import java.lang.reflect.Member;
 import java.lang.reflect.Method;
 
+/**
+ * @Author 冷雨
+ * @Description XposedHook工具类
+ */
 public class HookUtils {
 
     private static ClassLoader hookClassLoader;

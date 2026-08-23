@@ -17,7 +17,10 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.util.Locale
 import kotlin.concurrent.thread
-
+/**
+ * @Author 冷雨
+ * @Description 图片视频语音下载
+ */
 @HookItemAnnotation(value = "图片视频语音下载", category = "item")
 object DownloadEmotion : BaseApiHookItem<DownloadEmotion.DownloadEmotionListener>() {
 

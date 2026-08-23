@@ -9,7 +9,10 @@ import me.lengyu.qedge.utils.qq.FriendTool
 import org.json.JSONObject
 import java.util.Collections
 import java.util.LinkedHashMap
-
+/**
+ * @Author 冷雨
+ * @Description 名片自动回赞
+ */
 @HookItemAnnotation(value = "名片自动回赞", category = "item")
 object AutoLikeBack : BaseApiHookItem<AutoLikeBack.Listener>() {
 

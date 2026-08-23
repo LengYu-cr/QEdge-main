@@ -1,5 +1,8 @@
 package me.lengyu.qedge.plugin.bean;
-
+/**
+ * @Author 冷雨
+ * @Description 群禁言用户信息（腾讯）
+ */
 public class ForbidInfo {
     public final String uin;
     public final String name;

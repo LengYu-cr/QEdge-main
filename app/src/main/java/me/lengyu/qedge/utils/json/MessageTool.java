@@ -11,7 +11,10 @@ import java.lang.reflect.Method;
 import java.util.Map;
 
 import me.lengyu.qedge.utils.LogUtils;
-
+/**
+ * @Author 冷雨
+ * @Description JSON 消息工具类
+ */
 public class MessageTool {
 
     private static Class<?> messageClass;

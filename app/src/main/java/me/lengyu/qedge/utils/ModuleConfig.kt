@@ -1,7 +1,10 @@
 package me.lengyu.qedge.utils
 
 import org.json.JSONObject
-
+/**
+ * @Author 冷雨
+ * @Description 模块配置工具类
+ */
 object ModuleConfig {
     private const val CONFIG_NAME = "config"
 

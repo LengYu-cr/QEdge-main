@@ -4,7 +4,10 @@ import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.qq.FriendTool;
-
+/**
+ * @Author 冷雨
+ * @Description 点赞处理
+ */
 public class LikeFeature implements ColdRainFeature {
 
     @Override

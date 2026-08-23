@@ -22,7 +22,10 @@ import java.io.FileOutputStream
 import java.io.OutputStream
 import java.lang.reflect.Field
 import java.lang.reflect.Method
-
+/**
+ * @Author 冷雨
+ * @Description 透明（群）头像，名片，阻止压缩图片
+ */
 @HookItemAnnotation(value = "透明头像", category = "item")
 object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarListener>(), DexKitTask {
 

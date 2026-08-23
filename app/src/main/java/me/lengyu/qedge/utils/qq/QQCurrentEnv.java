@@ -19,7 +19,10 @@ import com.tencent.qqnt.kernel.api.impl.MsgService;
 import com.tencent.qqnt.kernel.api.impl.KernelServiceImpl;
 
    
-
+/**
+ * @Author 冷雨
+ * @Description QQ 当前环境工具类
+ */
 public class QQCurrentEnv {
     public static String currentDir;
     public static String currentUin;

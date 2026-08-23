@@ -8,6 +8,10 @@ import java.io.FileWriter;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 
+/**
+ * @Author 冷雨
+ * @Description 插件错误处理
+ */
 public class PluginError {
 
     public static void evalError(Exception e, PluginInfo info) {

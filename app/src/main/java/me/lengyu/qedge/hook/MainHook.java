@@ -45,7 +45,10 @@ import me.lengyu.qedge.hook.item.LongClickSendCard;
 import me.lengyu.qedge.hook.item.RepeatMsg;
 
 import java.util.List;
-
+/**
+ * @Author 冷雨
+ * @Description 主钩子类
+ */
 public class MainHook {
 
     private static boolean initialized = false;

@@ -3,7 +3,10 @@ package me.lengyu.qedge.hook.base;
 import me.lengyu.qedge.hook.annotation.HookCategory;
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
 import me.lengyu.qedge.utils.ModuleConfig;
-
+/**
+ * @Author 冷雨
+ * @Description 基础开关钩子项
+ */
 public abstract class BaseSwitchHookItem extends BaseHookItem {
 
     protected boolean isAvailable = false;

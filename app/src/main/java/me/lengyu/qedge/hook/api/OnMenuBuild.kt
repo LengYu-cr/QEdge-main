@@ -25,7 +25,10 @@ import me.lengyu.qedge.utils.reflect.getObjectByTypeOrNull
 import org.luckypray.dexkit.query.FindClass
 import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Method
-
+/**
+ * @Author 冷雨
+ * @Description 监听消息菜单
+ */
 @HookItemAnnotation(value = "监听消息菜单", category = "api")
 object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTask {
 

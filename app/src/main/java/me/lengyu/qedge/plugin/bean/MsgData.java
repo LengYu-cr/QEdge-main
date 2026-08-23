@@ -12,6 +12,10 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.HashMap;
 
+/**
+ * @Author 冷雨
+ * @Description 消息数据
+ */
 public class MsgData {
 
     public final MsgRecord data;

@@ -21,7 +21,10 @@ import org.luckypray.dexkit.DexKitBridge;
 import org.luckypray.dexkit.query.FindMethod;
 import org.luckypray.dexkit.query.matchers.MethodMatcher;
 import org.luckypray.dexkit.result.MethodData;
-
+/**
+ * @Author 冷雨
+ * @Description 去除酷狗大字版和概念版开屏广告
+ */
 public class KuGouHook {
 
     private static boolean initialized = false;

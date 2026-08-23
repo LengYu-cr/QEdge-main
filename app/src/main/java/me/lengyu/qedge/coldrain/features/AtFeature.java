@@ -5,7 +5,10 @@ import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.LogUtils;
-
+/**
+ * @Author 冷雨
+ * @Description 艾特处理
+ */
 public class AtFeature implements ColdRainFeature {
 
     @Override

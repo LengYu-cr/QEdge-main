@@ -9,7 +9,10 @@ import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import com.tencent.common.app.BaseApplicationImpl;
-
+/**
+ * @Author 冷雨
+ * @Description QQ Service, Handler, Api助手类
+ */
 public class QQServiceHelper {
 
     public static <T> T getApi(Class<T> apiClass) {

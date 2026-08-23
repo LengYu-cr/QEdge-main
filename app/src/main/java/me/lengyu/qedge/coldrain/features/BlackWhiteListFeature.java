@@ -15,7 +15,10 @@ import me.lengyu.qedge.hook.api.OnTroopJoin;
 import me.lengyu.qedge.hook.api.OnTroopShutUp;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.qq.TroopTool;
-
+/**
+ * @Author 冷雨
+ * @Description 黑白名单处理
+ */
 public class BlackWhiteListFeature implements ColdRainFeature {
 
     @Override

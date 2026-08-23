@@ -2,7 +2,10 @@ package me.lengyu.qedge.utils.reflect
 
 import java.lang.reflect.Member
 import de.robv.android.xposed.XposedBridge
-
+/**
+ * @Author 冷雨
+ * @Description 反射扩展工具类
+ */
 val Any.TAG: String
     get() = this.javaClass.simpleName
 

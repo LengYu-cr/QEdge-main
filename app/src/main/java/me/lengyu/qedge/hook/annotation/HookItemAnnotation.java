@@ -5,7 +5,10 @@ import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
-@Target(ElementType.TYPE)
+/**
+ * @Author 冷雨
+ * @Description 钩子项注解
+ */
 @Retention(RetentionPolicy.RUNTIME)
 public @interface HookItemAnnotation {
     String value() default "";

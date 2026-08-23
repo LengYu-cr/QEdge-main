@@ -8,7 +8,10 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 import me.lengyu.qedge.utils.LogUtils;
-
+/**
+ * @Author 冷雨
+ * @Description Http工具类
+ */
 public class HttpUtils {
 
     public static boolean downloadSync(String urlStr, String savePath) {

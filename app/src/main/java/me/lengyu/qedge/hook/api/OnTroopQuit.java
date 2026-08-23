@@ -5,7 +5,10 @@ import me.lengyu.qedge.hook.base.BaseApiHookItem;
 import me.lengyu.qedge.hook.base.Listener;
 import me.lengyu.qedge.utils.HookUtils;
 import me.lengyu.qedge.utils.LogUtils;
-
+/**
+ * @Author 冷雨
+ * @Description 监听群成员退出
+ */
 @HookItemAnnotation(value = "监听群成员退出", category = "api")
 public class OnTroopQuit extends BaseApiHookItem<OnTroopQuit.TroopQuitListener> {
 

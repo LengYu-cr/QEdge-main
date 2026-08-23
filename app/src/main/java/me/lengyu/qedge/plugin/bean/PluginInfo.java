@@ -10,6 +10,10 @@ import java.util.Properties;
 import me.lengyu.qedge.plugin.PluginCompiler;
 import me.lengyu.qedge.utils.LogUtils;
 
+/**
+ * @Author 冷雨
+ * @Description Java插件信息
+ */
 public class PluginInfo {
     private final String id;
     private String name;

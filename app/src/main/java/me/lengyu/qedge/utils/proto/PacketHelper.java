@@ -19,6 +19,10 @@ import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.proto.packetListener;
 import me.lengyu.qedge.utils.proto.protoListener;
 
+/**
+ * @Author 冷雨
+ * @Description ProtoBuffer包助手类
+ */
 
 public class PacketHelper {
 

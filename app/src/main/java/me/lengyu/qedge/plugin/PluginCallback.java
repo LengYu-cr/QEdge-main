@@ -14,6 +14,10 @@ import me.lengyu.qedge.plugin.bean.PluginInfo;
 
 import java.util.Arrays;
 
+/**
+ * @Author 冷雨
+ * @Description 插件回调
+ */
 public class PluginCallback {
     private final PluginCompiler compiler;
     private final PluginInfo info;

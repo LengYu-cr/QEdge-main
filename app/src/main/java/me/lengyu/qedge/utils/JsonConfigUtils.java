@@ -19,7 +19,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * JSON 配置读写工具。
+ * @Author 冷雨
+ * @Description JSON 配置读写工具类
  *
  * <p>性能优化：每个配置文件在进程内维护一份内存缓存，读操作命中缓存后仅做一次
  * {@code lastModified()} 判断（O(1) stat），不再每次全量读盘 + 解析；写操作立即更新

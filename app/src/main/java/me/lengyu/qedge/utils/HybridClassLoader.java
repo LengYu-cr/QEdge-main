@@ -2,6 +2,10 @@ package me.lengyu.qedge.utils;
 
 import android.content.Context;
 
+/**
+ * @Author 冷雨
+ * @Description 混合类加载器
+ */
 public class HybridClassLoader extends ClassLoader {
 
     public static final HybridClassLoader INSTANCE = new HybridClassLoader();

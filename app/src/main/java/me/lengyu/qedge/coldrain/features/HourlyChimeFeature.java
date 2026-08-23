@@ -10,7 +10,10 @@ import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 整点报时处理
+ */
 public class HourlyChimeFeature implements ColdRainFeature {
 
     private static final String MY_WEB = "https://api.yuafeng.cn/API/ly/";

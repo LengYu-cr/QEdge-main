@@ -7,6 +7,10 @@ import android.os.Build;
 
 import androidx.core.content.ContextCompat;
 
+/**
+ * @Author 冷雨
+ * @Description 主题帮助类
+ */
 public class ThemeHelper {
 
     public static void applyTheme(Context context) {

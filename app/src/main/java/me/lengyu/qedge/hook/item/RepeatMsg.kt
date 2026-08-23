@@ -26,7 +26,10 @@ import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import com.tencent.qqnt.kernel.nativeinterface.MsgElement
 import com.tencent.qqnt.kernel.nativeinterface.MsgRecord
 import java.lang.reflect.Method
-
+/**
+ * @Author 冷雨
+ * @Description 消息复读
+ */
 @HookItemAnnotation(value = "消息复读", category = "item", tag = "消息复读", desc = "在消息旁显示复读按钮，点击快速复读消息")
 class RepeatMsg : BaseSwitchHookItem() {
 

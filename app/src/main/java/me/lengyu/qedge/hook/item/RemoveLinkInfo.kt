@@ -11,7 +11,10 @@ import me.lengyu.qedge.utils.dexkit.DexKitTask
 import org.luckypray.dexkit.query.FindMethod
 import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Method
-
+/**
+ * @Author 冷雨
+ * @Description 移除链接信息
+ */
 @HookItemAnnotation(value = "移除链接信息", category = "item")
 object RemoveLinkInfo : BaseApiHookItem<Listener>(), DexKitTask {
 

@@ -18,6 +18,10 @@ import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.HostInfo;
 
+/**
+ * @Author 冷雨
+ * @Description 自定义Toast工具类
+ */
 public class Toasts {
 
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());

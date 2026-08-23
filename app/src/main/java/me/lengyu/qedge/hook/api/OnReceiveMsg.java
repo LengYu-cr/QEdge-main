@@ -23,6 +23,10 @@ import org.luckypray.dexkit.wrap.DexClass;
 import android.content.Context;
 import me.lengyu.qedge.utils.HostInfo;
 
+/**
+ * @Author 冷雨
+ * @Description 监听接收消息
+ */
 @HookItemAnnotation(value = "监听接收消息", category = "api")
 public class OnReceiveMsg extends BaseApiHookItem<OnReceiveMsg.ReceiveMsgListener> {
 

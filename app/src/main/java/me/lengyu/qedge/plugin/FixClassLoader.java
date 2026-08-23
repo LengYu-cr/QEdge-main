@@ -6,7 +6,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import me.lengyu.qedge.utils.LogUtils;
-
+/**
+ * @Author 冷雨
+ * @Description ClassLoader 修复类
+ * 用于修复 ClassLoader 问题，确保模块自身的类可被加载
+ */
 public class FixClassLoader extends ClassLoader {
     private final List<ClassLoader> classLoaders = new ArrayList<>();
     private final ClassLoader hostClassLoader;

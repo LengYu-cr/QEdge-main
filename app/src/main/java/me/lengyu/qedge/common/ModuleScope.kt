@@ -11,7 +11,10 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import me.lengyu.qedge.utils.LogUtils
 import kotlin.coroutines.CoroutineContext
-
+/**
+ * @Author 冷雨
+ * @Description 模块作用域
+ */
 object ModuleScope : CoroutineScope {
 
     private val exceptionHandler = CoroutineExceptionHandler { _, throwable ->

@@ -15,7 +15,10 @@ import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 视频菜单处理
+ */
 public class VideoMenuFeature implements ColdRainFeature {
 
     private static final String MY_WEB = "https://api.yuafeng.cn/API/ly/";

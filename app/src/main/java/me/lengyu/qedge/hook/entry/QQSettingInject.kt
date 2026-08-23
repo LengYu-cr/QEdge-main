@@ -20,7 +20,10 @@ import me.lengyu.qedge.utils.reflect.toClass
 import org.luckypray.dexkit.query.FindClass
 import org.luckypray.dexkit.query.base.BaseFinder
 import java.lang.reflect.Proxy
-
+/**
+ * @Author 冷雨
+ * @Description QQ设置入口
+ */
 @HookItemAnnotation(category = "entry", process = "All", value = "QQ设置入口")
 object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
 

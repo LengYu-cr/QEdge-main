@@ -1,5 +1,9 @@
 package me.lengyu.qedge.plugin.bean;
 
+/**
+ * @Author 冷雨
+ * @Description 群信息（腾讯）
+ */
 public class GroupInfo {
     public final String group;
     public final String groupName;

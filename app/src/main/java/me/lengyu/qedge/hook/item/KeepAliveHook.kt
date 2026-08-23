@@ -18,7 +18,10 @@ import me.lengyu.qedge.hook.base.BaseSwitchHookItem
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
-
+/**
+ * @Author 冷雨
+ * @Description QQ进程保活：像素悬浮窗/前台通知/后台通知
+ */
 @HookItemAnnotation(
     value = "保活机制",
     desc = "QQ进程保活：像素悬浮窗/前台通知/后台通知",

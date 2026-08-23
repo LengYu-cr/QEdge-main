@@ -16,7 +16,10 @@ import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.Toasts
-
+/**
+ * @Author 冷雨
+ * @Description 复制卡片消息
+ */
 @HookItemAnnotation(value = "复制卡片消息", category = "item", tag = "复制卡片消息", desc = "卡片消息上方显示按钮，长按可复制卡片JSON数据")
 class CopyArkMessage : BaseSwitchHookItem() {
 

@@ -16,7 +16,10 @@ import me.lengyu.qedge.hook.base.BaseApiHookItem;
 import me.lengyu.qedge.lifecycle.Parasitics;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
-
+/**
+ * @Author 冷雨
+ * @Description QQ加号入口
+ */
 @HookItemAnnotation(category = "entry", process = "All", value = "QQ加号入口")
 public class QQPlusInject extends BaseApiHookItem {
 

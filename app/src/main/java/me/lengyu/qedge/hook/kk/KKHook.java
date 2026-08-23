@@ -13,7 +13,10 @@ import org.luckypray.dexkit.query.FindClass;
 import org.luckypray.dexkit.query.matchers.ClassMatcher;
 import org.luckypray.dexkit.result.ClassData;
 import org.luckypray.dexkit.wrap.DexClass;
-
+/**
+ * @Author 冷雨
+ * @Description KK键盘 去除广告，破解Vip，阻止应用闪退
+ */
 public class KKHook {
 
     private static boolean initialized = false;

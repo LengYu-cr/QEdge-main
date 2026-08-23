@@ -2,7 +2,10 @@ package me.lengyu.qedge.lifecycle
 
 import android.app.Activity
 import java.util.concurrent.ConcurrentHashMap
-
+/**
+ * @Author 冷雨
+ * @Description 动态活动注册类
+ */
 object DynamicActivityRegistry {
     
     private val registry = ConcurrentHashMap<String, Class<out Activity>>()

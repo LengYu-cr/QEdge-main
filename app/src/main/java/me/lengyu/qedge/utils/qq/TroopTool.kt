@@ -22,6 +22,10 @@ import com.tencent.mobileqq.data.troop.TroopMemberCardInfo
 import com.tencent.mobileqq.troop.api.ITroopInfoService
 
 @Suppress("DEPRECATION")
+/**
+ * @Author 冷雨
+ * @Description 群工具类，需要dexkit查找
+ */
 object TroopTool : DexKitTask {
 
     private val modifyTroopShutUpTime by lazy {

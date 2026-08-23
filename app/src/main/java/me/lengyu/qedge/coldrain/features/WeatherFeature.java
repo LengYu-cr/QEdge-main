@@ -14,7 +14,10 @@ import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 天气系统处理
+ */
 public class WeatherFeature implements ColdRainFeature {
 
     private static final String MY_WEB = "https://api.yuafeng.cn/API/ly/";

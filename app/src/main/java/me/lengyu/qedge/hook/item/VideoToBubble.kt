@@ -11,7 +11,10 @@ import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.qq.MsgTool
 import java.util.ArrayList
-
+/**
+ * @Author 冷雨
+ * @Description 视频转泡泡消息
+ */
 @HookItemAnnotation(value = "视频转泡泡消息", category = "item")
 object VideoToBubble : BaseApiHookItem<VideoToBubble.VideoToBubbleListener>() {
 

@@ -13,7 +13,10 @@ import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.HookUtils;
 import com.tencent.mobileqq.paiyipai.PaiYiPaiHandler;
-
+/**
+ * @Author 冷雨
+ * @Description 取消拍一拍时间限制
+ */
 @HookItemAnnotation(value = "取消拍一拍时间限制", category = "item")
 public class AntiPokeDelay extends BaseApiHookItem {
     public static final AntiPokeDelay INSTANCE = new AntiPokeDelay();

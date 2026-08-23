@@ -23,7 +23,10 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-
+/**
+ * @Author 冷雨
+ * @Description 拦截QQ空间推送
+ */ 
 @HookItemAnnotation(value = "拦截QQ空间推送", category = "api")
 public class OnQZonePush extends BaseApiHookItem<OnQZonePush.QZonePushListener> {
 

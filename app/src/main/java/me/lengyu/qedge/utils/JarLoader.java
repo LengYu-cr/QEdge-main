@@ -15,6 +15,10 @@ import dalvik.system.DexClassLoader;
 import dalvik.system.PathClassLoader;
 import me.lengyu.qedge.utils.LogUtils;
 
+/**
+ * @Author 冷雨
+ * @Description Jar加载工具类
+ */
 public class JarLoader {
 
     public static ClassLoader loadJar(String path) throws IOException {

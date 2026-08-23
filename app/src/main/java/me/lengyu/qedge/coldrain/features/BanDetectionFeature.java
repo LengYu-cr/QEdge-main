@@ -6,7 +6,10 @@ import java.util.List;
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.plugin.bean.MsgData;
-
+/**
+ * @Author 冷雨
+ * @Description 违禁词检测处理
+ */
 public class BanDetectionFeature implements ColdRainFeature {
 
     @Override

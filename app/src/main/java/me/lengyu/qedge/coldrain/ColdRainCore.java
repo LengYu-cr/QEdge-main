@@ -46,7 +46,10 @@ import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.MsgTool;
-
+/**
+ * @Author 冷雨
+ * @Description 冷雨Java核心类
+ */
 public class ColdRainCore {
     private static final String TAG = "ColdRainCore";
     private static final String CONFIG_FILE_NAME = "config.json";

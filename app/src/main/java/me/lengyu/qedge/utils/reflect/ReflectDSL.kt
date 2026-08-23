@@ -4,6 +4,10 @@ import java.lang.reflect.Field
 import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 
+/**
+ * @Author 冷雨
+ * @Description 反射 DSL 工具类
+ */
 enum class Visibility {
     PUBLIC, PROTECTED, PRIVATE, PACKAGE
 }

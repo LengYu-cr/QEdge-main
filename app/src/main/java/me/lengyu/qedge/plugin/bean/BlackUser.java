@@ -2,7 +2,7 @@ package me.lengyu.qedge.plugin.bean;
 
 /**
  * @Author 冷雨
- * @Description 黑名单
+ * @Description 群黑名单用户信息（腾讯）
  */
 public class BlackUser {
 

@@ -36,7 +36,10 @@ import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.json.ProtoData;
-
+/**
+ * @Author 冷雨
+ * @Description 额外工具类
+ */
 public class ExtraTool {
 
     public interface UploadCallback {

@@ -10,7 +10,10 @@ import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.ForbidInfo;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.qq.TroopTool;
-
+/**
+ * @Author 冷雨
+ * @Description 群管处理
+ */
 public class GroupManagerFeature implements ColdRainFeature {
 
     @Override

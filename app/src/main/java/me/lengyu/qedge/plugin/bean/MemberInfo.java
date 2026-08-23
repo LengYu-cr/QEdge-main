@@ -1,5 +1,9 @@
 package me.lengyu.qedge.plugin.bean;
 
+/**
+ * @Author 冷雨
+ * @Description 群成员信息（腾讯）
+ */
 public class MemberInfo {
     public final long joinGroupTime;
     public final long lastActiveTime;

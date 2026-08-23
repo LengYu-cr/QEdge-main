@@ -4,7 +4,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
+/**
+ * @Author 冷雨
+ * @Description 钩子注册器
+ */
 public class HookRegistry {
 
     private static final List<BaseHookItem> hookItems = new ArrayList<>();

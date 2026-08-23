@@ -21,6 +21,10 @@ import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 
+/**
+ * @Author 冷雨
+ * @Description 运行状态处理
+ */
 public class StatusFeature implements ColdRainFeature {
 
     private static long firstLoadTime = System.currentTimeMillis();

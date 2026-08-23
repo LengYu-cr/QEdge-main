@@ -2,8 +2,8 @@ package me.lengyu.qedge.plugin.bean;
 
 /**
  * @Author 冷雨
- * @Description 共同群
- */
+ * @Description 共同群信息（腾讯）
+ * */
 public class JointGroup {
 
     public String qun;

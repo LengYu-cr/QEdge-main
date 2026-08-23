@@ -9,7 +9,10 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.regex.Pattern;
-
+/**
+ * @Author 冷雨
+ * @Description 监听拍一拍
+ */
 @HookItemAnnotation(value = "监听拍一拍", category = "api")
 public class OnPaiYiPai extends BaseApiHookItem<OnPaiYiPai.PaiYiPaiListener> {
 

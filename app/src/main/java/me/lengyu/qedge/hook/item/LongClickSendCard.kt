@@ -17,7 +17,10 @@ import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.utils.qq.MsgTool
 import org.json.JSONObject
-
+/**
+ * @Author 冷雨
+ * @Description 长按发送按钮发卡片
+ */
 @HookItemAnnotation(value = "长按发送按钮发卡片", category = "item", tag = "长按发送按钮发卡片", desc = "长按发送按钮将输入框内的JSON作为卡片消息发送")
 class LongClickSendCard : BaseSwitchHookItem() {
 

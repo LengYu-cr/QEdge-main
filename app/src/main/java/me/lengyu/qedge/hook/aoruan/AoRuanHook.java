@@ -14,6 +14,10 @@ import org.luckypray.dexkit.query.matchers.ClassMatcher;
 import org.luckypray.dexkit.result.ClassData;
 import org.luckypray.dexkit.wrap.DexClass;
 
+/**
+ * @Author 冷雨
+ * @Description 傲软抠图破解会员
+ */
 public class AoRuanHook {
 
     private static boolean initialized = false;

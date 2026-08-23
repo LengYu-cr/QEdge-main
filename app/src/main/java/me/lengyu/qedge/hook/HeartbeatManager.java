@@ -22,7 +22,10 @@ import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
 
-
+/**
+ * @Author 冷雨
+ * @Description 心跳管理类
+ */
 public class HeartbeatManager {
 
     private static final String API_URL = "https://v.yuafeng.cn/QEdge/heartbeat/index.php";

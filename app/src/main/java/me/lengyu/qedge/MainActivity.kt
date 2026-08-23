@@ -37,7 +37,10 @@ import me.lengyu.qedge.ui.pages.home.MainScreen
 import me.lengyu.qedge.utils.LogUtils
 import org.json.JSONObject
 import java.lang.Runnable
-
+/**
+ * @Author 冷雨
+ * @Description 主活动
+ */
 class MainActivity : ComponentActivity() {
 
     private var updateStatus by mutableStateOf(HomeUpdateStatus.IDLE)

@@ -10,7 +10,10 @@ import me.lengyu.qedge.utils.json.ProtoData;
 import com.tencent.qphone.base.remote.FromServiceMsg;
 import org.json.JSONArray;
 import org.json.JSONObject;
-
+/**
+ * @Author 冷雨
+ * @Description 监听RKey
+ */
 @HookItemAnnotation(value = "监听RKey", category = "api")
 public class OnGetRKey extends BaseApiHookItem<Listener> {
 

@@ -10,6 +10,10 @@ import me.lengyu.qedge.utils.qq.ExtraTool;
 import me.lengyu.qedge.utils.qq.FriendTool;
 import me.lengyu.qedge.utils.qq.TroopTool;
 
+/**
+ * @Author 冷雨
+ * @Description 头衔功能处理
+ */
 public class TitleFeature implements ColdRainFeature {
 
     @Override

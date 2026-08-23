@@ -12,6 +12,10 @@ import org.json.JSONObject;
 
 import java.lang.reflect.Method;
 import java.util.concurrent.CopyOnWriteArrayList;
+/**
+ * @Author 冷雨
+ * @Description 监听接收protoBuffer包体
+ */
 @HookItemAnnotation(value = "监听接收包体", category = "api")
 public class FromServiceMsgDispatcher {
 

@@ -12,7 +12,10 @@ import me.lengyu.qedge.utils.HookUtils;
 import com.tencent.mobileqq.qroute.QRoute;
 import com.tencent.qqnt.kernelpublic.nativeinterface.Contact;
 import com.tencent.qqnt.kernel.nativeinterface.MsgElement;
-
+/**
+ * @Author 冷雨
+ * @Description 监听发送消息
+ */
 @HookItemAnnotation(value = "监听发送消息", category = "api")
 public class OnSendMsg extends BaseApiHookItem<OnSendMsg.SendMsgListener> {
 

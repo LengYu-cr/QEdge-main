@@ -23,7 +23,8 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
 /**
- * 防撤回 — 基于 QStory PreventRetractingMessageCore 逻辑
+ * @Author 冷雨
+ * @Description 防撤回 — 基于 QStory PreventRetractingMessageCore 逻辑
  *
  * 核心思路：
  * 1. Hook onMsfPush 拦截撤回推送

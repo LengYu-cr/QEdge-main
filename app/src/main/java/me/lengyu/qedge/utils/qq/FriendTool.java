@@ -14,6 +14,10 @@ import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
+/**
+ * @Author 冷雨
+ * @Description 好友工具类
+ */
 public class FriendTool {
 
     public static List<FriendInfo> getAllFriend() {

@@ -16,7 +16,8 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 
 /**
- * 日志工具。
+ * @Author 冷雨
+ * @Description 日志工具类
  *
  * <p>性能：调用方（主线程 / Hook 线程）只把日志行放入队列后立即返回，由后台单线程
  * {@code QEdge-Log} 批量写入文件，避免原先"每条日志都 open→write→close + 全局锁"的

@@ -12,6 +12,10 @@ import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
 
+/**
+ * @Author 冷雨
+ * @Description 问答处理
+ */
 public class QuestionFeature implements ColdRainFeature {
 
     // 数据文件名

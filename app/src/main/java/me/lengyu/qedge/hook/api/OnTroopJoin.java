@@ -14,6 +14,10 @@ import org.json.JSONObject;
 
 import java.util.ArrayList;
 
+/**
+ * @Author 冷雨
+ * @Description 监听群成员加入
+ */
 @HookItemAnnotation(value = "监听群成员加入", category = "api")
 public class OnTroopJoin extends BaseApiHookItem<OnTroopJoin.TroopJoinListener> {
 

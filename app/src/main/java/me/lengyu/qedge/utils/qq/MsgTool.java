@@ -25,6 +25,10 @@ import me.lengyu.qedge.utils.ReflectUtils;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import kotlin.math.MathKt;
 
+/**
+ * @Author 冷雨
+ * @Description 消息工具类
+ */
 public class MsgTool {
 
     public static MsgUtilApiImpl msgUtilApiImpl;
@@ -518,9 +522,18 @@ public class MsgTool {
 
     public static void recallMsg(Contact contact, long msgId) {
         try {
-            Object service = QQCurrentEnv.getKernelMsgService();
+            Object service = getMsgServiceViaReflection();
             if (service != null) {
-                ReflectUtils.callMethod(service, "recallMsg", contact, msgId, null);
+                ReflectUtils.callMethod(service, "recallMsg", contact, msgId, new com.tencent.qqnt.kernel.nativeinterface.IOperateCallback() {
+                    @Override
+                    public void onResult(int i, String str) {
+                        if (i == 0) {
+                             LogUtils.i("MsgTool", "recallMsg success: " + msgId);
+                        } else {
+                            LogUtils.e("MsgTool", "recallMsg failed: " + msgId + ", " + str);
+                        }
+                    }
+                });
             }
         } catch (Throwable e) {
             LogUtils.e(e);

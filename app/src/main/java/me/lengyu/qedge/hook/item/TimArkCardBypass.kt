@@ -16,7 +16,10 @@ import org.luckypray.dexkit.query.FindClass
 import org.luckypray.dexkit.query.base.BaseFinder
 import dalvik.system.DexFile
 import java.lang.reflect.Method
-
+/**
+ * @Author 冷雨
+ * @Description TIM卡片阻断绕过
+ */
 @HookItemAnnotation(value = "TIM卡片阻断绕过", category = "item")
 object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListener>(), DexKitTask {
 

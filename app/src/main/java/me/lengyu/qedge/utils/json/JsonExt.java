@@ -6,7 +6,10 @@ import org.json.JSONObject;
 import java.util.Iterator;
 
 import me.lengyu.qedge.utils.LogUtils;
-
+/**
+ * @Author 冷雨
+ * @Description JSON 扩展工具类
+ */
 public class JsonExt {
 
     /**

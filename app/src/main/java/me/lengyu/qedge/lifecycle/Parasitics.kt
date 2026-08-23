@@ -35,7 +35,10 @@ import java.io.File
 import java.lang.reflect.InvocationTargetException
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
-
+/**
+ * @Author 冷雨
+ * @Description 活动寄生类
+ */
 @SuppressLint("DiscouragedPrivateApi", "PrivateApi")
 @Suppress("DEPRECATION")
 object Parasitics {

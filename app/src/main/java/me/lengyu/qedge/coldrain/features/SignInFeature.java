@@ -6,6 +6,10 @@ import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.LogUtils;
 
+/**
+ * @Author 冷雨
+ * @Description 签到系统处理
+ */
 public class SignInFeature implements ColdRainFeature {
     @Override
     public boolean shouldHandle(MsgData msgData) {

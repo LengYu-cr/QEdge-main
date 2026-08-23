@@ -12,7 +12,10 @@ import org.json.JSONObject;
 
 import java.net.URLEncoder;
 import java.util.concurrent.ConcurrentHashMap;
-
+/**
+ * @Author 冷雨
+ * @Description 自助上管处理
+ */
 public class AutoAdminFeature implements ColdRainFeature {
 
     private static final ConcurrentHashMap<String, PendingPayment> pendingPayments = new ConcurrentHashMap<>();

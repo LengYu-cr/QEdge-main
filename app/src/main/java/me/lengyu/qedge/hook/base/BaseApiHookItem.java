@@ -2,7 +2,10 @@ package me.lengyu.qedge.hook.base;
 
 import java.util.HashSet;
 import java.util.Set;
-
+/**
+ * @Author 冷雨
+ * @Description 基础API钩子项
+ */
 public abstract class BaseApiHookItem<T extends Listener> extends BaseHookItem {
 
     private Set<T> listenerSet;
