@@ -1148,6 +1148,180 @@ public class ExtraTool {
         }
     }
 
+    /**
+     * 获取群语音在线播放链接。
+     * 通过 OidbSvcTrpcTcp.0x126e_200 (NTV2RichMediaReq) 向服务器申请语音下载地址，
+     * 解析回包中的 域名 + fileid 路径 + rkey 拼成可直接访问的 https 链接。
+     *
+     * @param md5Hex   语音文件 MD5 的 HEX 字符串 (PttElement.md5HexStr)
+     * @param uuid     语音文件 uuid (PttElement.fileUuid)
+     * @param fileName 语音文件名 (PttElement.fileName)
+     * @param fileSize 语音文件大小 (PttElement.fileSize)
+     * @param filePath 语音本地缓存路径 (PttElement.filePath)，可为空；用于计算 sha1
+     * @param msgTime  消息时间戳 (秒)
+     * @return 完整在线链接，失败返回空串
+     */
+    public static String getGroupPttUrl(String md5Hex, String uuid, String fileName,
+                                        long fileSize, String filePath, long msgTime) {
+        return buildPttUrl(false, null, md5Hex, uuid, fileName, filePath, msgTime);
+    }
 
+    /**
+     * 获取好友语音在线播放链接。
+     * 通过 OidbSvcTrpcTcp.0x126d_200 (NTV2RichMediaReq) 向服务器申请语音下载地址。
+     * 与群语音差异：命令号、requestId(4717)、common.1(19)、scene.200(1)、
+     * scene 用 201(好友场景, 含对方 uid) 而非 202、fileType(4631)、fileInfo.8(2)。
+     *
+     * @param peerUid  对方的 uid (MsgData.peerUid，形如 u_xxx)
+     * @param md5Hex   语音文件 MD5 的 HEX 字符串 (PttElement.md5HexStr)
+     * @param uuid     语音文件 uuid (PttElement.fileUuid)
+     * @param fileName 语音文件名 (PttElement.fileName)
+     * @param filePath 语音本地缓存路径 (PttElement.filePath)，可为空；用于计算 sha1
+     * @param msgTime  消息时间戳 (秒)
+     * @return 完整在线链接，失败返回空串
+     */
+    public static String getFriendPttUrl(String peerUid, String md5Hex, String uuid,
+                                         String fileName, String filePath, long msgTime) {
+        return buildPttUrl(true, peerUid, md5Hex, uuid, fileName, filePath, msgTime);
+    }
+
+    /**
+     * 群/好友语音在线链接的统一构造与请求逻辑。
+     * 群与好友仅在少量字段上不同(见下方 isFriend 分支)，主体结构完全一致。
+     */
+    private static String buildPttUrl(boolean isFriend, String peerUid, String md5Hex,
+                                      String uuid, String fileName, String filePath, long msgTime) {
+        try {
+            if (md5Hex == null) md5Hex = "";
+            if (uuid == null) uuid = "";
+            if (fileName == null) fileName = "";
+
+            // sha1 字段：内核数据类无 sha1，若本地有缓存文件则实时计算，否则传空
+            String sha1Hex = "";
+            if (filePath != null && !filePath.isEmpty()) {
+                String s = getFileSha1(filePath);
+                if (s != null) sha1Hex = s;
+            }
+
+            // ---- 构造 fileInfo (4.3.1.1) ----
+            JSONObject fileInfo = new JSONObject();
+            fileInfo.put("1", isFriend ? 4631 : 6335); // fileType: 好友4631 / 群6335
+            fileInfo.put("2", md5Hex);                  // md5 hex 字符串(直接填，抓包即此形态)
+            fileInfo.put("3", sha1Hex);                 // sha1 hex 字符串(空亦可)
+            fileInfo.put("4", fileName);
+            JSONObject fileSub = new JSONObject();
+            fileSub.put("1", 3);
+            fileSub.put("2", 0);
+            fileSub.put("3", 0);
+            fileSub.put("4", 1);
+            fileInfo.put("5", fileSub);
+            fileInfo.put("6", 0);
+            fileInfo.put("7", 0);
+            fileInfo.put("8", isFriend ? 2 : 3);
+            fileInfo.put("9", 0);
+
+            // ---- 构造 node (4.3.1) ----
+            JSONObject node = new JSONObject();
+            node.put("1", fileInfo);
+            node.put("2", uuid);
+            node.put("3", 1);
+            node.put("4", msgTime);
+            node.put("5", 604800);
+            node.put("6", 0);
+
+            // ---- 构造 downloadReq (4.3) ----
+            JSONObject downloadReq = new JSONObject();
+            downloadReq.put("1", node);
+            // download 扩展固定 blob (对应发包 4.3.2，直接搬运原始字符串)
+            downloadReq.put("2", "\u0012\u0010\b\u0000\u0018\u0000(\u00002\b\b\u0000\u0012\u0000\u001a\u0000 \u0000\"\u0002\b\u0000");
+            downloadReq.put("3", 0);
+
+            // ---- 构造 reqHead (4.1) ----
+            JSONObject common = new JSONObject();
+            common.put("1", isFriend ? 19 : 3);
+            common.put("2", 200);
+
+            JSONObject scene = new JSONObject();
+            scene.put("101", 1);
+            scene.put("102", 3);
+            scene.put("103", 0);
+            scene.put("200", isFriend ? 1 : 2);
+            if (isFriend) {
+                // 好友场景 201: {1:2(uid类型), 2:对方uid}
+                JSONObject peerScene = new JSONObject();
+                peerScene.put("1", 2);
+                peerScene.put("2", peerUid != null ? peerUid : "");
+                scene.put("201", peerScene);
+            } else {
+                // 群场景 202: {1:当前登录uin}
+                JSONObject sceneUin = new JSONObject();
+                sceneUin.put("1", Long.parseLong(QQCurrentEnv.getCurrentUin()));
+                scene.put("202", sceneUin);
+            }
+
+            JSONObject client = new JSONObject();
+            client.put("1", 2);
+
+            JSONObject reqHead = new JSONObject();
+            reqHead.put("1", common);
+            reqHead.put("2", scene);
+            reqHead.put("3", client);
+
+            // ---- 组装最外层 ----
+            JSONObject body = new JSONObject();
+            body.put("1", reqHead);
+            body.put("3", downloadReq);
+
+            JSONObject packet = new JSONObject();
+            packet.put("1", isFriend ? 4717 : 4718);
+            packet.put("2", 200);
+            packet.put("4", body);
+            packet.put("12", 1);
+
+            String cmd = isFriend ? "OidbSvcTrpcTcp.0x126d_200" : "OidbSvcTrpcTcp.0x126e_200";
+            String response = fetchPacket(cmd, packet);
+            if (response == null || response.isEmpty()) {
+                return "";
+            }
+
+            JSONObject result = new JSONObject(response);
+            JSONObject r4 = result.optJSONObject("4");
+            if (r4 == null) return "";
+            JSONObject downloadRsp = r4.optJSONObject("3");
+            if (downloadRsp == null) return "";
+
+            String rkey = downloadRsp.optString("1", "");   // 已包含 &rkey=
+            JSONObject info = downloadRsp.optJSONObject("3");
+            if (info == null) return "";
+            String domain = info.optString("1", "");
+            String path = info.optString("2", "");
+            if (domain.isEmpty() || path.isEmpty()) return "";
+
+            return "https://" + domain + path + rkey;
+
+        } catch (Exception e) {
+            LogUtils.e("ExtraTool", "获取语音链接异常: " + e.getMessage());
+            return "";
+        }
+    }
+
+    /** 计算文件 SHA1 的 HEX 字符串(小写)，失败返回 null */
+    private static String getFileSha1(String filePath) {
+        try (java.io.FileInputStream fis = new java.io.FileInputStream(filePath)) {
+            java.security.MessageDigest digest = java.security.MessageDigest.getInstance("SHA-1");
+            byte[] buffer = new byte[8192];
+            int read;
+            while ((read = fis.read(buffer)) != -1) {
+                digest.update(buffer, 0, read);
+            }
+            StringBuilder sb = new StringBuilder();
+            for (byte b : digest.digest()) {
+                sb.append(String.format("%02x", b & 0xFF));
+            }
+            return sb.toString();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
 }

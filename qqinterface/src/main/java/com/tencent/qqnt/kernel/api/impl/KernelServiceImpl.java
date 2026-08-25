@@ -17,4 +17,8 @@ public class KernelServiceImpl {
     public static IKernelService getKernelService() {
         return null;
     }
+
+    public Object getRichMediaService() {
+        return null;
+    }
 }

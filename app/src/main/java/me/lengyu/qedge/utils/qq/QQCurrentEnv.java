@@ -30,6 +30,7 @@ public class QQCurrentEnv {
     public static String currentNickname;
 
     public static MsgService kernelMsgService;
+    public static Object richMediaService;
     public static QQAppInterface qqAppInterface;
 
     public static QQAppInterface getQQAppInterface() {
@@ -90,6 +91,37 @@ public class QQCurrentEnv {
         return null;
     }
 
+    public static Object getRichMediaService() {
+        if (richMediaService != null) {
+            return richMediaService;
+        }
+        try {
+            QQAppInterface appInterface = getQQAppInterface();
+            if (appInterface == null) {
+                return null;
+            }
+            // 从运行时取 QQ 已创建的内核服务，不是 new
+            Object kernelService = appInterface.getRuntimeService(IKernelService.class, "");
+            if (kernelService == null) {
+                return null;
+            }
+            // getRichMediaService 方法名各版本稳定(IKernelService 接口方法),但运行时真实返回
+            // 类型是混淆类 com.tencent.qqnt.kernel.api.ai,stub 声明为 Object,直接调用会因返回
+            // 类型签名不匹配报 No virtual method,故按稳定方法名反射调用以规避返回类型变动
+            Method method = ReflectUtils.findMethod(kernelService.getClass(), "getRichMediaService");
+            if (method == null) {
+                LogUtils.e("QQCurrentEnv", "[getRichMediaService] method not found");
+                return null;
+            }
+            richMediaService = method.invoke(kernelService);
+
+            return richMediaService;
+        } catch (Throwable e) {
+            LogUtils.e("QQCurrentEnv", "[getRichMediaService] error: " + e.getMessage());
+            return null;
+        }
+    }
+
     public static MsgService getKernelMsgService() {
         if (kernelMsgService != null) {
             return kernelMsgService;
@@ -102,9 +134,8 @@ public class QQCurrentEnv {
             // 从运行时取 QQ 已创建的内核服务，不是 new
             KernelServiceImpl kernelService = (KernelServiceImpl)
             appInterface.getRuntimeService(IKernelService.class, "");
-            kernelMsgService = kernelService.getMsgService(); // 或 kernelService.msgService.getValue()
+            kernelMsgService = kernelService.getMsgService(); 
 
-            // kernelMsgService = kernelService.getMsgService();
             return kernelMsgService;
         } catch (Throwable e) {
             LogUtils.e("QQCurrentEnv", "[getKernelMsgService] error: " + e.getMessage());

@@ -59,8 +59,6 @@ public class OnGetRKey extends BaseApiHookItem<Listener> {
                     JSONObject json = protoData.toJSON();
                     if (json != null) {
                         parseRKey(json);
-                    } else {
-                        LogUtils.e("OnGetRKey", "protoData.toJSON() returned null");
                     }
                 } catch (Throwable e) {
                     LogUtils.e("OnGetRKey", "hook error: " + e.getMessage());

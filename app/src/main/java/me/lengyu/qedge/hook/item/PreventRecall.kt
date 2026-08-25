@@ -14,7 +14,6 @@ import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.qq.QQCurrentEnv
-import me.lengyu.qedge.utils.json.ProtoData
 import me.lengyu.qedge.utils.qq.FriendTool
 import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
@@ -589,13 +588,49 @@ class PreventRecall : BaseSwitchHookItem() {
      * 需要判断哪个 uid 才是真正的聊天对方（peer），与 MsgRecord.getPeerUin() 保持一致
      */
     private fun extractC2CRecallMeta(bytes: ByteArray): RecallMeta? {
-        val proto = ProtoData()
-        proto.fromBytes(bytes)
-        val inner = proto.getMessage(1) ?: return null
-        val operatorUid = inner.getString(1)
-        val peerUid = inner.getString(2)
+        // 定位 info 子消息 (field 1, wire 2)
+        val inner = extractLengthDelimited(bytes, 1) ?: return null
+
+        var operatorUid = ""
+        var peerUid = ""
+        var msgSeq = 0
+        var index = 0
+        while (index < inner.size) {
+            val key = readVarInt(inner, index) ?: break
+            val fn = key.value ushr 3
+            val wt = key.value and 0x07
+            index = key.nextIndex
+            when {
+                fn == 1 && wt == 2 -> {
+                    val l = readVarInt(inner, index) ?: break
+                    operatorUid = String(inner, l.nextIndex, l.value, Charsets.UTF_8)
+                    index = l.nextIndex + l.value
+                }
+                fn == 2 && wt == 2 -> {
+                    val l = readVarInt(inner, index) ?: break
+                    peerUid = String(inner, l.nextIndex, l.value, Charsets.UTF_8)
+                    index = l.nextIndex + l.value
+                }
+                fn == 20 && wt == 0 -> {
+                    val v = readVarInt(inner, index) ?: break
+                    msgSeq = v.value
+                    index = v.nextIndex
+                }
+                else -> {
+                    index = when (wt) {
+                        0 -> readVarInt(inner, index)?.nextIndex ?: break
+                        1 -> (index + 8).coerceAtMost(inner.size)
+                        2 -> {
+                            val l = readVarInt(inner, index) ?: break
+                            l.nextIndex + l.value
+                        }
+                        5 -> (index + 4).coerceAtMost(inner.size)
+                        else -> break
+                    }
+                }
+            }
+        }
         if (peerUid.isEmpty()) return null
-        val msgSeq = inner.getInt(20)
 
         val currentUin = QQCurrentEnv.getCurrentUin()
         val peerUin = FriendTool.getUinFromUid(peerUid)
@@ -722,12 +757,75 @@ class PreventRecall : BaseSwitchHookItem() {
      * 结构：C2CRecallOperationInfo(1: operatorUid, 2: peerUid, 20: msgSeq, ...)
      */
     private fun rewriteC2CRecallMsgSeq(bytes: ByteArray): ByteArray? {
-        val proto = ProtoData()
-        proto.fromBytes(bytes)
-        val inner = proto.getMessage(1) ?: return null
-        if (!inner.hasField(20)) return null
-        inner.setInt(20, 1)
-        return proto.toBytes()
+        var index = 0
+        while (index < bytes.size) {
+            val key = readVarInt(bytes, index) ?: break
+            val fn = key.value ushr 3
+            val wt = key.value and 0x07
+            val tagStart = index
+            index = key.nextIndex
+
+            if (fn == 1 && wt == 2) {
+                // info 嵌套消息 (field 1)，进入内部改 msgSeq (field 20)
+                val length = readVarInt(bytes, index) ?: break
+                val subStart = length.nextIndex
+                val subEnd = subStart + length.value
+                val subBytes = bytes.copyOfRange(subStart, subEnd)
+
+                val newSubBytes = rewriteMsgSeqField(subBytes, 20) ?: return null
+
+                val output = ByteArrayOutputStream(bytes.size)
+                output.write(bytes, 0, tagStart)
+                writeVarInt(output, (fn shl 3) or 2)
+                writeVarInt(output, newSubBytes.size)
+                output.write(newSubBytes)
+                output.write(bytes, subEnd, bytes.size - subEnd)
+                return output.toByteArray()
+            }
+            index = when (wt) {
+                0 -> readVarInt(bytes, index)?.nextIndex ?: break
+                1 -> (index + 8).coerceAtMost(bytes.size)
+                2 -> {
+                    val l = readVarInt(bytes, index) ?: break
+                    l.nextIndex + l.value
+                }
+                5 -> (index + 4).coerceAtMost(bytes.size)
+                else -> break
+            }
+        }
+        return null
+    }
+
+    /**
+     * 读取指定字段 (wire type 2) 的 length-delimited 内容字节
+     */
+    private fun extractLengthDelimited(bytes: ByteArray, targetField: Int): ByteArray? {
+        var index = 0
+        while (index < bytes.size) {
+            val key = readVarInt(bytes, index) ?: break
+            val fn = key.value ushr 3
+            val wt = key.value and 0x07
+            index = key.nextIndex
+
+            if (fn == targetField && wt == 2) {
+                val length = readVarInt(bytes, index) ?: break
+                val start = length.nextIndex
+                val end = start + length.value
+                if (end > bytes.size) return null
+                return bytes.copyOfRange(start, end)
+            }
+            index = when (wt) {
+                0 -> readVarInt(bytes, index)?.nextIndex ?: break
+                1 -> (index + 8).coerceAtMost(bytes.size)
+                2 -> {
+                    val l = readVarInt(bytes, index) ?: break
+                    l.nextIndex + l.value
+                }
+                5 -> (index + 4).coerceAtMost(bytes.size)
+                else -> break
+            }
+        }
+        return null
     }
 
     /**

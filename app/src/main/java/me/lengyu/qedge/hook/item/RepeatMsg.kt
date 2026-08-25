@@ -21,11 +21,14 @@ import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.plugin.bean.MsgData
+import me.lengyu.qedge.common.ModuleScope
+import me.lengyu.qedge.utils.qq.ExtraTool
 import me.lengyu.qedge.utils.qq.MsgTool
 import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import com.tencent.qqnt.kernel.nativeinterface.MsgElement
 import com.tencent.qqnt.kernel.nativeinterface.MsgRecord
 import java.lang.reflect.Method
+import java.lang.reflect.Proxy
 /**
  * @Author 冷雨
  * @Description 消息复读
@@ -172,20 +175,134 @@ class RepeatMsg : BaseSwitchHookItem() {
                 )
             }
 
-            // 复制路径：视频 / 语音
+            // 复制路径：视频（异步获取在线播放地址）
             if (msgData.videoList.size > 0) {
                 actions.add(
-                    RepeatMsgAction("复制路径", "视频(需先预览视频才会缓存)") {
-                        copyToClipboard(hostActivity, msgData.videoList.joinToString("\n"))
-                        Toasts.showCustomToast("已复制视频路径到剪贴板")
+                    RepeatMsgAction("复制路径", "视频(获取在线播放地址)") {
+                        try {
+                            val richMediaService = QQCurrentEnv.getRichMediaService()
+                            if (richMediaService == null) {
+                                Toasts.showCustomToast("富媒体服务不可用")
+                                return@RepeatMsgAction
+                            }
+
+                            val contact = msgData.contact ?: return@RepeatMsgAction
+                            val videoElement = msgData.data.elements?.firstOrNull { it.videoElement != null }
+                            if (videoElement == null) {
+                                Toasts.showCustomToast("未找到视频元素")
+                                return@RepeatMsgAction
+                            }
+                            val elementId = videoElement.elementId
+
+                            // 关键：枚举/参数/回调类都必须用宿主 ClassLoader 的类。模块 stub 是
+                            // compileOnly 不打包，运行时若用模块自己的接口实现类做 callback，宿主内核
+                            // 的 JNI 环境无法识别该类，异步回调阶段会在 native 层直接崩溃（进程 abort，
+                            // 无 Java 日志可捕获）。故 callback 用宿主接口的动态代理生成。
+                            val hostCL = richMediaService.javaClass.classLoader
+                            val codecClass = XposedHelpers.findClass(
+                                "com.tencent.qqnt.kernel.nativeinterface.VideoCodecFormatType", hostCL
+                            )
+                            val rmParamsClass = XposedHelpers.findClass(
+                                "com.tencent.qqnt.kernel.nativeinterface.RMReqExParams", hostCL
+                            )
+                            val callbackClass = XposedHelpers.findClass(
+                                "com.tencent.qqnt.kernel.nativeinterface.IVideoPlayUrlCallback", hostCL
+                            )
+                            // 宿主的 VideoCodecFormatType.KCODECFORMATH264 枚举实例
+                            val codecH264 = codecClass.enumConstants?.firstOrNull {
+                                (it as? Enum<*>)?.name == "KCODECFORMATH264"
+                            } ?: codecClass.enumConstants?.get(0)
+                            // 用宿主类构造 RMReqExParams(downSourceType=1, triggerType=0)
+                            val rMReqExParams = XposedHelpers.newInstance(
+                                rmParamsClass,
+                                arrayOf<Class<*>>(Integer.TYPE, Integer.TYPE),
+                                1, 0
+                            )
+
+                            // 用宿主 ClassLoader + 宿主接口生成回调代理，代理类由宿主 CL 定义，
+                            // 内核 JNI 可正常识别；结果对象是宿主 VideoPlayUrlResult，通过反射读字段。
+                            val callback = Proxy.newProxyInstance(
+                                hostCL, arrayOf(callbackClass)
+                            ) { _, m, args ->
+                                if (m.name == "onResult") {
+                                    val code = (args?.getOrNull(0) as? Int) ?: -1
+                                    val msg = args?.getOrNull(1) as? String
+                                    val result = args?.getOrNull(2)
+                                    hostActivity.runOnUiThread {
+                                        runCatching {
+                                            val url = if (code == 0) extractVideoUrl(result) else null
+                                            if (!url.isNullOrEmpty()) {
+                                                copyToClipboard(hostActivity, url)
+                                                Toasts.showCustomToast("已复制视频地址到剪贴板")
+                                            } else {
+                                                Toasts.showCustomToast(msg ?: "获取视频地址失败")
+                                            }
+                                        }.onFailure { LogUtils.e(TAG, "video onResult error: ${it.message}") }
+                                    }
+                                }
+                                // onResult 返回 void
+                                null
+                            }
+
+                            val method = XposedHelpers.findMethodExact(
+                                richMediaService.javaClass, "getVideoPlayUrlV2",
+                                contact.javaClass, java.lang.Long.TYPE, java.lang.Long.TYPE,
+                                codecClass, rmParamsClass, callbackClass
+                            )
+                            method.invoke(
+                                richMediaService, contact, msgData.msgId, elementId,
+                                codecH264, rMReqExParams, callback
+                            )
+                        } catch (e: Throwable) {
+                            LogUtils.e(TAG, "video copy error: ${e.message}")
+                            Toasts.showCustomToast("获取视频地址失败: ${e.message}")
+                        }
                     }
                 )
             }
             if (msgData.pttList.size > 0) {
                 actions.add(
-                    RepeatMsgAction("复制路径", "语音(需先播放语音才会缓存)") {
-                        copyToClipboard(hostActivity, msgData.pttList.joinToString("\n"))
-                        Toasts.showCustomToast("已复制语音路径到剪贴板")
+                    RepeatMsgAction("复制链接", "语音(获取在线播放地址)") {
+                        val pttElement = msgData.data.elements
+                            ?.firstOrNull { it.pttElement != null }?.pttElement
+                        if (pttElement == null) {
+                            Toasts.showCustomToast("未找到语音元素")
+                            return@RepeatMsgAction
+                        }
+                        Toasts.showCustomToast("正在获取语音地址...")
+                        // fetchPacket 会阻塞等待回包，必须放到 IO 线程执行
+                        ModuleScope.launchIOJava(TAG) {
+                            val url = runCatching {
+                                // chatType==1 为好友(c2c)，其余按群处理
+                                if (msgData.type == 1) {
+                                    ExtraTool.getFriendPttUrl(
+                                        msgData.peerUid,
+                                        pttElement.md5HexStr,
+                                        pttElement.fileUuid,
+                                        pttElement.fileName,
+                                        pttElement.filePath,
+                                        msgData.time
+                                    )
+                                } else {
+                                    ExtraTool.getGroupPttUrl(
+                                        pttElement.md5HexStr,
+                                        pttElement.fileUuid,
+                                        pttElement.fileName,
+                                        pttElement.fileSize,
+                                        pttElement.filePath,
+                                        msgData.time
+                                    )
+                                }
+                            }.getOrNull()
+                            hostActivity.runOnUiThread {
+                                if (!url.isNullOrEmpty()) {
+                                    copyToClipboard(hostActivity, url)
+                                    Toasts.showCustomToast("已复制语音地址到剪贴板")
+                                } else {
+                                    Toasts.showCustomToast("获取语音地址失败")
+                                }
+                            }
+                        }
                     }
                 )
             }
@@ -225,6 +342,27 @@ class RepeatMsg : BaseSwitchHookItem() {
             val clip = ClipData.newPlainText("repeat_msg", text)
             clipboard.setPrimaryClip(clip)
         }
+    }
+
+    /**
+     * 从宿主 VideoPlayUrlResult 中反射取出视频在线地址。
+     * result 是宿主 ClassLoader 的类，模块 stub 与之不是同一个 Class，不能直接 cast，
+     * 故按字段名反射读取：优先 domainUrl，退回 v4IpUrl / v6IpUrl；再取列表首元素的 url 字段。
+     * 字段名为 QQ 内核公开数据类的稳定字段，方法名混淆不影响字段访问。
+     */
+    private fun extractVideoUrl(result: Any?): String? {
+        if (result == null) return null
+        try {
+            for (field in arrayOf("domainUrl", "v4IpUrl", "v6IpUrl")) {
+                val list = ReflectUtils.getFieldValue(result, field) as? List<*> ?: continue
+                val first = list.firstOrNull() ?: continue
+                val url = ReflectUtils.getFieldValue(first, "url") as? String
+                if (!url.isNullOrEmpty()) return url
+            }
+        } catch (e: Throwable) {
+            LogUtils.e(TAG, "extractVideoUrl error: ${e.message}")
+        }
+        return null
     }
 
 

@@ -8,4 +8,5 @@ import mqq.app.api.IRuntimeService;
 public interface IKernelService extends IRuntimeService {
     IQQNTWrapperSession getWrapperSession();
     MsgService getMsgService(); // 新增此行
+    Object getRichMediaService(); // 新增此行
 }

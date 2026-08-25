@@ -14,10 +14,6 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 
-/**
- * @Author 冷雨
- * @Description JSON 和 Protobuffer 数据转换类
- */
 public class ProtoData {
     private static final String HEX_PREFIX = "hex->";
     private final HashMap<Integer, List<Object>> values = new HashMap<>();
