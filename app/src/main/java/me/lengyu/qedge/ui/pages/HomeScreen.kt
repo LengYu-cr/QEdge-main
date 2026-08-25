@@ -1,6 +1,7 @@
 package me.lengyu.qedge.ui.pages
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -69,19 +70,17 @@ import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.pages.home.HomeCommentInputDialog
 import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
-import me.lengyu.qedge.ui.pages.home.HomeUpdateLogDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.hook.item.KeepAliveHook
+import me.lengyu.qedge.hook.UserData
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box as ComposeBox
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import androidx.compose.material3.CircularProgressIndicator
 import android.graphics.BitmapFactory
 import kotlinx.coroutines.Dispatchers
@@ -139,12 +138,29 @@ fun HomeScreen(
     var moodText by remember { mutableStateOf(LevelBoost.getMoodText()) }
     var showCommentDialog by remember { mutableStateOf(false) }
     var showMoodConfigDialog by remember { mutableStateOf(false) }
-    var showUpdateLogDialog by remember { mutableStateOf(false) }
-    var showSponsorDialog by remember { mutableStateOf(false) }
     var keepAlivePixel by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_PIXEL, false)) }
     var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
     var keepAliveBackground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_BACKGROUND, false)) }
     var chatSettingEntry by remember { mutableStateOf(ModuleConfig.getString("chat_setting_entry", "more_features")) }
+
+    // 顶栏下推面板：0=无 1=用户信息 2=更新日志 3=赞助（互斥，点同一按钮收起）
+    val currentUin = remember { ModuleConfig.getString("heartbeat_current_uin", "") }
+    var expandedPanel by remember { mutableIntStateOf(0) }
+    var avatarBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+    LaunchedEffect(currentUin) {
+        if (currentUin.isNotEmpty()) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val url = URL("https://q.qlogo.cn/g?b=qq&nk=$currentUin&s=100")
+                    val connection = url.openConnection()
+                    connection.connectTimeout = 10000
+                    connection.readTimeout = 10000
+                    avatarBitmap = BitmapFactory.decodeStream(connection.getInputStream())
+                } catch (_: Throwable) {
+                }
+            }
+        }
+    }
 
     fun loadOnlinePlugins() {
         isLoading = true
@@ -237,14 +253,33 @@ fun HomeScreen(
                 showDocButton = selectedTab == 1,
                 onDocClick = onDocClick,
                 showUpdateLogButton = true,
-                onUpdateLogClick = { showUpdateLogDialog = true },
+                onUpdateLogClick = { expandedPanel = if (expandedPanel == 2) 0 else 2 },
+                showAvatarButton = selectedTab == 0,
+                avatarBitmap = avatarBitmap,
+                onAvatarClick = { expandedPanel = if (expandedPanel == 1) 0 else 1 },
                 showSponsorButton = true,
-                onSponsorClick = { showSponsorDialog = true },
+                onSponsorClick = { expandedPanel = if (expandedPanel == 3) 0 else 3 },
                 actions = {}
             )
 
+            AnimatedVisibility(visible = expandedPanel == 1 && selectedTab == 0) {
+                UserInfoCard(
+                    uin = currentUin,
+                    avatarBitmap = avatarBitmap
+                )
+            }
+
+            AnimatedVisibility(visible = expandedPanel == 2) {
+                UpdateLogCard()
+            }
+
+            AnimatedVisibility(visible = expandedPanel == 3) {
+                SponsorCard()
+            }
+
             HomeTabBar(selectedTab, { newTab ->
                 selectedTab = newTab
+                expandedPanel = 0
                 if (newTab == 1 && onlinePlugins.isEmpty()) {
                     loadOnlinePlugins()
                 }
@@ -467,14 +502,133 @@ fun HomeScreen(
             }
         )
 
-        HomeUpdateLogDialog(
-            show = showUpdateLogDialog,
-            onDismiss = { showUpdateLogDialog = false }
-        )
+    }
+}
 
-        SponsorDialog(
-            show = showSponsorDialog,
-            onDismiss = { showSponsorDialog = false }
+@Composable
+private fun UserInfoCard(uin: String, avatarBitmap: android.graphics.Bitmap?) {
+    val colors = QEdgeTheme.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val nickname = remember(uin) { UserData.getNickname(uin) }
+    val signature = remember(uin) { UserData.getSignature(uin) }
+    val registerTime = remember(uin) { UserData.getRegisterTime(uin) }
+    val moduleVersion = remember(uin) { UserData.getModuleVersion(uin) }
+    val qqVersion = remember(uin) { UserData.getQqVersion(uin) }
+    val isSponsor = remember(uin) { UserData.isSponsor(uin) }
+    val canUpload = remember(uin) { UserData.hasUploadPermission(uin) }
+    val canReview = remember(uin) { UserData.hasReviewPermission(uin) }
+
+    QEdgeCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier
+                        .size(56.dp)
+                        .clip(RoundedCornerShape(28.dp))
+                        .background(colors.cardBackground)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null
+                        ) {
+                            try {
+                                val intent = android.content.Intent(
+                                    android.content.Intent.ACTION_VIEW,
+                                    android.net.Uri.parse("https://v.yuafeng.cn/QEdge/user/")
+                                ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                                context.startActivity(intent)
+                            } catch (_: Throwable) {
+                                android.widget.Toast.makeText(context, "无法打开浏览器", android.widget.Toast.LENGTH_SHORT).show()
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarBitmap != null) {
+                        Image(
+                            bitmap = avatarBitmap.asImageBitmap(),
+                            contentDescription = "用户头像",
+                            modifier = Modifier.size(56.dp).clip(RoundedCornerShape(28.dp))
+                        )
+                    } else {
+                        Text("👤", fontSize = 24.sp)
+                    }
+                }
+                Spacer(modifier = Modifier.width(14.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = if (nickname.isNotEmpty()) nickname else "未登录",
+                        fontSize = 17.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = if (uin.isNotEmpty()) "QQ: $uin" else "QQ: --",
+                        fontSize = 13.sp,
+                        color = colors.textSecondary
+                    )
+                }
+            }
+
+            // 权限/身份标签
+            val tags = buildList {
+                if (isSponsor) add("赞助用户")
+                if (canUpload) add("上传权限")
+                if (canReview) add("审核权限")
+            }
+            if (tags.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    tags.forEach { tag ->
+                        Box(
+                            modifier = Modifier
+                                .padding(end = 8.dp)
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(colors.accentBlue.copy(alpha = 0.12f))
+                                .padding(horizontal = 10.dp, vertical = 4.dp)
+                        ) {
+                            Text(tag, fontSize = 12.sp, color = colors.accentBlue)
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+            HorizontalDivider(color = colors.textSecondary.copy(alpha = 0.12f))
+            Spacer(modifier = Modifier.height(12.dp))
+
+            UserInfoRow("个性签名", if (signature.isNotEmpty()) signature else "暂无")
+            UserInfoRow("注册时间", if (registerTime.isNotEmpty()) registerTime else "--")
+            UserInfoRow("模块版本", if (moduleVersion.isNotEmpty()) moduleVersion else "--")
+            UserInfoRow("QQ版本", if (qqVersion.isNotEmpty()) qqVersion else "--")
+        }
+    }
+}
+
+@Composable
+private fun UserInfoRow(label: String, value: String) {
+    val colors = QEdgeTheme.colors
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+        verticalAlignment = Alignment.Top
+    ) {
+        Text(
+            text = label,
+            fontSize = 13.sp,
+            color = colors.textSecondary,
+            modifier = Modifier.width(72.dp)
+        )
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            text = value,
+            fontSize = 13.sp,
+            color = colors.textPrimary,
+            modifier = Modifier.weight(1f)
         )
     }
 }
@@ -730,7 +884,7 @@ private fun HomePage(
 
                 SettingSwitchItem(
                     title = "消息复读",
-                    subtitle = "点击复读，长按可复制图链、查看原始消息",
+                    subtitle = "点击复读，长按可复制链接、查看原始消息",
                     checked = state.repeatMsg,
                     onCheckedChange = callbacks.onRepeatMsgToggle
                 )
@@ -1540,9 +1694,85 @@ private fun PluginCardActions(onDelete: () -> Unit, onReload: () -> Unit, onUplo
 }
 
 @Composable
-private fun SponsorDialog(show: Boolean, onDismiss: () -> Unit) {
-    if (!show) return
+private fun UpdateLogCard() {
+    val colors = QEdgeTheme.colors
+    var logText by remember { mutableStateOf("加载中...") }
 
+    LaunchedEffect(Unit) {
+        Thread {
+            try {
+                val url = URL("https://v.yuafeng.cn/QEdge/update/changelog.php")
+                val connection = url.openConnection() as java.net.HttpURLConnection
+                connection.connectTimeout = 5000
+                connection.readTimeout = 5000
+                connection.requestMethod = "GET"
+
+                val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream, "UTF-8"))
+                val response = StringBuilder()
+                var line: String?
+                while (reader.readLine().also { line = it } != null) {
+                    response.append(line)
+                }
+                reader.close()
+
+                val json = org.json.JSONObject(response.toString())
+                if (json.getInt("code") == 200) {
+                    val data = json.getJSONObject("data")
+                    val changelog = data.getJSONArray("changelog")
+                    val sb = StringBuilder()
+                    for (i in 0 until changelog.length()) {
+                        val entry = changelog.getJSONObject(i)
+                        sb.append("v${entry.getString("version")} (${entry.getString("date")})\n")
+                        val items = entry.getJSONArray("items")
+                        for (j in 0 until items.length()) {
+                            sb.append("• ${items.getString(j)}\n")
+                        }
+                        if (i < changelog.length() - 1) {
+                            sb.append("\n")
+                        }
+                    }
+                    logText = sb.toString()
+                } else {
+                    logText = "获取失败"
+                }
+            } catch (e: Exception) {
+                logText = "获取失败: ${e.message}"
+            }
+        }.start()
+    }
+
+    QEdgeCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+            Text(
+                "更新日志",
+                fontSize = 17.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(280.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    logText,
+                    fontSize = 14.sp,
+                    color = colors.textSecondary,
+                    lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SponsorCard() {
     val colors = QEdgeTheme.colors
     var bitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
     var isLoading by remember { mutableStateOf(true) }
@@ -1562,36 +1792,28 @@ private fun SponsorDialog(show: Boolean, onDismiss: () -> Unit) {
         }
     }
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+    QEdgeCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp)
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .clip(RoundedCornerShape(24.dp))
-                .background(colors.cardBackground)
-                .padding(24.dp)
-                .verticalScroll(rememberScrollState()),
+            modifier = Modifier.fillMaxWidth().padding(16.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
                 "赞助作者",
-                fontSize = 20.sp,
+                fontSize = 17.sp,
                 fontWeight = FontWeight.Bold,
                 color = colors.textPrimary
             )
-
             Spacer(modifier = Modifier.height(4.dp))
-
             Text(
                 "感谢你的支持！",
-                fontSize = 14.sp,
+                fontSize = 13.sp,
                 color = colors.textSecondary
             )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
+            Spacer(modifier = Modifier.height(16.dp))
             if (isLoading) {
                 CircularProgressIndicator(
                     modifier = Modifier.size(48.dp),
@@ -1602,7 +1824,7 @@ private fun SponsorDialog(show: Boolean, onDismiss: () -> Unit) {
                     bitmap = bitmap!!.asImageBitmap(),
                     contentDescription = "微信赞赏码",
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .fillMaxWidth(0.7f)
                         .clip(RoundedCornerShape(12.dp))
                 )
             } else {
@@ -1610,29 +1832,6 @@ private fun SponsorDialog(show: Boolean, onDismiss: () -> Unit) {
                     "加载失败",
                     fontSize = 14.sp,
                     color = colors.textSecondary
-                )
-            }
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(colors.accentBlue)
-                    .clickable(
-                        interactionSource = remember { MutableInteractionSource() },
-                        indication = null,
-                        onClick = onDismiss
-                    )
-                    .padding(vertical = 12.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    "关闭",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color.White
                 )
             }
         }

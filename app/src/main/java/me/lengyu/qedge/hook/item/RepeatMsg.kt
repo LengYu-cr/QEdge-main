@@ -188,11 +188,12 @@ class RepeatMsg : BaseSwitchHookItem() {
 
                             val contact = msgData.contact ?: return@RepeatMsgAction
                             val videoElement = msgData.data.elements?.firstOrNull { it.videoElement != null }
-                            if (videoElement == null) {
+                            val filterMsgElement = msgData.data.elements?.firstOrNull { it.filterMsgElement != null }   
+                            if (videoElement == null && filterMsgElement == null) {
                                 Toasts.showCustomToast("未找到视频元素")
                                 return@RepeatMsgAction
                             }
-                            val elementId = videoElement.elementId
+                            val elementId = videoElement?.elementId ?: filterMsgElement?.elementId ?: return@RepeatMsgAction
 
                             // 关键：枚举/参数/回调类都必须用宿主 ClassLoader 的类。模块 stub 是
                             // compileOnly 不打包，运行时若用模块自己的接口实现类做 callback，宿主内核

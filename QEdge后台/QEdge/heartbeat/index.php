@@ -146,7 +146,10 @@ try {
             'qq' => $qq,
             'nickname' => $finalNickname,
             'is_sponsor' => $user['is_sponsor'] == 1,
-            'upload_permission' => $user['upload_permission'] == 1
+            'upload_permission' => $user['upload_permission'] == 1,
+            'review_permission' => $user['review_permission'] == 1,
+            'signature' => $user['signature'],
+            'register_time' => $user['register_time']
         ]);
     }
 

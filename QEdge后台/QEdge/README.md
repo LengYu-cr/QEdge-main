@@ -170,30 +170,32 @@ hr {
 阴影 rgba(180, 200, 220, 0.15)
 
 
-## 十一、数据库：plugins 表版本冲突规则（同ID同版本驳回）
+## 十一、数据库：plugins 表索引调整（版本重复冲突修复）
 
-> 背景：could_id 自增主键是全局唯一标识（所有下载/详情/预览接口都按 could_id 定位），但 **同一个 plugin_id + 同一个 version_code 组合 必须唯一**：
-> - ✅ 同一个 plugin_id 下 1.0 / 1.1 / 2.0 三个不同 version_code → 正常新增，could_id 不同
-> - ❌ 同一个 plugin_id + 同一个 version_code（无论作者是谁）→ 直接驳回，防止版本号语义混乱
+> 背景：`idx_plugin_version` 原来是 `UNIQUE(plugin_id, version_code)`，会导致：
+> - 同一个脚本 ID 不能上传两个相同版本号（即使是不同作者、完全不同的内容也不行）
+> - 作者自己想重新打包上传修复版（不改版本号）直接抛 1062 Duplicate entry
 >
-> 代码层面（`online_plugin/index.php`）已经做了**应用层优先拦截**：上传前先 SELECT 一遍，命中同 ID + 同版本就返回 400 友好错误（提示作者改 info.prop 的 versionCode 再重新打包），避免数据库层直接抛 1062 Duplicate entry。
-> 数据库层 `UNIQUE KEY idx_plugin_version(plugin_id, version_code)` 继续保留，作为并发兜底（防止两个人同一秒同时上传相同 ID+版本号时应用层漏判）。
+> 修复思路：**`could_id` 自增主键是全局唯一标识**，`plugin_id + version_code` 只用作快速查询的普通索引，不再唯一。
+> 代码层面（`online_plugin/index.php`）已经做了幂等处理：
+> - 同一作者再次上传同 `plugin_id + version_code` → 覆盖旧记录（更新 zip/名称/介绍，重走审核，旧 zip 自动删除）
+> - 不同作者上传同 `plugin_id + version_code` → 作为两条独立 could_id 记录存在（完全不冲突）
+> - 不同版本号（同一 plugin_id） → 正常 INSERT，版本历史列表页按 `ORDER BY could_id DESC` 展示即可
 
-### 推荐索引（保持默认即可，不用改）
+执行以下 ALTER 语句（**需要先处理线上已有的重复数据，否则 DROP UNIQUE → ADD INDEX 后数据不会丢，只是不再强约束唯一**，推荐先备份）：
 
 ```sql
--- could_id 自增主键（PRIMARY KEY 默认就有）
--- idx_plugin_version = UNIQUE(plugin_id, version_code) —— 数据库兜底防并发
--- 其他辅助索引按业务需要加（如 status+upload_time、upload_qq）
+-- 1) 先确认当前索引名和状态（正常是 idx_plugin_version，UNIQUE）
 SHOW INDEX FROM plugins WHERE Key_name = 'idx_plugin_version';
-```
 
-如果之前按旧说明把 UNIQUE 改成普通 INDEX 了，可以执行以下语句改回 UNIQUE：
-
-```sql
+-- 2) 删除 UNIQUE 约束（如果报索引不存在可以跳过，证明已经改过）
 ALTER TABLE `plugins` DROP INDEX `idx_plugin_version`;
-ALTER TABLE `plugins` ADD UNIQUE INDEX `idx_plugin_version` (`plugin_id`, `version_code`);
+
+-- 3) 重新加为普通 INDEX（加速按 plugin_id+version_code 查询，不唯一）
+ALTER TABLE `plugins` ADD INDEX `idx_plugin_version` (`plugin_id`, `version_code`);
 ```
+
+执行完成后上传 `today_wife_memory-1.0` 多次应该不会再出现 1062 错误。
 
 ## 十二、数据库：feedback 反馈表安装
 

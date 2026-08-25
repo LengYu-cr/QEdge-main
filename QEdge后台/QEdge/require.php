@@ -49,7 +49,7 @@ define('SMTP_PORT', 465);
 define('SMTP_USER', '1431136407@qq.com');
 define('SMTP_PASS', 'fgiimwilgpfkjjcg'); // 请在此处填写授权码
 define('SMTP_FROM', '1431136407@qq.com');
-define('SMTP_FROM_NAME', 'QEdge系统');
+define('SMTP_FROM_NAME', 'QEdge');
 
 // 会话配置
 define('SESSION_NAME', 'QEDGE_SESSION');
@@ -66,16 +66,18 @@ define('QQ_AVATAR_URL', 'https://q1.qlogo.cn/g?b=qq&nk=');
 
 // 系统信息
 define('SYSTEM_NAME', 'QEdge');
-define('SYSTEM_VERSION', '0.1.3');
+define('SYSTEM_VERSION', '0.2.0');
 const SYSTEM_UPDATE_LOG = [
-    '修复 冷雨Java开关机',
-    '新增 空间秒赞，秒评',
-    '新增 视频转泡泡功能',
-    '新增 闪照破解',
-    '新增 半透明头像/名片/群头像/群名片等',
-    '新增 表情长按下载'
+    '新增 消息复读',
+    '优化 部分情况下模块卡顿问题',
+    '优化 项目源代码结构和逻辑',
+    '优化 减少使用Java反射',
+    '优化 首次加载模块页面时的速度',
+    '优化 dexkit缓存和模块配置数据缓存',
+    '修复 等级加速--自动加好友逻辑错误问题',
+    '增加 模块体积，让你的手机内存减少0.03MB',
+    '好像已经忘了还更新了什么了'
 ];
-
 // 创建数据库连接
 function getDBConnection() {
     try {

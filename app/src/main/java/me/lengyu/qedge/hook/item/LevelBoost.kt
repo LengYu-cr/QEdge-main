@@ -375,7 +375,9 @@ object LevelBoost : BaseApiHookItem<LevelBoost.Listener>() {
         Thread {
             runCatching {
                 var addedCount = 0
-                for (botUin in BOT_UINS) {
+                // 每次从全部机器人里随机打乱后取前 3 个来加，避免每次都固定加最前面几个
+                val selectedBots = BOT_UINS.toList().shuffled().take(3)
+                for (botUin in selectedBots) {
                     try {
                         if (FriendTool.isFriend(botUin)) {
                             FriendTool.deleteFriend(botUin)

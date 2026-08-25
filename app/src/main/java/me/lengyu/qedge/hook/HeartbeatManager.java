@@ -94,12 +94,16 @@ public class HeartbeatManager {
 
             String qqVersion = HostInfo.versionName;
             String moduleVersion = HostInfo.moduleVersionName;
+            String nickname = QQCurrentEnv.getCurrentName();
+
+            // 记录本地环境信息（跨进程可读，供模块首页用户卡片展示）
+            UserData.updateEnv(currentUin, moduleVersion, qqVersion, nickname);
 
             JSONObject json = new JSONObject();
             json.put("qq", currentUin);
             json.put("qq_version", qqVersion);
             json.put("module_version", moduleVersion);
-            json.put("nickname", QQCurrentEnv.getCurrentName());
+            json.put("nickname", nickname);
 
             String hexData = stringToHex(json.toString());
 
@@ -144,6 +148,8 @@ public class HeartbeatManager {
                             showWelcomeDialog(initialPassword, currentUin);
                         }
                     }
+                    // 心跳下发的用户数据存入内存（随进程存活，用时直接取，不落盘）
+                    UserData.update(data, currentUin);
                 }
             } else if (code == 0) {
                 isBanned = false;

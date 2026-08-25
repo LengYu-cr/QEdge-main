@@ -1,0 +1,3 @@
+# 日志目录安全配置
+Order Allow,Deny
+Deny from all

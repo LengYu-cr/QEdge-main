@@ -235,44 +235,57 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $userQQ      = sanitizeInput($userQQ);
 
         // 4) 冲突处理 + 写入数据库（status=0 待审核）
-        // 规则：
-        // - could_id 自增主键是全局唯一标识（列表、详情、下载都按 could_id 定位）
-        // - 同一个 plugin_id 允许存在多个版本（不同 version_code）→ 正常 INSERT
-        // - 同一个 plugin_id + 同一个 version_code → 无论作者是谁，都直接驳回（防止版本号语义混乱）
-        // - UNIQUE KEY idx_plugin_version(plugin_id, version_code) 继续保留在 DB 层做并发兜底
-        $dupCheck = $pdo->prepare("SELECT could_id, upload_qq, plugin_name FROM plugins WHERE plugin_id = ? AND version_code = ? LIMIT 1");
+        // 注意：UNIQUE KEY idx_plugin_version(plugin_id, version_code) 已在 README 推荐改为普通索引，
+        // could_id 自增主键才是全局唯一标识，同 plugin_id+version_code 允许存在多条
+        // （不同作者重名上传 = 不同 could_id 的独立记录；同一作者重传同版本号 = 覆盖之前那条）
+        $dupCheck = $pdo->prepare("SELECT could_id, upload_qq, file_path FROM plugins WHERE plugin_id = ? AND version_code = ? LIMIT 1");
         $dupCheck->execute([$pluginID, $versionCode]);
         $dup = $dupCheck->fetch(PDO::FETCH_ASSOC);
 
-        if ($dup) {
-            // 同 ID + 同版本 → 驳回，新文件也删掉
-            @unlink($filePath);
-            $dupName = htmlspecialchars($dup['plugin_name'] ?? '未知脚本');
-            logMessage("用户 {$userQQ} 上传插件被驳回：同ID同版本已存在 plugin_id={$pluginID} version={$versionCode} existing_could_id={$dup['could_id']}", 'WARN');
-            jsonResponse(400, "脚本ID【{$pluginID}】的版本号【{$versionCode}】已存在（当前占用：{$dupName}），请修改 info.prop 中的版本号后重新上传");
+        if ($dup && strval($dup['upload_qq']) === strval($userQQ)) {
+            // 同一作者再次上传同 plugin_id + 同 version_code：覆盖旧记录（更新文件名/作者/介绍/状态），旧 zip 删掉
+            $oldPath = $dup['file_path'];
+            $couldId = intval($dup['could_id']);
+            $upd = $pdo->prepare("UPDATE plugins SET plugin_name=?, author_name=?, file_path=?, description=?, status=0, reject_reason=NULL, upload_time=CURRENT_TIMESTAMP WHERE could_id=?");
+            $upd->execute([$pluginName, $authorName, $filePath, $description, $couldId]);
+            // 删除旧 zip（失败不影响主流程）
+            if ($oldPath && file_exists($oldPath) && $oldPath !== $filePath) {
+                @unlink($oldPath);
+            }
+            logMessage("用户 {$userQQ} 覆盖上传插件 {$pluginName} (ID: {$pluginID}, Could ID: {$couldId}, 版本: {$versionCode}) [同作者同版本号覆盖]", 'INFO');
+            jsonResponse(200, '同版本覆盖上传成功，等待重新审核', [
+                'could_id'     => $couldId,
+                'plugin_id'    => $pluginID,
+                'plugin_name'  => $pluginName,
+                'version_code' => $versionCode,
+                'author_name'  => $authorName,
+                'description'  => $description,
+                'overwritten'  => true
+            ]);
+        } else {
+            // 全新记录 / 不同作者同 plugin_id+version：直接 INSERT，could_id 自增主键独立区分
+            $stmt = $pdo->prepare("INSERT INTO plugins (plugin_id, plugin_name, version_code, author_name, upload_qq, file_path, download_count, status, description) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?)");
+            $stmt->execute([
+                $pluginID,
+                $pluginName,
+                $versionCode,
+                $authorName,
+                $userQQ,
+                $filePath,
+                $description
+            ]);
+            $couldId = $pdo->lastInsertId();
+            logMessage("用户 {$userQQ} 上传插件 {$pluginName} (ID: {$pluginID}, Could ID: {$couldId}) [服务端从ZIP内info.prop读取]", 'INFO');
+            jsonResponse(200, '插件上传成功，等待审核', [
+                'could_id'     => $couldId,
+                'plugin_id'    => $pluginID,
+                'plugin_name'  => $pluginName,
+                'version_code' => $versionCode,
+                'author_name'  => $authorName,
+                'description'  => $description,
+                'overwritten'  => false
+            ]);
         }
-
-        // 没有重复 → 正常 INSERT，could_id 自增主键独立区分每条记录
-        $stmt = $pdo->prepare("INSERT INTO plugins (plugin_id, plugin_name, version_code, author_name, upload_qq, file_path, download_count, status, description) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?)");
-        $stmt->execute([
-            $pluginID,
-            $pluginName,
-            $versionCode,
-            $authorName,
-            $userQQ,
-            $filePath,
-            $description
-        ]);
-        $couldId = $pdo->lastInsertId();
-        logMessage("用户 {$userQQ} 上传插件 {$pluginName} (ID: {$pluginID}, Could ID: {$couldId}) [服务端从ZIP内info.prop读取]", 'INFO');
-        jsonResponse(200, '插件上传成功，等待审核', [
-            'could_id'     => $couldId,
-            'plugin_id'    => $pluginID,
-            'plugin_name'  => $pluginName,
-            'version_code' => $versionCode,
-            'author_name'  => $authorName,
-            'description'  => $description
-        ]);
 
     } catch (Exception $e) {
         if (isset($filePath) && file_exists($filePath)) {

@@ -59,7 +59,7 @@ public class Toasts {
     }
 
     public static void showToast(String message) {
-        toast(message);
+        showCustomToast(message);
     }
 
     public static void showCustomToast(String message) {

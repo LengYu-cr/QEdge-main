@@ -23,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,6 +47,9 @@ fun QEdgeTopBar(
     onDocClick: () -> Unit = {},
     showUpdateLogButton: Boolean = false,
     onUpdateLogClick: () -> Unit = {},
+    showAvatarButton: Boolean = false,
+    avatarBitmap: android.graphics.Bitmap? = null,
+    onAvatarClick: () -> Unit = {},
     showSponsorButton: Boolean = false,
     onSponsorClick: () -> Unit = {},
     actions: @Composable () -> Unit = {}
@@ -124,6 +128,34 @@ fun QEdgeTopBar(
                     contentAlignment = Alignment.Center
                 ) {
                     Text("📖", fontSize = 18.sp)
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+
+            if (showAvatarButton) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(colors.cardBackground)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = ripple(color = colors.ripple),
+                            onClick = onAvatarClick
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (avatarBitmap != null) {
+                        androidx.compose.foundation.Image(
+                            bitmap = avatarBitmap.asImageBitmap(),
+                            contentDescription = "用户头像",
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                        )
+                    } else {
+                        Text("👤", fontSize = 18.sp)
+                    }
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }
