@@ -11,8 +11,8 @@ android {
         applicationId = "me.lengyu.qedge"
         minSdk = 29
         targetSdk = 37
-        versionCode = 20
-        versionName = "0.2.0"
+        versionCode = 21
+        versionName = "0.2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -98,6 +98,8 @@ dependencies {
     compileOnly(libs.xposed)
     // dx
     implementation(libs.dalvik.dx)
+    // rhino js engine
+    implementation(libs.rhino)
     // qq stub
     compileOnly(project(":qqinterface"))
 }

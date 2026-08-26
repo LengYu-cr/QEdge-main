@@ -32,6 +32,7 @@ import me.lengyu.qedge.utils.ReflectUtils;
 public class PluginCompiler {
     public final PluginInfo info;
     private Interpreter interpreter;
+    private JsRuntime jsRuntime;
     private final Map<String, String> menuItems = new LinkedHashMap<>();
     private final List<String> msgMenuItem = new ArrayList<>();
     private final List<String> registedActivitys = new ArrayList<>();
@@ -59,6 +60,11 @@ public class PluginCompiler {
             stop(false);
         }
         info.updateFromDisk();
+
+        if (info.isJs()) {
+            startJs();
+            return;
+        }
 
         File scriptFile = new File(info.getDirPath(), "main.java");
         if (!scriptFile.exists()) {
@@ -100,10 +106,31 @@ public class PluginCompiler {
         }
     }
 
+    /** 启动 JS 插件：用 Rhino 执行 main.js，菜单/回调注册逻辑与 Java 插件共用 */
+    private void startJs() {
+        File scriptFile = new File(info.getDirPath(), "main.js");
+        if (!scriptFile.exists()) {
+            throw new IllegalStateException("main.js not found");
+        }
+        try {
+            jsRuntime = new JsRuntime(info, api);
+            info.setRunning(true);
+            // start() 内部会执行 main.js，脚本里的 addItem/addMenuItem 会填充 msgMenuItem
+            jsRuntime.start();
+            registerCallbacks();
+        } catch (Throwable e) {
+            LogUtils.e("[DEBUG-PLUGIN]", "DP-JS FATAL ERROR: " + e.getMessage());
+            LogUtils.e("[DEBUG-PLUGIN]", e);
+            stop(false);
+            throw new RuntimeException(e);
+        }
+    }
+
     public synchronized void stop(boolean invokeCallback) {
         if (!info.isRunning()) return;
 
-        if (invokeCallback) {
+        if (invokeCallback && !info.isJs()) {
+            // JS 的 unLoadPlugin 回调在 jsRuntime.destroy() 内部脚本线程里执行
             try {
                 callback.unLoadPlugin();
             } catch (Exception e) {
@@ -116,6 +143,14 @@ public class PluginCompiler {
                 DynamicActivityRegistry.unregister(activityName);
             }
             removeCallbacks();
+            if (jsRuntime != null) {
+                try {
+                    jsRuntime.destroy();
+                } catch (Throwable e) {
+                    PluginError.callError(new RuntimeException(e), info);
+                }
+                jsRuntime = null;
+            }
             if (interpreter != null && interpreter.getNameSpace() != null) {
                 interpreter.getNameSpace().clear();
             }
@@ -182,6 +217,10 @@ public class PluginCompiler {
 
     public Interpreter getInterpreter() {
         return interpreter;
+    }
+
+    public JsRuntime getJsRuntime() {
+        return jsRuntime;
     }
 
     public Map<String, String> getMenuItems() {

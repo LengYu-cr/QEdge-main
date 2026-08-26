@@ -5,6 +5,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import com.tencent.mobileqq.app.BaseActivity
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation
 import me.lengyu.qedge.hook.base.BaseApiHookItem
 import me.lengyu.qedge.hook.base.Listener
@@ -80,7 +81,7 @@ object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarLi
         hookPhotoCropSource(cropClass)
         hookProfileCardUtilF(fMethod)
         hookBitmapCompress()
-        hookBitmapFactoryDecodeFile(classLoader)
+        hookBitmapFactoryDecodeFile(classLoader, cropClass)
     }
 
     // ------- 递归搜字段：找存在的文件路径 / content/file URI -------
@@ -190,7 +191,7 @@ object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarLi
     }
 
     // ------- decodeFile：在 PhotoCropActivity 调用栈中记录路径兜底 -------
-    private fun hookBitmapFactoryDecodeFile(classLoader: ClassLoader) {
+    private fun hookBitmapFactoryDecodeFile(classLoader: ClassLoader, cropClass: Class<*>) {
         try {
             listOf(
                 BitmapFactory::class.java.getDeclaredMethod(
@@ -202,12 +203,16 @@ object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarLi
             ).forEach { method ->
                 HookUtils.hookBefore(method) { param ->
                     if (pendingSource != null) return@hookBefore
+                    // 头像裁剪解码只发生在 PhotoCropActivity 处于前台时；顶层 Activity 不是裁剪页就
+                    // 直接放行，避免对聊天图片等全局 decodeFile 都生成完整调用栈(昂贵)。
+                    if (!cropClass.isInstance(BaseActivity.sTopActivity)) return@hookBefore
                     val path = param.args.getOrNull(0) as? String ?: return@hookBefore
                     val file = File(path)
                     if (!file.isFile) return@hookBefore
-                    val stack = Thread.currentThread().stackTrace
-                    for (el in stack) {
-                        val cn = el.className
+                    val stack = Throwable().stackTrace
+                    val limit = if (stack.size < 40) stack.size else 40
+                    for (i in 0 until limit) {
+                        val cn = stack[i].className
                         if (cn.contains("ProfileCardUtil")) return@hookBefore
                         if (cn.contains("PhotoCropActivity")) {
                             pendingSource = path
@@ -275,9 +280,12 @@ object TransparentAvatar : BaseApiHookItem<TransparentAvatar.TransparentAvatarLi
             HookUtils.hookBefore(method) { param ->
                 val fmt = param.args[0] as? Bitmap.CompressFormat ?: return@hookBefore
                 if (fmt != Bitmap.CompressFormat.JPEG) return@hookBefore
-                val stack = Thread.currentThread().stackTrace
-                for (el in stack) {
-                    val cn = el.className
+                // Throwable().stackTrace 比 Thread.currentThread().stackTrace 更省，且限制帧数，
+                // 头像相关调用帧通常在栈上部，命中即 break。
+                val stack = Throwable().stackTrace
+                val limit = if (stack.size < 40) stack.size else 40
+                for (i in 0 until limit) {
+                    val cn = stack[i].className
                     if (cn.contains("PhotoCropActivity") ||
                         cn.contains("ProfileCardUtil") ||
                         cn.contains("pic.compress") ||

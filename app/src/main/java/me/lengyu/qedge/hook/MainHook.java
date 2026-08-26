@@ -285,7 +285,8 @@ public class MainHook {
                     plugin.getDesc(),
                     plugin.isRunning(),
                     me.lengyu.qedge.plugin.PluginManager.autoLoadList.contains(plugin.getId()),
-                    plugin.getDirPath()
+                    plugin.getDirPath(),
+                    plugin.getType()
                 ));
             }
         } catch (Throwable e) {
@@ -355,6 +356,15 @@ public class MainHook {
     public static void createPlugin() {
         try {
             me.lengyu.qedge.plugin.PluginManager.createExamplePlugin();
+        } catch (Throwable e) {
+            LogUtils.e("MainHook", e);
+        }
+    }
+
+    /** 按新建弹窗填写的信息创建插件(type: java/js, 主脚本为空文件) */
+    public static void createPlugin(String type, String name, String desc, String author, String version) {
+        try {
+            me.lengyu.qedge.plugin.PluginManager.createPlugin(type, name, desc, author, version);
         } catch (Throwable e) {
             LogUtils.e("MainHook", e);
         }

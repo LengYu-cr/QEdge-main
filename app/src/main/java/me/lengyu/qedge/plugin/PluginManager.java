@@ -160,8 +160,92 @@ public class PluginManager {
     }
 
     public static boolean createExamplePlugin() {
+        return createExamplePlugin(PluginInfo.TYPE_JAVA);
+    }
+
+    /**
+     * 按弹窗填写的信息新建插件。
+     * type 为 "java"(BeanShell) 或 "js"(Rhino)，主脚本文件建空文件由用户自行编写。
+     * 目录名直接用脚本名(去非法字符)，唯一性由 id 保证：已存在同名目录或同 id 插件则拒绝创建。
+     */
+    public static boolean createPlugin(String type, String name, String desc, String author, String version) {
+        boolean isJs = "js".equalsIgnoreCase(type) || "javascript".equalsIgnoreCase(type);
         long timestamp = System.currentTimeMillis();
-        String dirName = "示例脚本";
+
+        String safeName = (name == null || name.trim().isEmpty())
+                ? (isJs ? "JS脚本" : "脚本") : name.trim();
+        String safeAuthor = (author == null || author.trim().isEmpty()) ? "Developer" : author.trim();
+        String safeVersion = (version == null || version.trim().isEmpty()) ? "1.0" : version.trim();
+        String safeDesc = (desc == null) ? "" : desc.trim();
+
+        // id 作为唯一标识；目录名直接用脚本名，不加时间戳
+        String id = (isJs ? "js_" : "plugin_") + timestamp;
+        if (isIdExists(id)) {
+            LogUtils.e("PluginManager", "Plugin id already exists: " + id);
+            Toasts.showCustomToast("已存在相同 id 的脚本");
+            return false;
+        }
+
+        String dirName = sanitizeFileName(safeName);
+        File targetDir = new File(getPluginDir(), dirName);
+        if (targetDir.exists()) {
+            LogUtils.e("PluginManager", "Plugin dir already exists: " + targetDir.getAbsolutePath());
+            Toasts.showCustomToast("已存在同名脚本，请换个名字");
+            return false;
+        }
+
+        if (!targetDir.mkdirs()) {
+            LogUtils.e("PluginManager", "Failed to create directory: " + targetDir.getAbsolutePath());
+            return false;
+        }
+
+        try {
+            File propFile = new File(targetDir, "info.prop");
+            String propContent = "id=" + id + "\n" +
+                    "pluginName=" + safeName + "\n" +
+                    "versionCode=" + safeVersion + "\n" +
+                    "author=" + safeAuthor + "\n" +
+                    "type=" + (isJs ? PluginInfo.TYPE_JS : PluginInfo.TYPE_JAVA) + "\n";
+            writeFile(propFile, propContent);
+
+            writeFile(new File(targetDir, "desc.txt"), safeDesc);
+
+            // 主脚本建空文件，交由用户自行编写
+            writeFile(new File(targetDir, isJs ? "main.js" : "main.java"), "");
+
+            PluginInfo info = PluginInfo.fromDir(targetDir);
+            if (info != null) {
+                plugins.add(info);
+                return true;
+            }
+            LogUtils.e("PluginManager", "Failed to load plugin info from dir");
+            return true;
+        } catch (Exception e) {
+            LogUtils.e("PluginManager", e);
+            deleteFile(targetDir);
+            return false;
+        }
+    }
+
+    /** 判断当前插件列表里是否已存在同 id 插件 */
+    private static boolean isIdExists(String id) {
+        for (PluginInfo p : plugins) {
+            if (id.equals(p.getId())) return true;
+        }
+        return false;
+    }
+
+    /** 过滤文件名里的非法字符，避免建目录失败 */
+    private static String sanitizeFileName(String name) {
+        String cleaned = name.replaceAll("[\\\\/:*?\"<>|]", "_").trim();
+        return cleaned.isEmpty() ? "plugin" : cleaned;
+    }
+
+    /** 新建示例插件。type 为 "java"(BeanShell) 或 "js"(Rhino) */
+    public static boolean createExamplePlugin(String type) {
+        boolean isJs = "js".equalsIgnoreCase(type) || "javascript".equalsIgnoreCase(type);
+        long timestamp = System.currentTimeMillis();
+        String dirName = isJs ? "JS示例脚本_" + timestamp : "示例脚本_" + timestamp;
         File targetDir = new File(getPluginDir(), dirName);
 
         if (!targetDir.mkdirs()) {
@@ -171,31 +255,57 @@ public class PluginManager {
 
         try {
             File propFile = new File(targetDir, "info.prop");
-            String propContent = "id=example_" + timestamp + "\n" +
-                    "pluginName=示例脚本\n" +
+            String propContent = "id=" + (isJs ? "jsexample_" : "example_") + timestamp + "\n" +
+                    "pluginName=" + (isJs ? "JS示例脚本" : "示例脚本") + "\n" +
                     "versionCode=1.0\n" +
-                    "author=Developer\n";
+                    "author=Developer\n" +
+                    "type=" + (isJs ? PluginInfo.TYPE_JS : PluginInfo.TYPE_JAVA) + "\n";
             writeFile(propFile, propContent);
 
             File descFile = new File(targetDir, "desc.txt");
-            writeFile(descFile, "这是一个自动生成的示例脚本");
+            writeFile(descFile, isJs ? "这是一个自动生成的 JS 示例脚本" : "这是一个自动生成的示例脚本");
 
-            File mainFile = new File(targetDir, "main.java");
-            String javaContent =
-                    "log(\"脚本开始运行...\");\n" +
-                    "qqToast(2, \"Hello World!\");\n" +
-                    "\n" +
-                    "addItem(\"测试菜单\", \"onTestClick\");\n" +
-                    "\n" +
-                    "void onTestClick(int chatType, String peerUin, String peerName) {\n" +
-                    "    qqToast(2, \"点击了菜单\");\n" +
-                    "}\n" +
-                    "\n" +
-                    "void unLoadPlugin() {\n" +
-                    "    qqToast(0, \"脚本停止运行\");\n" +
-                    "    log(\"脚本停止运行\");\n" +
-                    "}\n";
-            writeFile(mainFile, javaContent);
+            if (isJs) {
+                File mainFile = new File(targetDir, "main.js");
+                String jsContent =
+                        "console.log(\"JS 脚本开始运行...\");\n" +
+                        "qqToast(2, \"Hello JS!\");\n" +
+                        "\n" +
+                        "// 注册消息菜单，点击后回调 onTestClick\n" +
+                        "addItem(\"测试菜单\", \"onTestClick\");\n" +
+                        "\n" +
+                        "// 收到消息回调(与 Java 插件一致)\n" +
+                        "function onMsg(msg) {\n" +
+                        "    console.log(\"收到消息: \" + msg);\n" +
+                        "}\n" +
+                        "\n" +
+                        "function onTestClick(chatType, peerUin, peerName) {\n" +
+                        "    qqToast(2, \"点击了菜单\");\n" +
+                        "}\n" +
+                        "\n" +
+                        "function unLoadPlugin() {\n" +
+                        "    qqToast(0, \"脚本停止运行\");\n" +
+                        "    console.log(\"脚本停止运行\");\n" +
+                        "}\n";
+                writeFile(mainFile, jsContent);
+            } else {
+                File mainFile = new File(targetDir, "main.java");
+                String javaContent =
+                        "log(\"脚本开始运行...\");\n" +
+                        "qqToast(2, \"Hello World!\");\n" +
+                        "\n" +
+                        "addItem(\"测试菜单\", \"onTestClick\");\n" +
+                        "\n" +
+                        "void onTestClick(int chatType, String peerUin, String peerName) {\n" +
+                        "    qqToast(2, \"点击了菜单\");\n" +
+                        "}\n" +
+                        "\n" +
+                        "void unLoadPlugin() {\n" +
+                        "    qqToast(0, \"脚本停止运行\");\n" +
+                        "    log(\"脚本停止运行\");\n" +
+                        "}\n";
+                writeFile(mainFile, javaContent);
+            }
 
             PluginInfo info = PluginInfo.fromDir(targetDir);
             if (info != null) {

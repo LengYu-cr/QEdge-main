@@ -375,3 +375,213 @@ fun HomeUpdateLogDialog(
         }
     }
 }
+
+/**
+ * 新建插件弹窗：选择语言(JS / Java)，填写脚本名、描述、作者、版本号。
+ * 确认后回调 onConfirm(type, name, desc, author, version)，主脚本建空文件由用户自行编写。
+ */
+@Composable
+fun HomeCreatePluginDialog(
+    show: Boolean,
+    onDismiss: () -> Unit,
+    onConfirm: (type: String, name: String, desc: String, author: String, version: String) -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var isJs by remember { mutableStateOf(false) }
+    var name by remember { mutableStateOf("") }
+    var desc by remember { mutableStateOf("") }
+    var author by remember { mutableStateOf("") }
+    var version by remember { mutableStateOf("1.0") }
+    val canConfirm = name.trim().isNotEmpty()
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth(0.9f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                "新建脚本",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Text("脚本语言", fontSize = 13.sp, color = colors.textPrimary)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                CreatePluginTypeOption(
+                    label = "Java",
+                    selected = !isJs,
+                    onClick = { isJs = false },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                CreatePluginTypeOption(
+                    label = "JS",
+                    selected = isJs,
+                    onClick = { isJs = true },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            CreatePluginField(
+                label = "脚本名",
+                value = name,
+                placeholder = "请输入脚本名",
+                singleLine = true,
+                onValueChange = { name = it }
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            CreatePluginField(
+                label = "描述",
+                value = desc,
+                placeholder = "简单介绍一下这个脚本",
+                singleLine = false,
+                onValueChange = { desc = it }
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            CreatePluginField(
+                label = "作者",
+                value = author,
+                placeholder = "作者名",
+                singleLine = true,
+                onValueChange = { author = it }
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            CreatePluginField(
+                label = "版本号",
+                value = version,
+                placeholder = "1.0",
+                singleLine = true,
+                onValueChange = { version = it }
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (canConfirm) AccentGreen else colors.textSecondary.copy(alpha = 0.3f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                if (!canConfirm) return@clickable
+                                onConfirm(
+                                    if (isJs) "js" else "java",
+                                    name.trim(),
+                                    desc.trim(),
+                                    author.trim(),
+                                    version.trim()
+                                )
+                            }
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "创建",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = if (canConfirm) Color.White else colors.textSecondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun CreatePluginTypeOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = QEdgeTheme.colors
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) AccentGreen.copy(alpha = 0.15f)
+                else colors.textSecondary.copy(alpha = 0.08f)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) AccentGreen else colors.textSecondary
+        )
+    }
+}
+
+@Composable
+private fun CreatePluginField(
+    label: String,
+    value: String,
+    placeholder: String,
+    singleLine: Boolean,
+    onValueChange: (String) -> Unit
+) {
+    val colors = QEdgeTheme.colors
+    Text(label, fontSize = 13.sp, color = colors.textPrimary)
+    Spacer(modifier = Modifier.height(6.dp))
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.textSecondary.copy(alpha = 0.08f))
+            .padding(14.dp)
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = TextStyle(fontSize = 14.sp, color = colors.textPrimary),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = singleLine,
+            maxLines = if (singleLine) 1 else 4,
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(placeholder, fontSize = 14.sp, color = colors.textSecondary)
+                }
+                innerTextField()
+            }
+        )
+    }
+}

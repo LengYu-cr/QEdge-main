@@ -15,11 +15,16 @@ import me.lengyu.qedge.utils.LogUtils;
  * @Description Java插件信息
  */
 public class PluginInfo {
+    /** 插件语言类型：java(BeanShell) 或 js(Rhino) */
+    public static final String TYPE_JAVA = "java";
+    public static final String TYPE_JS = "js";
+
     private final String id;
     private String name;
     private String version;
     private String author;
     private final String dirPath;
+    private String type = TYPE_JAVA;
     private boolean isRunning = false;
     private String desc = "";
     private PluginCompiler compiler;
@@ -32,6 +37,14 @@ public class PluginInfo {
         this.dirPath = dirPath;
         this.compiler = new PluginCompiler(this);
         updateFromDisk();
+    }
+
+    /** 归一化 info.prop 里的 type 字段：js/javascript -> js，其余(含空/缺省) -> java */
+    private static String normalizeType(String raw) {
+        if (raw == null) return TYPE_JAVA;
+        String t = raw.trim().toLowerCase();
+        if (t.equals("js") || t.equals("javascript")) return TYPE_JS;
+        return TYPE_JAVA;
     }
 
     public void updateFromDisk() {
@@ -47,6 +60,7 @@ public class PluginInfo {
                 this.name = props.getProperty("pluginName", name);
                 this.version = props.getProperty("versionCode", version);
                 this.author = props.getProperty("author", author);
+                this.type = normalizeType(props.getProperty("type"));
             }
 
             File descFile = new File(dir, "desc.txt");
@@ -120,6 +134,8 @@ public class PluginInfo {
     public String getAuthor() { return author; }
     public void setAuthor(String author) { this.author = author; }
     public String getDirPath() { return dirPath; }
+    public String getType() { return type; }
+    public boolean isJs() { return TYPE_JS.equals(type); }
     public boolean isRunning() { return isRunning; }
     public void setRunning(boolean running) { isRunning = running; }
     public String getDesc() { return desc; }

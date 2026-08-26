@@ -166,6 +166,10 @@ class SettingActivity : ComponentActivity() {
         callMainHookMethod("createPlugin")
     }
 
+    private fun createPlugin(type: String, name: String, desc: String, author: String, version: String) {
+        callMainHookMethod("createPlugin", type, name, desc, author, version)
+    }
+
     private fun downloadPlugin(plugin: me.lengyu.qedge.ui.pages.OnlinePluginItem) {
         Thread {
             try {
@@ -417,7 +421,10 @@ class SettingActivity : ComponentActivity() {
                                 refreshPlugins()
                             },
                             onCreateClick = {
-                                createPlugin()
+                                // 打开新建弹窗由 HomeScreen 内部处理，这里无需操作
+                            },
+                            onCreatePlugin = { type, name, desc, author, version ->
+                                createPlugin(type, name, desc, author, version)
                                 refreshPlugins()
                             },
                             onUploadClick = { plugin ->

@@ -67,6 +67,10 @@ public class PluginCallback {
         );
 
         sendMsgListener = (contact, elements) -> {
+            if (info.isJs()) {
+                handleSendMsgJs(elements);
+                return;
+            }
             Interpreter interpreter = info.getCompiler().getInterpreter();
             if (interpreter == null) return;
             NameSpace nameSpace = interpreter.getNameSpace();
@@ -110,6 +114,44 @@ public class PluginCallback {
         };
     }
 
+    /** JS 插件的发送消息拦截：调用脚本里定义的 getMsg/getSummary 修改文本/图片摘要 */
+    private void handleSendMsgJs(Object elements) {
+        JsRuntime rt = info.getCompiler().getJsRuntime();
+        if (rt == null) return;
+        boolean hasGetMsg = rt.hasFunction("getMsg");
+        boolean hasGetSummary = rt.hasFunction("getSummary");
+        if (!hasGetMsg && !hasGetSummary) return;
+        try {
+            if (elements instanceof Iterable) {
+                for (Object element : (Iterable<?>) elements) {
+                    if (hasGetMsg) {
+                        Object textElement = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(element, "textElement");
+                        if (textElement != null) {
+                            String content = (String) me.lengyu.qedge.utils.ReflectUtils.getFieldValue(textElement, "content");
+                            Object result = rt.callFunctionSync("getMsg", content);
+                            if (result instanceof String) {
+                                me.lengyu.qedge.utils.ReflectUtils.setFieldValue(textElement, "content", result);
+                            }
+                        }
+                    }
+                    if (hasGetSummary) {
+                        Object picElement = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(element, "picElement");
+                        if (picElement != null) {
+                            String summary = (String) me.lengyu.qedge.utils.ReflectUtils.getFieldValue(picElement, "summary");
+                            if (summary == null) summary = "";
+                            Object result = rt.callFunctionSync("getSummary", summary);
+                            if (result instanceof String) {
+                                me.lengyu.qedge.utils.ReflectUtils.setFieldValue(picElement, "summary", result);
+                            }
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            PluginError.callError(e, info);
+        }
+    }
+
     public void unLoadPlugin() {
         invokeMethodExists("unLoadPlugin", new Class[]{}, new Object[]{});
     }
@@ -135,11 +177,26 @@ public class PluginCallback {
     }
 
     private void runOnBackground(String methodName, Class<?>[] paramTypes, Object[] args) {
+        if (info.isJs()) {
+            // JS 插件走自己的专用单线程 Executor，不能再包 new Thread(跨线程碰 Rhino scope 会崩)
+            JsRuntime rt = info.getCompiler().getJsRuntime();
+            if (rt != null) {
+                rt.callFunctionAsync(methodName, args);
+            }
+            return;
+        }
         new Thread(() -> invokeMethodExists(methodName, paramTypes, args), "Plugin-" + info.getId()).start();
     }
 
     private void invokeMethodExists(String methodName, Class<?>[] paramTypes, Object[] args) {
         try {
+            if (info.isJs()) {
+                JsRuntime rt = info.getCompiler().getJsRuntime();
+                if (rt != null && rt.hasFunction(methodName)) {
+                    rt.callFunctionSync(methodName, args);
+                }
+                return;
+            }
             Interpreter interpreter = info.getCompiler().getInterpreter();
             if (interpreter == null || interpreter.getNameSpace() == null) return;
 

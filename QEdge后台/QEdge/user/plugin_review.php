@@ -84,7 +84,7 @@ $pageTitle = '脚本审核';
     .review-title { font-size: 17px; font-weight: 600; color: #1a1a1a; word-break: break-word; }
     .review-id { font-size: 12px; color: #999; background: #f5f5f5; padding: 2px 10px; border-radius: 3px; white-space: nowrap; }
     .review-body { margin-bottom: 10px; }
-    .review-desc { font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 10px; padding: 8px 12px; background: #fafafa; border-radius: 4px; border-left: 3px solid #d9d9d9; }
+    .review-desc { font-size: 13px; color: #666; line-height: 1.6; margin-bottom: 10px; padding: 8px 12px; background: #fafafa; border-radius: 4px; border-left: 3px solid #d9d9d9; word-break: break-all; overflow-wrap: break-word; white-space: pre-wrap; }
     .review-info { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 6px 20px; font-size: 13px; color: #555; }
     .review-info > div { padding: 3px 0; }
     .review-info strong { color: #333; }
@@ -265,7 +265,7 @@ $pageTitle = '脚本审核';
 <script>
     var currentRejectId = null;
     var currentCouldId = null;
-    var previewExts = ['java', 'json', 'prop', 'txt'];
+    var previewExts = ['java', 'js', 'json', 'prop', 'txt'];
 
     function downloadPlugin(couldId) {
         window.open('../api/user/plugin_download.php?could_id=' + couldId, '_blank');

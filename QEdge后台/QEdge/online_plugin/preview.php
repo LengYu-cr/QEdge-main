@@ -9,7 +9,7 @@ if ($couldId <= 0 || empty($filePath)) {
     die('参数不正确');
 }
 
-$allowedExts = ['java', 'json', 'prop', 'txt'];
+$allowedExts = ['java', 'js', 'json', 'prop', 'txt'];
 $ext = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
 if (!in_array($ext, $allowedExts)) {
     die('不支持预览该文件类型');
@@ -123,65 +123,35 @@ $pluginName = htmlspecialchars($plugin['plugin_name']);
             overflow: auto;
             max-height: calc(100vh - 57px);
         }
-        .code-table {
-            border-collapse: collapse;
-            width: 100%;
-            table-layout: fixed;
+        .code-pre {
+            margin: 0;
         }
-        .code-table td {
-            vertical-align: top;
+        .code-pre code.hljs {
             padding: 0;
-            line-height: 1.6;
             font-size: 13px;
+            line-height: 1.6;
             font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            white-space: pre-wrap;
-            word-break: break-all;
+            background: #fff;
         }
-        .line-num {
-            width: 55px;
-            min-width: 55px;
-            max-width: 55px;
+        /* highlight.js 行号插件的表格样式 */
+        .hljs-ln { width: 100%; }
+        .hljs-ln td { padding: 0; vertical-align: top; }
+        .hljs-ln-numbers {
             text-align: right;
-            padding: 0 10px 0 0 !important;
             color: #b0b0b0;
             background: #fafafa;
             border-right: 1px solid #e8e8e8;
             user-select: none;
             -webkit-user-select: none;
+            width: 1%;
+            white-space: nowrap;
         }
-        .line-content {
-            padding: 0 12px !important;
-            background: #fff;
+        .hljs-ln-n { padding: 0 12px 0 14px; display: block; }
+        .hljs-ln-code {
+            padding: 0 14px;
+            white-space: pre-wrap;
+            word-break: break-all;
         }
-        .code-table tr:hover .line-num {
-            background: #f0f0f0;
-        }
-        .code-table tr:hover .line-content {
-            background: #fafafa;
-        }
-
-        /* Java syntax highlighting */
-        .hl-keyword { color: #0033b3; font-weight: bold; }
-        .hl-string { color: #067d17; }
-        .hl-comment { color: #8c8c8c; font-style: italic; }
-        .hl-number { color: #1750eb; }
-        .hl-annotation { color: #7f0055; font-weight: bold; }
-        .hl-type { color: #0057ae; }
-        .hl-constant { color: #ff0000; }
-
-        /* JSON syntax highlighting */
-        .hl-json-key { color: #0451a5; }
-        .hl-json-string { color: #a31515; }
-        .hl-json-number { color: #098658; }
-        .hl-json-bool { color: #0000ff; }
-        .hl-json-null { color: #0000ff; }
-        .hl-json-brace { color: #333; }
-
-        /* Prop syntax highlighting */
-        .hl-prop-key { color: #0451a5; }
-        .hl-prop-sep { color: #333; }
-        .hl-prop-value { color: #a31515; }
-        .hl-prop-comment { color: #8c8c8c; font-style: italic; }
     </style>
 </head>
 <body>
@@ -195,86 +165,28 @@ $pluginName = htmlspecialchars($plugin['plugin_name']);
         <a href="javascript:history.back()" class="preview-back">返回</a>
     </div>
     <div class="code-container">
-        <table class="code-table">
-            <tbody>
 <?php
-$needsHighlight = in_array($ext, ['java', 'json']);
-
-foreach ($lines as $i => $line) {
-    $lineNum = $i + 1;
-    $escaped = htmlspecialchars($line, ENT_QUOTES, 'UTF-8');
-
-    if ($needsHighlight) {
-        if ($ext === 'java') {
-            $escaped = highlightJava($escaped);
-        } elseif ($ext === 'json') {
-            $escaped = highlightJson($escaped);
-        }
-    } elseif ($ext === 'prop') {
-        $escaped = highlightProp($escaped);
-    }
-
-    echo '<tr><td class="line-num">' . $lineNum . '</td><td class="line-content">' . ($escaped ?: ' ') . '</td></tr>' . "\n";
-}
+// highlight.js 语言映射：prop/txt 不做语法高亮（plaintext）
+$langMap = ['java' => 'java', 'js' => 'javascript', 'json' => 'json', 'prop' => 'properties', 'txt' => 'plaintext'];
+$hljsLang = isset($langMap[$ext]) ? $langMap[$ext] : 'plaintext';
 ?>
-            </tbody>
-        </table>
+        <pre class="code-pre"><code class="language-<?php echo $hljsLang; ?>"><?php echo htmlspecialchars($content, ENT_QUOTES, 'UTF-8'); ?></code></pre>
     </div>
+
+    <!-- highlight.js：成熟的语法高亮库，自动识别 Java/JS/JSON 等，避免手写正则的边界问题 -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.8.0/highlightjs-line-numbers.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            document.querySelectorAll('pre code').forEach(function (block) {
+                hljs.highlightElement(block);
+                if (window.hljs && hljs.lineNumbersBlock) {
+                    hljs.lineNumbersBlock(block);
+                }
+            });
+        });
+    </script>
 </body>
 </html>
 
-<?php
-function highlightJava($line) {
-    // Comments
-    if (preg_match('/^(\s*)(\/\/.*)$/', $line, $m)) {
-        return $m[1] . '<span class="hl-comment">' . $m[2] . '</span>';
-    }
-
-    $patterns = [
-        // Annotations
-        '/(@\w+)/' => '<span class="hl-annotation">$1</span>',
-        // Strings (double and single quoted)
-        '/(&quot;[^&]*?&quot;)/' => '<span class="hl-string">$1</span>',
-        // Keywords
-        '/\b(abstract|assert|boolean|break|byte|case|catch|char|class|continue|default|do|double|else|enum|extends|final|finally|float|for|if|implements|import|instanceof|int|interface|long|native|new|null|package|private|protected|public|return|short|static|strictfp|super|switch|synchronized|this|throw|throws|transient|try|void|volatile|while|true|false)\b/' => '<span class="hl-keyword">$1</span>',
-        // Types
-        '/\b(String|Integer|Long|Double|Float|Boolean|Object|List|Map|Set|ArrayList|HashMap|HashSet|Exception|Throwable|Override|Deprecated|SuppressWarnings)\b/' => '<span class="hl-type">$1</span>',
-        // Numbers
-        '/\b(\d+[lL]?[fFdD]?)\b/' => '<span class="hl-number">$1</span>',
-    ];
-
-    foreach ($patterns as $pattern => $replacement) {
-        $line = preg_replace($pattern, $replacement, $line);
-    }
-
-    return $line;
-}
-
-function highlightJson($line) {
-    // JSON key-value pattern: "key": value
-    $line = preg_replace('/(&quot;)(.*?)(&quot;)\s*:/', '<span class="hl-json-key">$1$2$3</span>:', $line);
-    // String values (not already highlighted as keys)
-    $line = preg_replace('/:\s*(&quot;)(.*?)(&quot;)/', ': <span class="hl-json-string">$1$2$3</span>', $line);
-    // Standalone strings in arrays
-    $line = preg_replace('/(?<=\[|,\s)(&quot;)(.*?)(&quot;)/', '<span class="hl-json-string">$1$2$3</span>', $line);
-    // Numbers
-    $line = preg_replace('/:\s*(\d+\.?\d*)\b/', ': <span class="hl-json-number">$1</span>', $line);
-    // Booleans and null
-    $line = preg_replace('/:\s*(true|false|null)\b/', ': <span class="hl-json-bool">$1</span>', $line);
-    return $line;
-}
-
-function highlightProp($line) {
-    $trimmed = ltrim($line);
-    if (strpos($trimmed, '#') === 0 || strpos($trimmed, '!') === 0) {
-        return '<span class="hl-prop-comment">' . $line . '</span>';
-    }
-    $eqPos = strpos($line, '=');
-    if ($eqPos !== false) {
-        $key = substr($line, 0, $eqPos);
-        $val = substr($line, $eqPos + 1);
-        return '<span class="hl-prop-key">' . htmlspecialchars($key, ENT_QUOTES, 'UTF-8') . '</span><span class="hl-prop-sep">=</span><span class="hl-prop-value">' . htmlspecialchars($val, ENT_QUOTES, 'UTF-8') . '</span>';
-    }
-    return $line;
-}
-?>

@@ -19,7 +19,6 @@ import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
-import java.util.concurrent.TimeUnit
 
 /**
  * @Author 冷雨
@@ -121,26 +120,27 @@ class PreventRecall : BaseSwitchHookItem() {
     /**
      * 处理 InfoSyncPush：移除 syncInfoBody 中的撤回消息条目
      * 使用原始字节操作（与 QStory 一致），避免 ProtoData 重编码改变字段顺序
-     * 重处理在线程池中执行
+     *
+     * 纯字节数组扫描(无 IO/阻塞)，直接在推送线程内联执行同步拦截。
+     * 此前是提交到单线程池再 future.get(500ms) 等待，多个推送包会串行排队并阻塞推送线程，
+     * 内联后既保持同步拦截语义，又消除了排队与最多 500ms 的阻塞。
      */
     private fun handleInfoSyncPush(buffer: ByteArray, param: XC_MethodHook.MethodHookParam) {
-        val future = recallExecutor.submit<ByteArray?> {
-            val syncInfoBodyStart = findSyncInfoBody(buffer) ?: return@submit null
-            val syncInfoBodyEnd = findFieldEnd(buffer, syncInfoBodyStart) ?: return@submit null
-            val tagKey = readVarInt(buffer, syncInfoBodyStart) ?: return@submit null
-            val payloadStart = skipVarInt(buffer, tagKey.nextIndex) ?: return@submit null
+        val newBuffer = try {
+            val syncInfoBodyStart = findSyncInfoBody(buffer) ?: return
+            val syncInfoBodyEnd = findFieldEnd(buffer, syncInfoBodyStart) ?: return
+            val tagKey = readVarInt(buffer, syncInfoBodyStart) ?: return
+            val payloadStart = skipVarInt(buffer, tagKey.nextIndex) ?: return
             val payloadBytes = buffer.copyOfRange(payloadStart, syncInfoBodyEnd)
-            val newPayload = rewriteSyncInfoBody(payloadBytes) ?: return@submit null
+            val newPayload = rewriteSyncInfoBody(payloadBytes) ?: return
             val output = ByteArrayOutputStream(buffer.size + newPayload.size - payloadBytes.size)
             output.write(buffer, 0, payloadStart)
             writeVarInt(output, newPayload.size)
             output.write(newPayload)
             output.write(buffer, syncInfoBodyEnd, buffer.size - syncInfoBodyEnd)
             output.toByteArray()
-        }
-        val newBuffer = try {
-            future.get(500, TimeUnit.MILLISECONDS)
         } catch (e: Exception) {
+            LogUtils.e(TAG, "handleInfoSyncPush error: ${e.message}")
             null
         }
         if (newBuffer != null) {
@@ -362,13 +362,15 @@ class PreventRecall : BaseSwitchHookItem() {
 
     /**
      * 处理 MsgPush：将撤回操作中的 msgSeq 改为非法值 1，使撤回失效
-     * 重处理在线程池中执行，避免阻塞调用线程
+     *
+     * 重写逻辑是纯字节扫描(无 IO/阻塞)，直接在推送线程内联同步执行拦截，
+     * 消除了原先单线程池排队 + future.get(500ms) 的阻塞。后续 AIO 视图刷新仍走异步。
      */
     private fun handleMsgPush(buffer: ByteArray, param: XC_MethodHook.MethodHookParam) {
-        val future = recallExecutor.submit<RewriteResult?> { rewriteMsgPush(buffer) }
         val result = try {
-            future.get(500, TimeUnit.MILLISECONDS)
+            rewriteMsgPush(buffer)
         } catch (e: Exception) {
+            LogUtils.e(TAG, "handleMsgPush error: ${e.message}")
             null
         } ?: return
 

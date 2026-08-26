@@ -13,6 +13,7 @@ protobuf = "4.35.1"
 xposed = "82"
 dalvikDx = "16.0.1"
 androidx-savedstate="1.5.0"
+rhino = "1.7.15"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
@@ -34,6 +35,7 @@ dexkit = { group = "org.luckypray", name = "dexkit", version.ref = "dexkit" }
 protobuf-javalite = { group = "com.google.protobuf", name = "protobuf-javalite", version.ref = "protobuf" }
 xposed = { group = "de.robv.android.xposed", name = "api", version.ref = "xposed" }
 dalvik-dx = { module = "com.jakewharton.android.repackaged:dalvik-dx", version.ref = "dalvikDx" }
+rhino = { group = "org.mozilla", name = "rhino", version.ref = "rhino" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

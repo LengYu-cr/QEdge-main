@@ -246,7 +246,7 @@ require_once __DIR__ . '/header.php';
                 <div class="plugin-review-title"><?php echo htmlspecialchars($plugin['plugin_name']); ?></div>
                 <span class="plugin-review-id">ID: <?php echo htmlspecialchars($plugin['plugin_id']); ?> (Could: <?php echo $plugin['could_id']; ?>)</span>
             </div>
-            <div style="font-size:13px;color:#666;line-height:1.6;margin-bottom:10px;padding:8px 12px;background:#fafafa;border-radius:4px;border-left:3px solid #d9d9d9;"><?php echo htmlspecialchars($desc); ?></div>
+            <div style="font-size:13px;color:#666;line-height:1.6;margin-bottom:10px;padding:8px 12px;background:#fafafa;border-radius:4px;border-left:3px solid #d9d9d9;word-break:break-all;overflow-wrap:break-word;white-space:pre-wrap;"><?php echo htmlspecialchars($desc); ?></div>
             <div class="plugin-review-info">
                 <div><strong>版本：</strong><?php echo htmlspecialchars($plugin['version_code']); ?></div>
                 <div><strong>作者：</strong><?php echo htmlspecialchars($plugin['author_name']); ?></div>
@@ -287,7 +287,7 @@ require_once __DIR__ . '/header.php';
 <script>
     var csrfToken = '<?php echo $csrfToken; ?>';
     var currentRejectId = null;
-    var previewExts = ['java', 'json', 'prop', 'txt'];
+    var previewExts = ['java', 'js', 'json', 'prop', 'txt'];
 
     function approvePlugin(id) {
         Modal.confirm('确认通过该脚本？', function() { submitAction(id, 'approve'); });

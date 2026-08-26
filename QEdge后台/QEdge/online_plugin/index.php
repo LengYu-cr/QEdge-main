@@ -197,6 +197,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $pluginID    = $findProp(['id', 'pluginID', 'plugin_id', 'pluginId']);
         $versionCode = $findProp(['versionCode', 'version_code', 'version', 'versionName']);
         $authorName  = $findProp(['author', 'authorName', 'author_name']);
+        // 脚本类型：info.prop 里 type=js 为 JS 脚本，其余（含缺省）一律按 java 处理
+        $pluginType  = strtolower($findProp(['type', 'lang', 'language']));
+        $pluginType  = ($pluginType === 'js' || $pluginType === 'javascript') ? 'js' : 'java';
 
         if ($pluginName === '') {
             @unlink($filePath);
@@ -246,8 +249,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // 同一作者再次上传同 plugin_id + 同 version_code：覆盖旧记录（更新文件名/作者/介绍/状态），旧 zip 删掉
             $oldPath = $dup['file_path'];
             $couldId = intval($dup['could_id']);
-            $upd = $pdo->prepare("UPDATE plugins SET plugin_name=?, author_name=?, file_path=?, description=?, status=0, reject_reason=NULL, upload_time=CURRENT_TIMESTAMP WHERE could_id=?");
-            $upd->execute([$pluginName, $authorName, $filePath, $description, $couldId]);
+            $upd = $pdo->prepare("UPDATE plugins SET plugin_name=?, author_name=?, file_path=?, description=?, type=?, status=0, reject_reason=NULL, upload_time=CURRENT_TIMESTAMP WHERE could_id=?");
+            $upd->execute([$pluginName, $authorName, $filePath, $description, $pluginType, $couldId]);
             // 删除旧 zip（失败不影响主流程）
             if ($oldPath && file_exists($oldPath) && $oldPath !== $filePath) {
                 @unlink($oldPath);
@@ -264,7 +267,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             ]);
         } else {
             // 全新记录 / 不同作者同 plugin_id+version：直接 INSERT，could_id 自增主键独立区分
-            $stmt = $pdo->prepare("INSERT INTO plugins (plugin_id, plugin_name, version_code, author_name, upload_qq, file_path, download_count, status, description) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?)");
+            $stmt = $pdo->prepare("INSERT INTO plugins (plugin_id, plugin_name, version_code, author_name, upload_qq, file_path, download_count, status, description, type) VALUES (?, ?, ?, ?, ?, ?, 0, 0, ?, ?)");
             $stmt->execute([
                 $pluginID,
                 $pluginName,
@@ -272,7 +275,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 $authorName,
                 $userQQ,
                 $filePath,
-                $description
+                $description,
+                $pluginType
             ]);
             $couldId = $pdo->lastInsertId();
             logMessage("用户 {$userQQ} 上传插件 {$pluginName} (ID: {$pluginID}, Could ID: {$couldId}) [服务端从ZIP内info.prop读取]", 'INFO');

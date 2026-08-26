@@ -38,6 +38,10 @@
 -dontwarn bsh.**
 -keep class bsh.** { *; }
 
+# Rhino JS 引擎 - 内部大量反射(方法/字段名不能变)，需全量保留
+-dontwarn org.mozilla.javascript.**
+-keep class org.mozilla.javascript.** { *; }
+
 # Protobuf - 保持必要的类
 -dontwarn com.google.protobuf.**
 -keepclassmembers public class * extends com.google.protobuf.MessageLite {*;}

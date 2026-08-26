@@ -17,10 +17,10 @@ if (isset($_GET['api']) && $_GET['api'] === 'json') {
     }
     try {
         if (!empty($search)) {
-            $stmt = $pdo->prepare("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description FROM plugins WHERE status = 1 AND (plugin_name LIKE ? OR author_name LIKE ? OR upload_qq LIKE ?) ORDER BY upload_time DESC");
+            $stmt = $pdo->prepare("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description, type FROM plugins WHERE status = 1 AND (plugin_name LIKE ? OR author_name LIKE ? OR upload_qq LIKE ?) ORDER BY upload_time DESC");
             $stmt->execute(["%$search%", "%$search%", "%$search%"]);
         } else {
-            $stmt = $pdo->query("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description FROM plugins WHERE status = 1 ORDER BY upload_time DESC");
+            $stmt = $pdo->query("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description, type FROM plugins WHERE status = 1 ORDER BY upload_time DESC");
         }
         $plugins = $stmt->fetchAll();
         // 关键：历史数据可能存了乱码，必须过一次dbFixUtf8再json_encode输出给Android端，
@@ -30,6 +30,8 @@ if (isset($_GET['api']) && $_GET['api'] === 'json') {
         $index = 1;
         foreach ($plugins as &$plugin) {
             $plugin['n'] = $index++;
+            // 老数据 type 可能为空，兜底 java
+            $plugin['type'] = (isset($plugin['type']) && $plugin['type'] === 'js') ? 'js' : 'java';
         }
         
         jsonResponse(200, '获取成功', $plugins);
@@ -43,10 +45,10 @@ $plugins = [];
 if ($pdo) {
     try {
         if (!empty($search)) {
-            $stmt = $pdo->prepare("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description FROM plugins WHERE status = 1 AND (plugin_name LIKE ? OR author_name LIKE ? OR upload_qq LIKE ?) ORDER BY upload_time DESC");
+            $stmt = $pdo->prepare("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description, type FROM plugins WHERE status = 1 AND (plugin_name LIKE ? OR author_name LIKE ? OR upload_qq LIKE ?) ORDER BY upload_time DESC");
             $stmt->execute(["%$search%", "%$search%", "%$search%"]);
         } else {
-            $stmt = $pdo->query("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description FROM plugins WHERE status = 1 ORDER BY upload_time DESC");
+            $stmt = $pdo->query("SELECT could_id, plugin_id, plugin_name, version_code, author_name, upload_qq, download_count, upload_time, description, type FROM plugins WHERE status = 1 ORDER BY upload_time DESC");
         }
         $plugins = $stmt->fetchAll();
         $plugins = dbFixUtf8($plugins);  // Web端列表展示也转码
@@ -54,6 +56,7 @@ if ($pdo) {
         $index = 1;
         foreach ($plugins as &$plugin) {
             $plugin['n'] = $index++;
+            $plugin['type'] = (isset($plugin['type']) && $plugin['type'] === 'js') ? 'js' : 'java';
         }
     } catch (Exception $e) {
         $dbError = '获取脚本列表失败: ' . $e->getMessage();
@@ -179,6 +182,8 @@ if ($pdo) {
                     <div class="card-body">
                         <div style="display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap;">
                             <span class="badge badge-primary">v<?php echo htmlspecialchars($plugin['version_code']); ?></span>
+                            <?php $ptype = ($plugin['type'] === 'js') ? 'JS' : 'Java'; ?>
+                            <span class="badge" style="background:<?php echo $plugin['type'] === 'js' ? '#f7df1e' : '#e8f0fe'; ?>;color:<?php echo $plugin['type'] === 'js' ? '#333' : '#1a73e8'; ?>;"><?php echo $ptype; ?></span>
                             <span class="badge badge-success">
                                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;">
                                     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>

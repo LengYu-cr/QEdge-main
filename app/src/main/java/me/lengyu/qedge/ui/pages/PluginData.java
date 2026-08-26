@@ -9,12 +9,17 @@ public class PluginData {
     public final boolean isRunning;
     public final boolean isAutoLoad;
     public final String dirPath;
+    public final String type;
 
     public PluginData(String id, String name, String version, String author, String description, boolean isRunning, boolean isAutoLoad) {
-        this(id, name, version, author, description, isRunning, isAutoLoad, "");
+        this(id, name, version, author, description, isRunning, isAutoLoad, "", "java");
     }
 
     public PluginData(String id, String name, String version, String author, String description, boolean isRunning, boolean isAutoLoad, String dirPath) {
+        this(id, name, version, author, description, isRunning, isAutoLoad, dirPath, "java");
+    }
+
+    public PluginData(String id, String name, String version, String author, String description, boolean isRunning, boolean isAutoLoad, String dirPath, String type) {
         this.id = id;
         this.name = name;
         this.version = version;
@@ -23,6 +28,7 @@ public class PluginData {
         this.isRunning = isRunning;
         this.isAutoLoad = isAutoLoad;
         this.dirPath = dirPath;
+        this.type = type;
     }
 
     public String getId() { return id; }
@@ -33,4 +39,5 @@ public class PluginData {
     public boolean isRunning() { return isRunning; }
     public boolean isAutoLoad() { return isAutoLoad; }
     public String getDirPath() { return dirPath; }
+    public String getType() { return type; }
 }

@@ -5,6 +5,7 @@ import android.util.Log;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Constructor;
+import java.util.concurrent.ConcurrentHashMap;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.HybridClassLoader;
 /**
@@ -15,6 +16,25 @@ public class ReflectUtils {
 
     private static final String TAG = "ReflectUtils";
     public static ClassLoader hostClassLoader;
+
+    // ---- 反射结果缓存：避免消息/图片等热路径每次都遍历方法表、重复抛 NoSuchFieldException ----
+    // key 用 "类名#成员名(#参数个数)"，value 命中缓存的 Method/Field；查不到用 NOT_FOUND 哨兵占位，避免反复失败查找。
+    private static final ConcurrentHashMap<String, Method> METHOD_CACHE = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<String, Field> FIELD_CACHE = new ConcurrentHashMap<>();
+
+    private static final Method NOT_FOUND_METHOD;
+    private static final Field NOT_FOUND_FIELD;
+    static {
+        Method m = null;
+        Field f = null;
+        try {
+            m = ReflectUtils.class.getDeclaredMethod("initClassLoader", ClassLoader.class);
+            f = ReflectUtils.class.getDeclaredField("hostClassLoader");
+        } catch (Throwable ignored) {
+        }
+        NOT_FOUND_METHOD = m;
+        NOT_FOUND_FIELD = f;
+    }
 
     public static void initClassLoader(ClassLoader loader) {
         if (loader != null) {
@@ -42,23 +62,35 @@ public class ReflectUtils {
     }
 
     public static Method findMethod(Class<?> clazz, String methodName) {
+        if (clazz == null) return null;
+        String key = clazz.getName() + "#" + methodName;
+        Method cached = METHOD_CACHE.get(key);
+        if (cached != null) {
+            return cached == NOT_FOUND_METHOD ? null : cached;
+        }
+        Method found = null;
         try {
             for (Method method : clazz.getDeclaredMethods()) {
                 if (method.getName().equals(methodName)) {
                     method.setAccessible(true);
-                    return method;
+                    found = method;
+                    break;
                 }
             }
-            for (Method method : clazz.getMethods()) {
-                if (method.getName().equals(methodName)) {
-                    method.setAccessible(true);
-                    return method;
+            if (found == null) {
+                for (Method method : clazz.getMethods()) {
+                    if (method.getName().equals(methodName)) {
+                        method.setAccessible(true);
+                        found = method;
+                        break;
+                    }
                 }
             }
         } catch (Throwable e) {
             LogUtils.e(e);
         }
-        return null;
+        METHOD_CACHE.put(key, found != null ? found : NOT_FOUND_METHOD);
+        return found;
     }
 
     public static Method findMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
@@ -79,23 +111,35 @@ public class ReflectUtils {
     }
 
     public static Method findMethod(Class<?> clazz, String methodName, int paramCount) {
+        if (clazz == null) return null;
+        String key = clazz.getName() + "#" + methodName + "#" + paramCount;
+        Method cached = METHOD_CACHE.get(key);
+        if (cached != null) {
+            return cached == NOT_FOUND_METHOD ? null : cached;
+        }
+        Method found = null;
         try {
             for (Method method : clazz.getDeclaredMethods()) {
                 if (method.getName().equals(methodName) && method.getParameterCount() == paramCount) {
                     method.setAccessible(true);
-                    return method;
+                    found = method;
+                    break;
                 }
             }
-            for (Method method : clazz.getMethods()) {
-                if (method.getName().equals(methodName) && method.getParameterCount() == paramCount) {
-                    method.setAccessible(true);
-                    return method;
+            if (found == null) {
+                for (Method method : clazz.getMethods()) {
+                    if (method.getName().equals(methodName) && method.getParameterCount() == paramCount) {
+                        method.setAccessible(true);
+                        found = method;
+                        break;
+                    }
                 }
             }
         } catch (Throwable e) {
             LogUtils.e(e);
         }
-        return null;
+        METHOD_CACHE.put(key, found != null ? found : NOT_FOUND_METHOD);
+        return found;
     }
 
     public static Method findMethod(Class<?> clazz, Class<?> returnType, Class<?>... parameterTypes) {
@@ -204,20 +248,26 @@ public class ReflectUtils {
     }
 
     public static Field findField(Class<?> clazz, String fieldName) {
+        if (clazz == null) return null;
+        String key = clazz.getName() + "#" + fieldName;
+        Field cached = FIELD_CACHE.get(key);
+        if (cached != null) {
+            return cached == NOT_FOUND_FIELD ? null : cached;
+        }
+        Field found = null;
         try {
-            Field field = clazz.getDeclaredField(fieldName);
-            field.setAccessible(true);
-            return field;
+            found = clazz.getDeclaredField(fieldName);
+            found.setAccessible(true);
         } catch (NoSuchFieldException e) {
             try {
-                Field field = clazz.getField(fieldName);
-                field.setAccessible(true);
-                return field;
+                found = clazz.getField(fieldName);
+                found.setAccessible(true);
             } catch (NoSuchFieldException ex) {
                 LogUtils.e(ex);
             }
         }
-        return null;
+        FIELD_CACHE.put(key, found != null ? found : NOT_FOUND_FIELD);
+        return found;
     }
 
     public static Object getFieldValue(Object obj, String fieldName) {

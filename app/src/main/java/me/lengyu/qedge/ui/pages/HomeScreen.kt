@@ -69,6 +69,7 @@ import me.lengyu.qedge.ui.core.theme.AccentGreen
 import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.pages.home.HomeCommentInputDialog
+import me.lengyu.qedge.ui.pages.home.HomeCreatePluginDialog
 import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.ModuleConfig
@@ -99,6 +100,7 @@ fun HomeScreen(
     onDelete: (String) -> Unit,
     onReload: (String) -> Unit,
     onCreateClick: () -> Unit,
+    onCreatePlugin: (type: String, name: String, desc: String, author: String, version: String) -> Unit = { _, _, _, _, _ -> },
     onUploadClick: (PluginData) -> Unit,
     onDownloadClick: (OnlinePluginItem) -> Unit,
     onDocClick: () -> Unit,
@@ -138,6 +140,7 @@ fun HomeScreen(
     var moodText by remember { mutableStateOf(LevelBoost.getMoodText()) }
     var showCommentDialog by remember { mutableStateOf(false) }
     var showMoodConfigDialog by remember { mutableStateOf(false) }
+    var showCreateDialog by remember { mutableStateOf(false) }
     var keepAlivePixel by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_PIXEL, false)) }
     var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
     var keepAliveBackground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_BACKGROUND, false)) }
@@ -203,7 +206,8 @@ fun HomeScreen(
                                 downloadCount = item.getInt("download_count"),
                                 uploadTime = item.getString("upload_time"),
                                 id = item.getInt("could_id"),
-                                description = item.optString("description", "")
+                                description = item.optString("description", ""),
+                                type = if (item.optString("type", "java") == "js") "js" else "java"
                             )
                         )
                     }
@@ -240,7 +244,7 @@ fun HomeScreen(
             QEdgeTopBar(
                 title = when (selectedTab) {
                     0 -> "模块首页"
-                    1 -> "Java脚本"
+                    1 -> "拓展脚本"
                     2 -> "冷雨Java"
                     else -> "文件管理"
                 },
@@ -249,7 +253,7 @@ fun HomeScreen(
                 isDarkTheme = isDarkTheme,
                 onThemeToggle = onThemeToggle,
                 showCreateButton = selectedTab == 1,
-                onCreateClick = onCreateClick,
+                onCreateClick = { showCreateDialog = true },
                 showDocButton = selectedTab == 1,
                 onDocClick = onDocClick,
                 showUpdateLogButton = true,
@@ -502,6 +506,15 @@ fun HomeScreen(
             }
         )
 
+        HomeCreatePluginDialog(
+            show = showCreateDialog,
+            onDismiss = { showCreateDialog = false },
+            onConfirm = { type, name, desc, author, version ->
+                onCreatePlugin(type, name, desc, author, version)
+                showCreateDialog = false
+            }
+        )
+
     }
 }
 
@@ -652,7 +665,7 @@ private fun HomeTabBar(
             horizontalArrangement = Arrangement.SpaceEvenly
         ) {
             TabItem("模块首页", selectedTab == 0, { onTabSelected(0) })
-            TabItem("Java脚本", selectedTab == 1, { onTabSelected(1) })
+            TabItem("拓展脚本", selectedTab == 1, { onTabSelected(1) })
             TabItem("冷雨Java", selectedTab == 2, { onTabSelected(2) })
             TabItem("文件管理", false, onFileManagerClick)
         }
@@ -1477,7 +1490,8 @@ private fun OnlinePluginCard(plugin: OnlinePluginItem, onDownload: () -> Unit) {
             OnlinePluginCardHeader(
                 plugin.pluginName,
                 plugin.versionCode,
-                plugin.authorName
+                plugin.authorName,
+                plugin.type
             ) { isExpanded = !isExpanded }
 
             if (isExpanded) {
@@ -1502,9 +1516,13 @@ private fun OnlinePluginCardHeader(
     name: String,
     version: String,
     author: String,
+    type: String,
     onExpandToggle: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
+    val isJs = type == "js"
+    val typeLabel = if (isJs) "JS" else "Java"
+    val typeColor = if (isJs) Color(0xFFB8860B) else colors.accentBlue
 
     Row(
         modifier = Modifier
@@ -1517,7 +1535,17 @@ private fun OnlinePluginCardHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .background(typeColor.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                ) {
+                    Text(typeLabel, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = typeColor)
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 "V$version • $author",
@@ -1578,7 +1606,8 @@ data class OnlinePluginItem(
     val downloadCount: Int,
     val uploadTime: String,
     val id: Int,
-    val description: String = ""
+    val description: String = "",
+    val type: String = "java"
 )
 
 @Composable
@@ -1598,6 +1627,7 @@ private fun LocalPluginCard(
             PluginCardHeader(
                 plugin.name,
                 plugin.version,
+                plugin.type,
                 plugin.isRunning,
                 onRunToggle
             ) { isExpanded = !isExpanded }
@@ -1623,11 +1653,15 @@ private fun LocalPluginCard(
 private fun PluginCardHeader(
     name: String,
     version: String,
+    type: String,
     isRunning: Boolean,
     onRunToggle: (Boolean) -> Unit,
     onExpandToggle: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
+    val isJs = type == "js"
+    val typeLabel = if (isJs) "JS" else "Java"
+    val typeColor = if (isJs) Color(0xFFB8860B) else colors.accentBlue
 
     Row(
         modifier = Modifier
@@ -1640,7 +1674,17 @@ private fun PluginCardHeader(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(name, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .background(typeColor.copy(alpha = 0.12f), RoundedCornerShape(4.dp))
+                        .padding(horizontal = 6.dp, vertical = 1.dp)
+                ) {
+                    Text(typeLabel, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = typeColor)
+                }
+            }
             Spacer(modifier = Modifier.height(4.dp))
             Text(
                 "V$version • ${if (isRunning) "运行中" else "未运行"}",
