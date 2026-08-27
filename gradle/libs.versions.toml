@@ -13,7 +13,7 @@ protobuf = "4.35.1"
 xposed = "82"
 dalvikDx = "16.0.1"
 androidx-savedstate="1.5.0"
-rhino = "1.7.15"
+rhino = "1.9.1"
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
