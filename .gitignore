@@ -27,8 +27,6 @@ libs/**/*.aar
 *.aab
 *.ap_
 *.dex
-QEdge后台/QEdge/PluginMethod/
-output-metadata.json
 
 # ---------- IDE / 编辑器工作区（不共享个人配置）----------
 .idea/
@@ -49,18 +47,8 @@ desktop.ini
 build_info.txt
 build_output.txt
 build.log
-# ---------- 参考项目（不是 QRoutine 自身源码）----------
+# ---------- 参考项目（不是 QEdge 自身源码）----------
 QFun-main/
 QStory/
-
-# ---------- 后台：环境生成的锁文件 / 导出 zip ----------
-QEdge后台/QEdge.zip
-QEdge后台/QEdge/user.zip
-QEdge后台/QEdge/install.lock
-
-# ---------- PHP 运行时（服务器端生成，不入库）----------
-QEdge后台/QEdge/**/*.log
-QEdge后台/QEdge/sessions/
-QEdge后台/QEdge/cache/
-QEdge后台/QEdge/upload/
-QEdge后台/QEdge/backup/
+# ---------- PHP 不入库----------
+QEdge后台/

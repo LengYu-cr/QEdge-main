@@ -26,5 +26,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "QRoutine"
+rootProject.name = "QEdge"
 include(":app", ":qqinterface")
