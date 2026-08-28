@@ -18,6 +18,7 @@
 | TIM Ark 卡片跳转白名单绕过 | ❌ | ✅ | 通过 DexKit 扫描 ark 组件包下所有 boolean 方法，HookAfter 强制返回 true，跳过 TIM 对非白名单卡片的阻断 |
 | 音乐卡片 / 小程序卡片发送 | ✅ | ✅ | ExtraTool.sendMusicCard / sendMiniApp，直接构造 Ark Proto 发送 |
 | 自定义透明头像 | ✅ | ✅ | 无限制，支持 PNG 透明头像|
+| 一键复读 | ✅ | ✅ | 消息气泡旁注入复读入口，点击自动复读该条消息 |
 
 ### 🛰️ QQ 空间系列
 
@@ -30,15 +31,18 @@
 
 ### ⚡ 等级加速类（每日 **00:00** 自动执行）
 
-三项签到全部走独立 HTTP 接口，同一分钟内串行调度、各自独立的跨进程幂等 key：
+等级加速全部功能走**三重触发**（loadHook 启动 / 开关切换 / 每日 00:00 Timer），并用 `isDoneToday`/`markDoneToday` 幂等去重：
 
 - **空间等级签到** 
 - **QQ 日签打卡**
 - **大会员签到**
+- **自动加好友**（LevelBoost，随机挑选账号加好友）
+- **空间浏览**（提取好友动态链接带 cookie 定时访问）
 
 ### 🧩 在线脚本平台（模块端 + PHP 后台）
 
-- 脚本 ZIP 上传自动校验 `info.prop` 字段（脚本名 / ID / 版本号 / 作者），`desc.txt` 作为介绍从 ZIP 内部读取
+- **双脚本引擎**：Java（BeanShell `main.java`）+ JS（Rhino `main.js`，es6/解释执行），两者共享同一套 `PluginMethod` 宿主 API（180+）
+- 脚本 ZIP 上传自动校验 `info.prop` 字段（脚本名 / ID / 版本号 / 作者 / `type`），`desc.txt` 作为介绍从 ZIP 内部读取
 - 同一脚本 ID + 版本号**无论作者都驳回**（数据库 `idx_plugin_version(plugin_id, version_code)` 唯一索引兜底）
 - 管理员后台 `admin/plugins.php` 可编辑脚本名称 / 介绍 / 作者
 - 用户后台 `user/` 电脑端侧滑栏同款布局：脚本下载、个人信息、反馈、赞助作者
@@ -109,35 +113,56 @@
 QEdge/
 ├── app/
 │   └── src/main/java/me/lengyu/qedge/
+│       ├── coldrain/               # 冷雨 QQ 机器人核心（21 功能，ColdRainCore + features/）
 │       ├── hook/
-│       │   ├── base/           # BaseHookItem / BaseApiHookItem 基类
-│       │   ├── api/            # 通用 Hook 能力（OnMenuBuild / OnSendMsg / OnPush…）
-│       │   ├── item/           # QQ/TIM 具体功能项（每个功能一个文件）
+│       │   ├── base/               # BaseHookItem / BaseApiHookItem / BaseSwitchHookItem 基类
+│       │   ├── api/                # 通用 Hook 能力（OnMenuBuild / OnSendMsg / OnPush…）
+│       │   ├── entry/              # QQPlusInject / QQSettingInject（设置入口劫持）
+│       │   ├── item/               # QQ/TIM 具体功能项（每功能一个文件，20 项）
+│       │   │   ├── PreventRecall.kt      # 防撤回（协议层拦截）
+│       │   │   ├── KeepAliveHook.kt      # 保活（像素窗/前台/后台通知三策略）
+│       │   │   ├── RepeatMsg.kt          # 复读机
+│       │   │   ├── LevelBoost.kt         # 等级加速（自动加好友）
 │       │   │   ├── QZoneSchedule.kt      # 定时任务调度器（三签到 + 定时说说）
 │       │   │   ├── QZoneLikeTool.kt      # 空间 HTTP 接口封装（秒赞/秒评/签到/发说说/日签/大会员）
+│       │   │   ├── LongClickSendCard.kt  # 长按发送按钮发卡片（三级 Hook 策略）
+│       │   │   ├── CopyArkMessage.kt     # 复制卡片消息
 │       │   │   ├── TimArkCardBypass.kt   # TIM Ark 卡片白名单绕过
 │       │   │   ├── AutoLikeBack.kt       # 名片自动回赞
-│       │   │   ├── VideoToBubble.kt      # 视频转泡泡消息
+│       │   │   ├── RemoveLinkInfo.kt     # 屏蔽链接卡片
+│       │   │   ├── AntiPokeDelay.java    # 取消拍一拍时间限制
 │       │   │   ├── DownloadEmotion.kt    # 图片/视频/语音长按下载
-│       │   │   └── FlashPicBypass.java   # 闪照绕过
-│       │   ├── kk/                        # KK 键盘（im.weshine.keyboard）VIP/去广告 Hook
-│       │   │   └── KKHook.java
-│       │   ├── kugou/                     # 酷狗音乐（普通/大字/概念 三版）开屏跳过 + 乐固签名绕过
-│       │   │   └── KuGouHook.java
-│       │   └── aoruan/                    # 傲软抠图（com.apowersoft.backgrounderaser）VIP 解锁
-│       │       └── AoRuanHook.java
-│       ├── plugin/                       # 在线脚本引擎
-│       │   ├── bean/MsgData.java
-│       │   └── api/PluginMethod.java
-│       ├── ui/pages/HomeScreen.kt        # 模块首页（Jetpack Compose）
-│       └── utils/
-│           ├── ModuleConfig.kt           # 跨进程 JSON SP
-│           ├── HostInfo.kt               # 进程名/包名
-│           └── qq/
-│               ├── CookieTool.java       # skey / pskey / bkn 读取
-│               ├── ExtraTool.java        # 音乐卡片 / 小程序卡片 / 消息工具
-│               ├── FriendTool.java       # 好友操作（点赞/发送消息）
-│               └── QQCurrentEnv.java     # 当前登录 QQ 号/Uin
+│       │   │   ├── FlashPicBypass.java   # 闪照绕过
+│       │   │   ├── TransparentAvatar.kt  # 透明头像
+│       │   │   ├── VideoToBubble.kt      # 视频转泡泡
+│       │   │   └── ...                   # 详见 CodeWiki
+│       │   ├── kk/                       # KK 键盘（im.weshine.keyboard）VIP/去广告 Hook
+│       │   ├── kugou/                    # 酷狗音乐（普通/大字/概念 三版）开屏跳过 + 乐固签名绕过
+│       │   └── aoruan/                   # 傲软抠图（com.apowersoft.backgrounderaser）VIP 解锁
+│       ├── plugin/                       # 在线脚本引擎（Java(BeanShell) + JS(Rhino) 双引擎）
+│       │   ├── JsRuntime.kt              # Rhino JS 运行时（单线程 Executor / ES6 / 解释执行）
+│       │   ├── PluginManager.java / PluginCompiler.java / PluginCallback.java
+│       │   ├── api/PluginMethod.java     # 暴露给脚本的 180+ 宿主 API
+│       │   ├── bean/                     # MsgData / PluginInfo / GroupInfo / MemberInfo / ...
+│       │   └── view/ChatSettingLoader.kt # 聊天设置入口 BottomSheet
+│       ├── ui/
+│       │   ├── pages/                    # HomeScreen（4 Tab）、home/（新首页侧滑栏）、coldrain/、file/
+│       │   ├── services/OnlinePluginService.kt  # 在线脚本 HTTP 服务
+│       │   ├── components/ + core/       # 原子组件 / 对话框 / 主题
+│       ├── lifecycle/                    # 寄生 Activity（Parasitics / DynamicActivityRegistry）
+│       ├── utils/
+│       │   ├── ModuleConfig.kt           # 集中式 JSON 配置（禁 SharedPreferences）
+│       │   ├── HostInfo.kt               # 进程名/包名
+│       │   ├── dexkit/                   # DexKitFinder / DexKitTask / DexKitCache / DexKitManager
+│       │   ├── json/ + proto/            # JSON/Protobuf 编解码、协议发包
+│       │   ├── reflect/ + hook/          # 反射工具 / Hook 扩展
+│       │   └── qq/
+│       │       ├── CookieTool.java       # skey / pskey / bkn 读取
+│       │       ├── ExtraTool.java        # 音乐卡片 / 小程序卡片 / 消息工具
+│       │       ├── FriendTool.java       # 好友操作（点赞/发送消息）
+│       │       ├── MsgTool.java          # 发消息/图片/视频/卡片/合并转发
+│       │       ├── TroopTool.kt          # 群成员/禁言/踢人/头衔
+│       │       └── QQCurrentEnv.java     # 当前登录 QQ 号/Uin/路径
 │
 └── QEdge后台/QEdge/
     ├── index.php                    # 首页（赞助墙 + 脚本列表）

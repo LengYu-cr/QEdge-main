@@ -1,6 +1,7 @@
 package me.lengyu.qedge.hook;
 
 import android.content.Context;
+import android.os.Build;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
@@ -77,6 +78,12 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
             return;
         }
 
+        // 仅打包 arm64(v8a)：若为 32 位设备，不加载模块并提示系统版本不支持
+        if (is32BitDevice()) {
+            reject32BitDevice(lpparam);
+            return;
+        }
+
         try {
             if (modulePath == null) {
                 modulePath = getModulePathFromClassLoader();
@@ -129,6 +136,50 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
         } catch (Throwable e) {
             XposedBridge.log("[QEdge] 获取模块路径失败: " + e.getMessage());
             return null;
+        }
+    }
+
+    /**
+     * 仅打包 arm64 后，若设备为纯 32 位则判定为不支持
+     */
+    private boolean is32BitDevice() {
+        return Build.SUPPORTED_64_BIT_ABIS == null || Build.SUPPORTED_64_BIT_ABIS.length == 0;
+    }
+
+    /**
+     * 32 位设备：不加载任何模块，仅 hook 宿主 Application.onCreate 提示系统版本不支持
+     */
+    private void reject32BitDevice(XC_LoadPackage.LoadPackageParam lpparam) {
+        final String appClass;
+        String pkg = lpparam.packageName;
+        if (pkg.equals("com.tencent.mobileqq") || pkg.equals("com.tencent.tim")) {
+            appClass = "com.tencent.common.app.BaseApplicationImpl";
+        } else if (pkg.equals("im.weshine.keyboard")) {
+            appClass = "im.weshine.foundation.base.delegate.BaseApplication";
+        } else if (pkg.equals("com.kugou.android.elder")) {
+            appClass = "com.kugou.common.app.KGTinkerApplication";
+        } else if (pkg.equals("com.kugou.android.lite")) {
+            appClass = "com.kugou.android.app.KGApplication";
+        } else if (pkg.equals("com.apowersoft.backgrounderaser")) {
+            appClass = "com.backgrounderaser.baselib.init.GlobalApplication";
+        } else {
+            return;
+        }
+        try {
+            XposedHelpers.findAndHookMethod(appClass, lpparam.classLoader, "onCreate", new XC_MethodHook() {
+                @Override
+                protected void afterHookedMethod(MethodHookParam param) {
+                    try {
+                        if (param.thisObject instanceof Context) {
+                            android.widget.Toast.makeText((Context) param.thisObject,
+                                    "QEdge 不支持 32 位系统版本", android.widget.Toast.LENGTH_LONG).show();
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+            });
+        } catch (Throwable e) {
+            XposedBridge.log("[QEdge] 32 位设备拦截提示失败: " + e.getMessage());
         }
     }
 

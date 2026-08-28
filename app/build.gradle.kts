@@ -19,7 +19,8 @@ android {
             useSupportLibrary = true
         }
         ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            // 仅保留 64 位 arm64，去掉 v7a 减小体积；32 位设备在 XposedEntry 处拦截提示
+            abiFilters += listOf("arm64-v8a")
         }
     }
 
@@ -51,6 +52,8 @@ android {
 
     androidResources {
         additionalParameters += listOf("--allow-reserved-package-id", "--package-id", "0x69")
+        // 资源表(arsc)只保留中文，其他语言不打包
+        localeFilters += listOf("zh")
     }
 
     compileOptions {
@@ -66,6 +69,9 @@ android {
     packaging {
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
+            // 去除依赖 jar 打进来的无用资源：Rhino 调试/工具(test.js 等)、protobuf 源描述文本
+            excludes += "org/mozilla/javascript/tools/**"
+            excludes += "google/protobuf/**"
         }
     }
 }

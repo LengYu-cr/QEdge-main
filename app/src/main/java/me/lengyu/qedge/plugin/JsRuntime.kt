@@ -10,9 +10,12 @@ import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import org.mozilla.javascript.Context
 import org.mozilla.javascript.Function
 import org.mozilla.javascript.NativeJavaObject
+import org.mozilla.javascript.BaseFunction
 import org.mozilla.javascript.Scriptable
 import org.mozilla.javascript.ScriptableObject
 import org.mozilla.javascript.Undefined
+import android.os.Handler
+import android.os.Looper
 import java.io.File
 import java.lang.reflect.Modifier
 import java.util.concurrent.Executors
@@ -70,6 +73,8 @@ class JsRuntime(private val info: PluginInfo, private val api: PluginMethod) {
             injectApiMethods(ctx, sc)
             injectConsole(ctx, sc)
             injectLoaders(ctx, sc)
+            injectClassImporter(ctx, sc)
+            injectUiBridge(ctx, sc)
 
             evalFile(ctx, sc, entry)
             started = true
@@ -191,6 +196,69 @@ class JsRuntime(private val info: PluginInfo, private val api: PluginMethod) {
             "var loadJs=function(path){return __loader__.loadJs(path);};",
             "<loader>", 1, null
         )
+    }
+
+    /** 全局注入 importClass：支持 Java 类对象(Packages.xxx)或类名字符串，把短名绑定到当前脚本作用域 */
+    private fun injectClassImporter(ctx: Context, sc: ScriptableObject) {
+        val loader = ReflectUtils.hostClassLoader
+        ScriptableObject.putProperty(sc, "importClass", object : BaseFunction() {
+            override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<out Any?>): Any? {
+                if (args.isEmpty()) return Undefined.instance
+                val cls = resolveJavaClass(args[0], cx, loader)
+                if (cls == null) {
+                    PluginError.callError(RuntimeException("importClass: 无法解析类 ${args[0]}"), info)
+                    return Undefined.instance
+                }
+                ScriptableObject.putProperty(sc, cls.simpleName, Context.javaToJS(cls, sc))
+                return Undefined.instance
+            }
+        })
+    }
+
+    /** 解析 importClass 参数：Java 类对象 或 类名字符串(支持嵌套类用 . 分隔，如 android.app.AlertDialog.Builder) */
+    private fun resolveJavaClass(arg: Any?, cx: Context, loader: ClassLoader): Class<*>? {
+        val fromObject = runCatching { Context.jsToJava(arg, Class::class.java) }.getOrNull()
+        if (fromObject is Class<*>) return fromObject
+        val name = (arg as? String) ?: return null
+        fun tryLoad(cn: String): Class<*>? = runCatching { Class.forName(cn, false, loader) }.getOrNull()
+        tryLoad(name)?.let { return it }
+        var cn = name
+        var idx = cn.lastIndexOf('.')
+        while (idx > 0) {
+            cn = cn.substring(0, idx) + '$' + cn.substring(idx + 1)
+            tryLoad(cn)?.let { return it }
+            idx = cn.lastIndexOf('.')
+        }
+        return null
+    }
+
+    /** 全局注入 runOnUiThread：把 JS 函数投递到主线程执行，便于直接弹窗/操作 UI */
+    private fun injectUiBridge(ctx: Context, sc: ScriptableObject) {
+        ScriptableObject.putProperty(sc, "runOnUiThread", object : BaseFunction() {
+            override fun call(cx: Context, scope: Scriptable, thisObj: Scriptable, args: Array<out Any?>): Any? {
+                if (args.isEmpty() || args[0] !is Function) return Undefined.instance
+                runOnMainThread(args[0] as Function)
+                return Undefined.instance
+            }
+        })
+    }
+
+    /** 把 JS 函数投递到主线程执行（主线程内临时进入 Rhino Context） */
+    private fun runOnMainThread(fn: Function) {
+        val sc = scope ?: return
+        Handler(Looper.getMainLooper()).post {
+            try {
+                val ux = Context.enter()
+                try {
+                    ux.optimizationLevel = -1
+                    fn.call(ux, sc, sc, emptyArray())
+                } finally {
+                    Context.exit()
+                }
+            } catch (t: Exception) {
+                PluginError.callError(t, info)
+            }
+        }
     }
 
     /** 供 loadJs 调用：在当前作用域求值目标文件(必须已在脚本线程内) */

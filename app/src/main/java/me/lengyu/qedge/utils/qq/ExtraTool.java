@@ -20,10 +20,15 @@ import com.tencent.mobileqq.troop.activity.TroopAvatarWallEditActivity;
 import com.tencent.mobileqq.app.BaseActivity;
 import com.tencent.mobileqq.app.QQAppInterface;
 import com.tencent.mobileqq.qroute.QRoute;
+import com.tencent.mobileqq.mini.api.IMiniCallback;
+import com.tencent.mobileqq.mini.share.MiniArkShareAsyncManager;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
+
 
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.HostInfo;
@@ -164,6 +169,35 @@ public class ExtraTool {
         return result.get();
     }
 
+    public static String uploadImage(String filepath) {
+        
+        CountDownLatch latch = new CountDownLatch(1);
+        AtomicBoolean result = new AtomicBoolean(false);
+        AtomicReference<String> imageUrl = new AtomicReference<>();
+        MiniArkShareAsyncManager.performUploadArkShareImage(filepath, new IMiniCallback() {
+            @Override
+            public void onCallbackResult(boolean success, Bundle bundle) {
+                if (bundle == null) {
+                    result.set(false);
+                    latch.countDown();
+                    return;
+                }
+                imageUrl.set(bundle.getString("imageUrl"));
+                result.set(success);
+                latch.countDown();
+            }
+        });
+        try {
+            latch.await(10, TimeUnit.SECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+        }
+        if (!result.get() || imageUrl.get() == null || imageUrl.get().isEmpty()) {
+            return "";
+        }
+        return imageUrl.get();
+    }
+
     public static boolean uploadTroopCover(String qun, String filepath) {
         if (BaseActivity.sTopActivity == null) {
             return false;
@@ -181,6 +215,10 @@ public class ExtraTool {
         }
         return result.get();
     }
+
+
+
+
 
     public static void changeMyName(String title) {
         try {
