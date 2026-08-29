@@ -372,12 +372,13 @@ class RepeatMsg : BaseSwitchHookItem() {
     private fun performRepeat(msgRecord: MsgRecord) {
 
         val msgType = msgRecord.msgType
+        val subMsgType = msgRecord.subMsgType
 
         val elements = msgRecord.elements
         val refreshedElements = refreshMsgElements(msgType, elements)
 
         if (refreshedElements != null) {
-            if (isNeedForward(msgType)) {
+            if (isNeedForward(msgType, subMsgType)) {
                 forwardSend(msgRecord, refreshedElements)
             }else{
                 directSend(msgRecord, refreshedElements)
@@ -385,8 +386,8 @@ class RepeatMsg : BaseSwitchHookItem() {
         }
     }
 
-    private fun isNeedForward(msgType: Int): Boolean {
-        return msgType == 7 || msgType == 19 || msgType == 10
+    private fun isNeedForward(msgType: Int, subMsgType: Int): Boolean {
+        return msgType == 3 || msgType == 7 || msgType == 19 || msgType == 10 || subMsgType == 3 || subMsgType == 4096 || subMsgType == 2
     }
 
     private fun refreshMsgElements(msgType: Int, elements: ArrayList<MsgElement>?): ArrayList<MsgElement>? {
@@ -396,7 +397,11 @@ class RepeatMsg : BaseSwitchHookItem() {
             2 -> {
                 elements.forEach { element ->
                     runCatching {
-                        element.textElement?.let { it.atType = 0 }
+                        element.textElement?.let { 
+                            if(it.atType == 1){
+                            it.atType = 0 
+                            }
+                        }
                     }
                 }
                 elements

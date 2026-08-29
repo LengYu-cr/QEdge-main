@@ -31,6 +31,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.core.compatibility.XposedComposeDialog
@@ -85,6 +86,7 @@ private fun UpdateContent(
 ) {
     val colors = QEdgeTheme.colors
     val context = LocalContext.current
+    val maxHeight = LocalConfiguration.current.screenHeightDp * 0.72f
 
     AnimatedVisibility(
         visible = visible,
@@ -95,6 +97,7 @@ private fun UpdateContent(
             modifier = Modifier
                 .padding(horizontal = 24.dp)
                 .fillMaxWidth()
+                .heightIn(max = maxHeight.dp)
                 .clip(RoundedCornerShape(24.dp))
                 .background(colors.cardBackground)
                 .padding(vertical = 24.dp)

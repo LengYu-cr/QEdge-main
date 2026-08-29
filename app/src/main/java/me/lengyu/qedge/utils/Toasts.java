@@ -26,13 +26,21 @@ public class Toasts {
 
     private static final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    public static void toast(String message) {
+    public static void Toast(String message) {
         mainHandler.post(() -> {
             Context context = getContext();
             if (context != null) {
                 Toast.makeText(context, message, Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+    public static void toast(String message) {
+        try {
+            showCustomToast(message);
+        } catch (Throwable e) {
+            Toast(message);
+        }
     }
 
     public static void qqToast(int icon, String message) {

@@ -17,7 +17,10 @@ import org.mozilla.javascript.Undefined
 import android.os.Handler
 import android.os.Looper
 import java.io.File
+import java.io.BufferedInputStream
+import java.io.FileInputStream
 import java.lang.reflect.Modifier
+import java.util.zip.ZipInputStream
 import java.util.concurrent.Executors
 import java.util.concurrent.ThreadFactory
 
@@ -188,12 +191,17 @@ class JsRuntime(private val info: PluginInfo, private val api: PluginMethod) {
         )
     }
 
-    /** 注入 loadJs(绝对路径)，对齐 loadJava，把目标文件加载进同一作用域 */
+    /** 注入 loadJs/loadJsLib(绝对路径)，对齐 loadJava，把目标文件或打包(zip/jar)加载进同一作用域 */
     private fun injectLoaders(ctx: Context, sc: ScriptableObject) {
         putJava(ctx, sc, "__loader__", JsLoader(this))
         ctx.evaluateString(
             sc,
             "var loadJs=function(path){return __loader__.loadJs(path);};",
+            "<loader>", 1, null
+        )
+        ctx.evaluateString(
+            sc,
+            "var loadJsLib=function(path){return __loader__.loadJsLib(path);};",
             "<loader>", 1, null
         )
     }
@@ -270,6 +278,33 @@ class JsRuntime(private val info: PluginInfo, private val api: PluginMethod) {
         evalFile(ctx, sc, f)
     }
 
+    /**
+     * 供 loadJsLib 调用：一次性加载打包(Zip/Jar)内所有 .js 到同一作用域。
+     * 按包内路径字典序逐个求值，保证可预期的加载顺序；不递归目录层级。
+     */
+    internal fun loadJsLibFile(path: String) {
+        val ctx = context ?: return
+        val sc = scope ?: return
+        val f = File(path)
+        if (!f.exists()) throw IllegalStateException("loadJsLib: file not found: $path")
+        val scripts = HashMap<String, String>()
+        ZipInputStream(BufferedInputStream(FileInputStream(f))).use { zis ->
+            while (true) {
+                val entry = zis.nextEntry ?: break
+                val name = entry.name
+                if (!entry.isDirectory && name.endsWith(".js")) {
+                    val code = zis.readBytes().toString(Charsets.UTF_8)
+                    scripts[name] = code
+                }
+                zis.closeEntry()
+            }
+        }
+        if (scripts.isEmpty()) throw IllegalStateException("loadJsLib: 包内没有 .js 文件: $path")
+        scripts.toSortedMap().forEach { (name, code) ->
+            ctx.evaluateString(sc, code, name, 1, null)
+        }
+    }
+
     private fun evalFile(ctx: Context, sc: ScriptableObject, file: File) {
         val code = file.readText(Charsets.UTF_8)
         ctx.evaluateString(sc, code, file.name, 1, null)
@@ -321,6 +356,11 @@ class JsRuntime(private val info: PluginInfo, private val api: PluginMethod) {
         fun loadJs(path: String?) {
             if (path == null) return
             runtime.loadJsFile(path)
+        }
+
+        fun loadJsLib(path: String?) {
+            if (path == null) return
+            runtime.loadJsLibFile(path)
         }
     }
 }

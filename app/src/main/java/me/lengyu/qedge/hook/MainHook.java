@@ -40,6 +40,9 @@ import me.lengyu.qedge.hook.entry.QQSettingInject;
 import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.hook.item.RemoveLinkInfo;
 import me.lengyu.qedge.hook.item.PreventRecall;
+import me.lengyu.qedge.hook.item.AntiQfixPatch;
+import me.lengyu.qedge.hook.item.AntiReport;
+import me.lengyu.qedge.hook.item.ForceVip;
 import me.lengyu.qedge.hook.item.CopyArkMessage;
 import me.lengyu.qedge.hook.item.LongClickSendCard;
 import me.lengyu.qedge.hook.item.RepeatMsg;
@@ -79,6 +82,9 @@ public class MainHook {
         HookRegistry.register(new CopyArkMessage());
         HookRegistry.register(new LongClickSendCard());
         HookRegistry.register(new RepeatMsg());
+        HookRegistry.register(AntiQfixPatch.INSTANCE);
+        HookRegistry.register(AntiReport.INSTANCE);
+        HookRegistry.register(ForceVip.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;

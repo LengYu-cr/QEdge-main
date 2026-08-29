@@ -128,6 +128,9 @@ fun HomeScreen(
     var copyArkMessage by remember { mutableStateOf(ModuleConfig.getBoolean("copy_ark_message", false)) }
     var longClickSendCard by remember { mutableStateOf(ModuleConfig.getBoolean("long_click_send_card", false)) }
     var repeatMsg by remember { mutableStateOf(ModuleConfig.getBoolean("repeat_msg", false)) }
+    var antiQfixPatch by remember { mutableStateOf(ModuleConfig.getBoolean("anti_qfix_patch", false)) }
+    var antiReport by remember { mutableStateOf(ModuleConfig.getBoolean("anti_report", false)) }
+    var forceVip by remember { mutableStateOf(ModuleConfig.getBoolean("force_vip", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_CHECKIN_ENABLED, false)) }
@@ -335,6 +338,9 @@ fun HomeScreen(
                             copyArkMessage = copyArkMessage,
                             longClickSendCard = longClickSendCard,
                             repeatMsg = repeatMsg,
+                            antiQfixPatch = antiQfixPatch,
+                            antiReport = antiReport,
+                            forceVip = forceVip,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
                             dailySignEnabled = dailySignEnabled,
                             bigVipCheckinEnabled = bigVipCheckinEnabled,
@@ -397,6 +403,18 @@ fun HomeScreen(
                             onRepeatMsgToggle = {
                                 repeatMsg = it
                                 Thread { ModuleConfig.putBoolean("repeat_msg", it) }.start()
+                            },
+                            onAntiQfixPatchToggle = {
+                                antiQfixPatch = it
+                                Thread { ModuleConfig.putBoolean("anti_qfix_patch", it) }.start()
+                            },
+                            onAntiReportToggle = {
+                                antiReport = it
+                                Thread { ModuleConfig.putBoolean("anti_report", it) }.start()
+                            },
+                            onForceVipToggle = {
+                                forceVip = it
+                                Thread { ModuleConfig.putBoolean("force_vip", it) }.start()
                             },
                             onTimArkCardBypassToggle = {
                                 timArkCardBypass = it
@@ -688,6 +706,9 @@ data class HomePageState(
     val copyArkMessage: Boolean,
     val longClickSendCard: Boolean,
     val repeatMsg: Boolean,
+    val antiQfixPatch: Boolean,
+    val antiReport: Boolean,
+    val forceVip: Boolean,
     val qzoneCheckinEnabled: Boolean,
     val dailySignEnabled: Boolean,
     val bigVipCheckinEnabled: Boolean,
@@ -718,6 +739,9 @@ class HomePageCallbacks(
     val onCopyArkMessageToggle: (Boolean) -> Unit,
     val onLongClickSendCardToggle: (Boolean) -> Unit,
     val onRepeatMsgToggle: (Boolean) -> Unit,
+    val onAntiQfixPatchToggle: (Boolean) -> Unit,
+    val onAntiReportToggle: (Boolean) -> Unit,
+    val onForceVipToggle: (Boolean) -> Unit,
     val onCheckinToggle: (Boolean) -> Unit,
     val onDailySignToggle: (Boolean) -> Unit,
     val onBigVipCheckinToggle: (Boolean) -> Unit,
@@ -1135,6 +1159,54 @@ private fun HomePage(
                     }
                     QEdgeSwitch(checked = state.keepAliveBackground, onCheckedChange = callbacks.onKeepAliveBackgroundToggle)
                 }
+            }
+        }
+        }
+
+        item(key = "card_system") {
+        QEdgeCard(modifier = Modifier.fillMaxWidth()) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                Text(
+                    "基础配置",
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    "禁用QQ修复补丁等系统级功能",
+                    fontSize = 13.sp,
+                    color = colors.textSecondary
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                SettingSwitchItem(
+                    title = "禁用QQ修复补丁",
+                    subtitle = "拦截并禁用QQ的修复补丁机制",
+                    checked = state.antiQfixPatch,
+                    onCheckedChange = callbacks.onAntiQfixPatchToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "禁用QQ日志上报",
+                    subtitle = "拦截SSO上报并禁用QQ日志",
+                    checked = state.antiReport,
+                    onCheckedChange = callbacks.onAntiReportToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "解锁本地会员",
+                    subtitle = "强制本地QQ超级会员/VIP/SVIP状态",
+                    checked = state.forceVip,
+                    onCheckedChange = callbacks.onForceVipToggle
+                )
             }
         }
         }

@@ -28,8 +28,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 
-
-
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.plugin.bean.JointGroup;

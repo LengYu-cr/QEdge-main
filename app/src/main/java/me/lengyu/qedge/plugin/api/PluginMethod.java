@@ -1104,6 +1104,15 @@ public class PluginMethod {
         }
     }
 
+    public String uploadImage(String imagePath) {
+        File file = new File(imagePath);
+        if(!file.exists()){
+            Toasts.toast("上传失败，图片不存在：" + imagePath);
+            return "";
+        }
+        return runWithErrorHandle(() -> ExtraTool.uploadImage(imagePath));
+    }
+
     public void sendMiniApp(String packageName, String appid, String token,
                                    String arkAppId, String miniAppPath,
                                    String uin, String appName, String desc,
