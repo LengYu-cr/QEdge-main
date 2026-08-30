@@ -11,7 +11,7 @@ import me.lengyu.qedge.utils.HookUtils;
 
 /**
  * @Author 冷雨
- * @Description 解锁本地QQ超级会员/VIP/SVIP
+ * @Description 解锁本地QQ超级会员/VIP/SVIP，目前可用于开启QQ自带的自动语音转文字、解除表情包收藏500的限制、解除语音发送时长限制，其他的自己去测试。会员不会在主页显示。    
  */
 @HookItemAnnotation(value = "解锁本地QQ超级会员", category = "item")
 public class ForceVip extends BaseApiHookItem {
@@ -39,9 +39,7 @@ public class ForceVip extends BaseApiHookItem {
                     HookUtils.hookBefore(method, param -> {
                         if (!isEnabled()) return;
                         param.setResult(true);
-                        LogUtils.d(TAG, "拦截 " + methodName + " -> true");
                     });
-                    LogUtils.d(TAG, "已拦截: " + methodName);
                 }
             }
             
@@ -53,13 +51,9 @@ public class ForceVip extends BaseApiHookItem {
                     if (!isEnabled()) return;
                     // 返回所有权限: VIP(2) + SVIP(4) + SuperQQ(1) + BigClub(8) + Star(16) = 31
                     param.setResult(31);
-                    LogUtils.d(TAG, "拦截 getPrivilegeFlags -> 31 (全部权限)");
                 });
-                LogUtils.d(TAG, "已拦截: getPrivilegeFlags");
             }
-            
-            LogUtils.d(TAG, "loadHook: 强制开启会员成功");
-            
+                        
         } catch (Exception e) {
             LogUtils.e(TAG, "loadHook: " + e.getMessage());
         }

@@ -43,6 +43,7 @@ import me.lengyu.qedge.hook.item.PreventRecall;
 import me.lengyu.qedge.hook.item.AntiQfixPatch;
 import me.lengyu.qedge.hook.item.AntiReport;
 import me.lengyu.qedge.hook.item.ForceVip;
+import me.lengyu.qedge.hook.item.DisableAIAvatar;
 import me.lengyu.qedge.hook.item.CopyArkMessage;
 import me.lengyu.qedge.hook.item.LongClickSendCard;
 import me.lengyu.qedge.hook.item.RepeatMsg;
@@ -85,6 +86,7 @@ public class MainHook {
         HookRegistry.register(AntiQfixPatch.INSTANCE);
         HookRegistry.register(AntiReport.INSTANCE);
         HookRegistry.register(ForceVip.INSTANCE);
+        HookRegistry.register(DisableAIAvatar.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;

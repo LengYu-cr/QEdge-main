@@ -24,7 +24,7 @@ public abstract class BaseHookItem {
     }
 
     public boolean isEnable() {
-        return isEnable;
+        return isEnable && !HookRegistry.isAllDisabled();
     }
 
     public void setEnable(boolean enable) {

@@ -2,7 +2,6 @@ package me.lengyu.qedge.hook;
 
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.Toast;
 
 import org.json.JSONObject;
 
@@ -13,12 +12,14 @@ import java.util.TimerTask;
 import com.tencent.common.app.AppInterface;
 import com.tencent.common.app.BaseApplicationImpl;
 
+import me.lengyu.qedge.hook.base.HookRegistry;
 import me.lengyu.qedge.ui.components.dialogs.UpdateDialog;
 import me.lengyu.qedge.ui.components.dialogs.WelcomeDialog;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.HostInfo;
+import me.lengyu.qedge.utils.Toasts;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
 
 
@@ -125,14 +126,11 @@ public class HeartbeatManager {
                 isBanned = true;
                 LogUtils.e("HeartbeatManager", "Account banned!");
                 stopHeartbeat();
-                runOnMainThread(() -> {
-                    Toast.makeText(
-                            HostInfo.getHostContext(),
-                            "您的账号已被拉黑，模块功能已禁用",
-                            Toast.LENGTH_LONG
-                    ).show();
-                });
-                disableAllHooks();
+                HookRegistry.disableAllHooks();
+                JSONObject data = json.optJSONObject("data");
+                String reason = (data != null) ? data.optString("reason", "") : "";
+                String message = "您的账号已被拉黑" + (reason.isEmpty() ? "" : "，原因：" + reason);
+                Toasts.toast(message);
             } else if (code == 200) {
                 isBanned = false;
                 JSONObject data = json.optJSONObject("data");
@@ -208,9 +206,6 @@ public class HeartbeatManager {
                 LogUtils.e("HeartbeatManager", "Show welcome dialog failed: " + e.getMessage());
             }
         });
-    }
-
-    private void disableAllHooks() {
     }
 
     private String stringToHex(String input) {

@@ -1,7 +1,7 @@
 # QEdge
 
 > 基于 **NT QQ / NT TIM** 的 Xposed 增强模块 + 在线脚本平台。  
-> 模块化设计，所有功能开关独立可控；零卡顿设计原则：Hook 全部 O(1)，无遍历/无循环反射/无深度拷贝；配套 PHP 后台支持脚本上传、下载、反馈、赞助墙、用户中心。
+> 模块化设计，所有功能开关独立可控；零卡顿设计原则：Hook 全部 O(1)，无遍历/无循环反射/无深度拷贝。
 
 ---
 
@@ -39,13 +39,11 @@
 - **自动加好友**（LevelBoost，随机挑选账号加好友）
 - **空间浏览**（提取好友动态链接带 cookie 定时访问）
 
-### 🧩 在线脚本平台（模块端 + PHP 后台）
+### 🧩 在线脚本平台
 
 - **双脚本引擎**：Java（BeanShell `main.java`）+ JS（Rhino `main.js`，es6/解释执行），两者共享同一套 `PluginMethod` 宿主 API（180+）
 - 脚本 ZIP 上传自动校验 `info.prop` 字段（脚本名 / ID / 版本号 / 作者 / `type`），`desc.txt` 作为介绍从 ZIP 内部读取
-- 同一脚本 ID + 版本号**无论作者都驳回**（数据库 `idx_plugin_version(plugin_id, version_code)` 唯一索引兜底）
-- 管理员后台 `admin/plugins.php` 可编辑脚本名称 / 介绍 / 作者
-- 用户后台 `user/` 电脑端侧滑栏同款布局：脚本下载、个人信息、反馈、赞助作者
+- 同一脚本 ID + 版本号**无论作者都驳回**
 - 用户反馈系统：用户提交反馈 → 管理员回复处理结果 → 用户侧可见处理状态与回复
 - 赞助墙：微信/支付宝收款码（赞助说明出现在首页赞助墙列表）
 
@@ -76,8 +74,7 @@
    - 所有 Hook 回调时间复杂度 O(1)
    - 避免 List 遍历、深度拷贝、循环反射；耗时操作（HTTP/IO）一律丢新 Thread
    - 定时任务仅主进程启动 Timer（通过 `HostInfo.processName == HostInfo.packageName` 判定），从源头减少子进程重复工作
-3. **安全 / 字符集**
-   - 后台 `require.php` 全局 `utf8mb4`，session 本地私有路径，`gc_maxlifetime / cookie_lifetime` 7 天 + 滑动窗口续期
+3. **安全**
    - 用户输入统一 PDO 预处理，防止 SQL 注入；XSS 通过 `htmlspecialchars(ENT_QUOTES, 'UTF-8')` 转义
    - ZIP 上传直接读取内部 `info.prop` / `desc.txt`，避免 multipart 中文字段编码问题
 
@@ -94,16 +91,6 @@
 | 傲软抠图（全版本） | 最新版即可 | `com.apowersoft.backgrounderaser` |
 | Android | 9.0 ~ 16 | — |
 | Xposed 框架 | LSPosed / LSPatch / FPA / 原子 / 无极（Zygisk 模式）等 | — |
-
----
-
-### 后台（PHP 7.3 + MySQL 5.7+ / MariaDB）
-
-1. 上传 `QEdge后台/QEdge/` 全部文件到网站根目录
-2. 修改 `QEdge/require.php` 中的数据库连接信息
-3. 首次访问 `install.php` 创建数据表
-4. 管理员默认账号密码：手动在 `users` 表里把 `permission` 改成 `admin`
-5. 目录权限：`sessions/ cache/ upload/ backup/` 必须写入权限（`chmod 755` 或 777）
 
 ---
 
@@ -163,23 +150,6 @@ QEdge/
 │       │       ├── MsgTool.java          # 发消息/图片/视频/卡片/合并转发
 │       │       ├── TroopTool.kt          # 群成员/禁言/踢人/头衔
 │       │       └── QQCurrentEnv.java     # 当前登录 QQ 号/Uin/路径
-│
-└── QEdge后台/QEdge/
-    ├── index.php                    # 首页（赞助墙 + 脚本列表）
-    ├── require.php                  # 全局引入（DB + 会话 + 字符集）
-    ├── admin/                       # 管理后台（侧滑栏布局）
-    │   ├── index.php
-    │   ├── plugins.php              # 脚本列表 + 编辑/删除
-    │   ├── sponsor.php              # 赞助管理
-    │   └── feedback.php             # 用户反馈处理
-    ├── user/                        # 用户中心（电脑端侧滑栏同款）
-    │   ├── index.php
-    │   ├── my_plugins.php
-    │   ├── upload.php               # 上传脚本
-    │   ├── feedback.php             # 我提交的反馈 + 新增
-    │   ├── sponsor.php              # 赞助作者（微信收款码）
-    │   └── header.php / footer.php  # 公共头尾
-    └── online_plugin/index.php      # 上传脚本的 HTTP 接口（模块端调用）
 ```
 
 ---

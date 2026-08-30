@@ -131,6 +131,7 @@ fun HomeScreen(
     var antiQfixPatch by remember { mutableStateOf(ModuleConfig.getBoolean("anti_qfix_patch", false)) }
     var antiReport by remember { mutableStateOf(ModuleConfig.getBoolean("anti_report", false)) }
     var forceVip by remember { mutableStateOf(ModuleConfig.getBoolean("force_vip", false)) }
+    var disableAIAvatar by remember { mutableStateOf(ModuleConfig.getBoolean("disable_ai_avatar", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_CHECKIN_ENABLED, false)) }
@@ -341,6 +342,7 @@ fun HomeScreen(
                             antiQfixPatch = antiQfixPatch,
                             antiReport = antiReport,
                             forceVip = forceVip,
+                            disableAIAvatar = disableAIAvatar,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
                             dailySignEnabled = dailySignEnabled,
                             bigVipCheckinEnabled = bigVipCheckinEnabled,
@@ -415,6 +417,10 @@ fun HomeScreen(
                             onForceVipToggle = {
                                 forceVip = it
                                 Thread { ModuleConfig.putBoolean("force_vip", it) }.start()
+                            },
+                            onDisableAIAvatarToggle = {
+                                disableAIAvatar = it
+                                Thread { ModuleConfig.putBoolean("disable_ai_avatar", it) }.start()
                             },
                             onTimArkCardBypassToggle = {
                                 timArkCardBypass = it
@@ -546,6 +552,7 @@ private fun UserInfoCard(uin: String, avatarBitmap: android.graphics.Bitmap?) {
     val moduleVersion = remember(uin) { UserData.getModuleVersion(uin) }
     val qqVersion = remember(uin) { UserData.getQqVersion(uin) }
     val isSponsor = remember(uin) { UserData.isSponsor(uin) }
+    val sponsorAmountCents = remember(uin) { UserData.getSponsorAmountCents(uin) }
     val canUpload = remember(uin) { UserData.hasUploadPermission(uin) }
     val canReview = remember(uin) { UserData.hasReviewPermission(uin) }
 
@@ -608,7 +615,7 @@ private fun UserInfoCard(uin: String, avatarBitmap: android.graphics.Bitmap?) {
 
             // 权限/身份标签
             val tags = buildList {
-                if (isSponsor) add("赞助用户")
+                if (isSponsor) add("赞助用户") else add("普通用户")
                 if (canUpload) add("上传权限")
                 if (canReview) add("审核权限")
             }
@@ -637,6 +644,12 @@ private fun UserInfoCard(uin: String, avatarBitmap: android.graphics.Bitmap?) {
             UserInfoRow("注册时间", if (registerTime.isNotEmpty()) registerTime else "--")
             UserInfoRow("模块版本", if (moduleVersion.isNotEmpty()) moduleVersion else "--")
             UserInfoRow("QQ版本", if (qqVersion.isNotEmpty()) qqVersion else "--")
+            if (isSponsor && sponsorAmountCents > 0) {
+                UserInfoRow(
+                    "赞助金额",
+                    String.format(java.util.Locale.CHINA, "¥%.2f", sponsorAmountCents / 100.0)
+                )
+            }
         }
     }
 }
@@ -709,6 +722,7 @@ data class HomePageState(
     val antiQfixPatch: Boolean,
     val antiReport: Boolean,
     val forceVip: Boolean,
+    val disableAIAvatar: Boolean,
     val qzoneCheckinEnabled: Boolean,
     val dailySignEnabled: Boolean,
     val bigVipCheckinEnabled: Boolean,
@@ -742,6 +756,7 @@ class HomePageCallbacks(
     val onAntiQfixPatchToggle: (Boolean) -> Unit,
     val onAntiReportToggle: (Boolean) -> Unit,
     val onForceVipToggle: (Boolean) -> Unit,
+    val onDisableAIAvatarToggle: (Boolean) -> Unit,
     val onCheckinToggle: (Boolean) -> Unit,
     val onDailySignToggle: (Boolean) -> Unit,
     val onBigVipCheckinToggle: (Boolean) -> Unit,
@@ -1203,9 +1218,18 @@ private fun HomePage(
 
                 SettingSwitchItem(
                     title = "解锁本地会员",
-                    subtitle = "强制本地QQ超级会员/VIP/SVIP状态",
+                    subtitle = "强制本地QQ超级会员/VIP/SVIP，目前可用于开启QQ自带的自动语音转文字、解除表情包收藏500的限制、解除语音发送时长限制、解除每日文件上传限制，其他的自己去测试。会员不会在主页显示。",
                     checked = state.forceVip,
                     onCheckedChange = callbacks.onForceVipToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "屏蔽QQ秀/AI头像",
+                    subtitle = "屏蔽QQ秀与AI头像相关显示",
+                    checked = state.disableAIAvatar,
+                    onCheckedChange = callbacks.onDisableAIAvatarToggle
                 )
             }
         }
@@ -1246,9 +1270,7 @@ private fun SettingSwitchItem(
             Text(
                 subtitle,
                 fontSize = 12.sp,
-                color = colors.textSecondary,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                color = colors.textSecondary
             )
         }
         QEdgeSwitch(checked = checked, onCheckedChange = onCheckedChange)

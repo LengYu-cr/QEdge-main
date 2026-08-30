@@ -18,6 +18,7 @@ public class UserData {
     private static final String K_QQ_VERSION = "user_qq_version_";
     private static final String K_MODULE_VERSION = "user_module_version_";
     private static final String K_IS_SPONSOR = "user_is_sponsor_";
+    private static final String K_SPONSOR_AMOUNT = "user_sponsor_amount_"; // 单位：分
     private static final String K_UPLOAD_PERMISSION = "user_upload_permission_";
     private static final String K_REVIEW_PERMISSION = "user_review_permission_";
 
@@ -38,6 +39,10 @@ public class UserData {
         }
         if (data.has("is_sponsor")) {
             ModuleConfig.INSTANCE.putBoolean(K_IS_SPONSOR + currentUin, data.optBoolean("is_sponsor", false));
+        }
+        if (data.has("sponsor_amount")) {
+            double amount = data.optDouble("sponsor_amount", 0);
+            ModuleConfig.INSTANCE.putLong(K_SPONSOR_AMOUNT + currentUin, Math.round(amount * 100));
         }
         if (data.has("upload_permission")) {
             ModuleConfig.INSTANCE.putBoolean(K_UPLOAD_PERMISSION + currentUin, data.optBoolean("upload_permission", false));
@@ -81,6 +86,11 @@ public class UserData {
 
     public static boolean isSponsor(String uin) {
         return ModuleConfig.INSTANCE.getBoolean(K_IS_SPONSOR + uin, false);
+    }
+
+    /** 赞助金额，单位：分（0 表示没有/非赞助） */
+    public static long getSponsorAmountCents(String uin) {
+        return ModuleConfig.INSTANCE.getLong(K_SPONSOR_AMOUNT + uin, 0);
     }
 
     public static boolean hasUploadPermission(String uin) {

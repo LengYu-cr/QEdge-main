@@ -61,11 +61,9 @@ public class AntiReport extends BaseApiHookItem {
                     String cmd = param.args.length > 0 ? (String) param.args[0] : "";
                     // 只拦截上报命令
                     if (cmd != null && cmd.equals("CliLogSvc.UploadReq")) {
-                        // LogUtils.d(TAG, "拦截上报: " + cmd);
                         param.setResult(null);
                     }
                 });
-                // LogUtils.d(TAG, "hookPacketSetSSOCommand: 已拦截 setSSOCommand");
             }
         } catch (Exception e) {
             LogUtils.e(TAG, "hookPacketSetSSOCommand: " + e.getMessage());
@@ -105,7 +103,6 @@ public class AntiReport extends BaseApiHookItem {
                             if (extras != null) {
                                 String cmd = (String) XposedHelpers.callMethod(extras, "getString", "ssoCmd");
                                 if (cmd != null && cmd.equals("CliLogSvc.UploadReq")) {
-                                    // LogUtils.d(TAG, "拦截 MSFServlet.send: " + cmd);
                                     param.setResult(null);
                                 }
                             }
@@ -114,7 +111,6 @@ public class AntiReport extends BaseApiHookItem {
                         }
                     }
                 });
-                // LogUtils.d(TAG, "hookMSFServlet: 已拦截 sendToMSF");
             }
         } catch (Exception e) {
             LogUtils.e(TAG, "hookMSFServlet: " + e.getMessage());
