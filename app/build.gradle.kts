@@ -11,8 +11,8 @@ android {
         applicationId = "me.lengyu.qedge"
         minSdk = 29
         targetSdk = 37
-        versionCode = 21
-        versionName = "0.2.1"
+        versionCode = 22
+        versionName = "0.2.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
