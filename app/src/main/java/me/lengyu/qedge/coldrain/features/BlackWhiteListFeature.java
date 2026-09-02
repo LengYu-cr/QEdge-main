@@ -13,6 +13,7 @@ import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.hook.api.OnTroopJoin;
 import me.lengyu.qedge.hook.api.OnTroopShutUp;
+import me.lengyu.qedge.plugin.bean.JoinData;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.utils.qq.TroopTool;
 /**
@@ -376,7 +377,9 @@ public class BlackWhiteListFeature implements ColdRainFeature {
     public static void registerListeners(ColdRainCore core) {
         OnTroopJoin.registerListener(new OnTroopJoin.TroopJoinListener() {
             @Override
-            public void onJoin(String troopUin, String memberUin) {
+            public void onJoin(JoinData data) {
+                String troopUin = data.getTroopUin();
+                String memberUin = data.getMemberUin();
                 if (!core.isMasterEnabled()) return;
                 if (!core.isGroupMasterEnabled(troopUin)) return;
                 if (!core.isGroupFeatureEnabled("feature_black_white_list", troopUin)) return;

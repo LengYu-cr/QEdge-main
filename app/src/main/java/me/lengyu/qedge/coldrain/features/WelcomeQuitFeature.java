@@ -8,6 +8,7 @@ import me.lengyu.qedge.coldrain.ColdRainCore;
 import me.lengyu.qedge.coldrain.ColdRainFeature;
 import me.lengyu.qedge.hook.api.OnTroopQuit;
 import me.lengyu.qedge.plugin.bean.MsgData;
+import me.lengyu.qedge.plugin.bean.QuitData;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.qq.MsgTool;
 /**
@@ -53,8 +54,10 @@ public class WelcomeQuitFeature implements ColdRainFeature {
 
         OnTroopQuit.registerListener(new OnTroopQuit.TroopQuitListener() {
             @Override
-            public void onQuit(String troopUin, String memberUin) {
+            public void onQuit(QuitData data) {
                 try {
+                    String troopUin = data.getTroopUin();
+                    String memberUin = data.getMemberUin();
                     if (!core.isMasterEnabled()) return;
                     if (!core.isFeatureEnabled("feature_welcome_quit")) return;
                     if (!core.isGroupMasterEnabled(troopUin)) return;

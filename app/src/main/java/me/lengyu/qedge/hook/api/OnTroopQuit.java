@@ -3,6 +3,7 @@ package me.lengyu.qedge.hook.api;
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
 import me.lengyu.qedge.hook.base.BaseApiHookItem;
 import me.lengyu.qedge.hook.base.Listener;
+import me.lengyu.qedge.plugin.bean.QuitData;
 import me.lengyu.qedge.utils.HookUtils;
 import me.lengyu.qedge.utils.LogUtils;
 /**
@@ -31,7 +32,11 @@ public class OnTroopQuit extends BaseApiHookItem<OnTroopQuit.TroopQuitListener> 
                     try {
                         String troopUin = (String) param.args[0];
                         String memberUin = (String) param.args[1];
-                        notifyListeners(troopUin, memberUin);
+                        boolean updateHeadAndName = (Boolean) param.args[2];
+                        // LogUtils.d("OnTroopQuit", "troopUin: " + troopUin + ", memberUin: " + memberUin + ", updateHeadAndName: " + updateHeadAndName);
+                        QuitData data = new QuitData(troopUin, memberUin, updateHeadAndName);
+                        LogUtils.i("OnTroopQuit", "quit data: " + data.toString());
+                        notifyListeners(data);
                     } catch (Throwable e) {
                         LogUtils.e("OnTroopQuit", "callback error: " + e.getMessage());
                         LogUtils.e(e);
@@ -49,12 +54,12 @@ public class OnTroopQuit extends BaseApiHookItem<OnTroopQuit.TroopQuitListener> 
         }
     }
 
-    private void notifyListeners(String troopUin, String memberUin) {
-        forEachChecked(listener -> listener.onQuit(troopUin, memberUin));
+    private void notifyListeners(QuitData data) {
+        forEachChecked(listener -> listener.onQuit(data));
     }
 
     public interface TroopQuitListener extends Listener {
-        void onQuit(String troopUin, String memberUin);
+        void onQuit(QuitData data);
     }
 
     public static void registerListener(TroopQuitListener listener) {

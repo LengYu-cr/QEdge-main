@@ -72,6 +72,8 @@ android {
             // 去除依赖 jar 打进来的无用资源：Rhino 调试/工具(test.js 等)、protobuf 源描述文本
             excludes += "org/mozilla/javascript/tools/**"
             excludes += "google/protobuf/**"
+            // kotlinx-coroutines 自带的协程调试探针元数据，release 用不到，纯冗余
+            excludes += "DebugProbesKt.bin"
         }
     }
 }

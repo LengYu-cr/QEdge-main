@@ -12,10 +12,10 @@ import java.io.BufferedReader
 import java.io.IOException
 import java.nio.charset.StandardCharsets
 import java.util.zip.ZipEntry
-import java.util.zip.ZipInputStream
 import java.util.zip.ZipOutputStream
-import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.LogUtils
+import me.lengyu.qedge.utils.ZipUtil
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 
 object OnlinePluginService {
 
@@ -132,70 +132,14 @@ object OnlinePluginService {
             throw IOException("无法创建目标目录: ${targetDir.absolutePath}")
         }
 
-        val rootFolder = findRootFolder(zipFile)
-        val targetDirAbs = targetDir.absolutePath.trimEnd('/')
+        // 直接解压到目标目录，不做根目录判断、不用临时目录，保证 info.prop 等文件不丢失
+        ZipUtil.unzip(zipFile.absolutePath, targetDir.absolutePath)
 
-        ZipInputStream(BufferedInputStream(FileInputStream(zipFile)), StandardCharsets.UTF_8).use { zis ->
-            var entry: ZipEntry? = zis.nextEntry
-            while (entry != null) {
-                val entryName = entry.name
-                val relativePath = if (rootFolder.isNotEmpty() && entryName.startsWith("$rootFolder/")) {
-                    entryName.substring(rootFolder.length + 1)
-                } else {
-                    entryName
-                }
-
-                if (relativePath.isEmpty() || relativePath == "/") {
-                    zis.closeEntry()
-                    entry = zis.nextEntry
-                    continue
-                }
-
-                // 用 normalize() + absolutePath 做 Zip Slip 检测，纯字符串操作，不依赖文件系统
-                val targetFile = targetDir.resolve(relativePath).normalize()
-                if (!targetFile.absolutePath.startsWith("$targetDirAbs/") && targetFile.absolutePath != targetDirAbs) {
-                    throw SecurityException("Zip Slip: ${entry.name}")
-                }
-
-                if (entry.isDirectory) {
-                    if (!targetFile.mkdirs() && !targetFile.isDirectory) {
-                        throw IOException("无法创建目录: ${targetFile.absolutePath}")
-                    }
-                } else {
-                    val parent = targetFile.parentFile
-                    if (parent != null && !parent.exists() && !parent.mkdirs()) {
-                        throw IOException("无法创建父目录: ${parent.absolutePath}")
-                    }
-                    targetFile.outputStream().buffered().use { fos ->
-                        zis.copyTo(fos, 8192)
-                    }
-                }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
+        // 目标目录需真实存在
+        if (!targetDir.isDirectory) {
+            throw IOException("解压失败: 目标目录未生成 ${targetDir.absolutePath}")
         }
-
         return targetDir
-    }
-
-    private fun findRootFolder(zipFile: File): String {
-        val pathCounts = mutableMapOf<String, Int>()
-        ZipInputStream(BufferedInputStream(FileInputStream(zipFile)), StandardCharsets.UTF_8).use { zis ->
-            var entry: ZipEntry? = zis.nextEntry
-            while (entry != null) {
-                val name = entry.name
-                if (!name.endsWith("/")) {
-                    val firstSlash = name.indexOf('/')
-                    if (firstSlash > 0) {
-                        val root = name.substring(0, firstSlash)
-                        pathCounts[root] = pathCounts.getOrDefault(root, 0) + 1
-                    }
-                }
-                zis.closeEntry()
-                entry = zis.nextEntry
-            }
-        }
-        return pathCounts.maxByOrNull { it.value }?.key ?: ""
     }
 
     private fun deleteDir(dir: File): Boolean {

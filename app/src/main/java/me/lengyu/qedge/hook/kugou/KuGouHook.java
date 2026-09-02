@@ -9,6 +9,7 @@ import android.os.Handler;
 import android.os.Looper;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XC_MethodHook;
+import de.robv.android.xposed.XC_MethodReplacement;
 import de.robv.android.xposed.XposedHelpers;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
@@ -176,8 +177,10 @@ public class KuGouHook {
             try {
                 if (packageName.equals("com.kugou.android.elder")) {
                     hookElder(bridge);
+                    hookAvatarUpload();
                 } else if (packageName.equals("com.kugou.android.lite")) {
                     hookLite(bridge);
+                    hookAvatarUpload();
                 }
                 hookGdtSplashActivity();
                 hookAdContainerActivity();
@@ -193,6 +196,64 @@ public class KuGouHook {
         } catch (Throwable e) {
             LogUtils.e("KuGouHook", "loadHook error: " + e.getMessage());
             LogUtils.e(e);
+        }
+    }
+
+    /**
+     * 头像上传不压缩，直接上传原图
+     * 通过 DexKit 特征定位 AvatarUploadTask 内部的压缩方法，
+     * 完成后替换它，直接返回原图路径，跳过缩放与 JPEG 降质。
+     */
+    private static void hookAvatarUpload() {
+        try {
+            String sourceDir = HostInfo.getHostContext().getApplicationInfo().sourceDir;
+            if (sourceDir == null) {
+                LogUtils.e("KuGouHook", "hookAvatarUpload: sourceDir is null");
+                return;
+            }
+
+            DexKitBridge bridge = DexKitBridge.create(sourceDir);
+            if (bridge == null) {
+                LogUtils.e("KuGouHook", "hookAvatarUpload: DexKitBridge.create returned null");
+                return;
+            }
+
+            try {
+                // 压缩方法 returnType=String、(String,String,double) 签名独特，
+                // 不写死方法名和类名，只靠签名 + 包名定位，抗混淆
+                FindMethod findMethod = new FindMethod();
+                findMethod.searchPackages("com.kugou.android.app.player.domain.avatar.upload");
+                findMethod.matcher(new MethodMatcher()
+                        .returnType("java.lang.String")
+                        .paramTypes("java.lang.String", "java.lang.String", "double")
+                );
+
+                List<MethodData> methods = bridge.findMethod(findMethod);
+                if (methods.isEmpty()) {
+                    LogUtils.e("KuGouHook", "hookAvatarUpload: 未找到头像压缩方法");
+                    return;
+                }
+
+                for (MethodData methodData : methods) {
+                    Method method = methodData.getMethodInstance(ReflectUtils.hostClassLoader);
+                    if (method == null) continue;
+                    XposedBridge.hookMethod(method, new XC_MethodReplacement() {
+                        @Override
+                        protected Object replaceHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
+                            // 返回原图路径，跳过缩放与压缩
+                            String src = (String) param.args[0];
+                            LogUtils.e("KuGouHook", "hookAvatarUpload: 拦截压缩，返回原图 " + src);
+                            return src;
+                        }
+                    });
+                    LogUtils.e("KuGouHook", "hookAvatarUpload: 已替换压缩方法 " + method.getName());
+                }
+            } finally {
+                bridge.close();
+            }
+
+        } catch (Throwable e) {
+            LogUtils.e("KuGouHook", "hookAvatarUpload error: " + e.getMessage());
         }
     }
 
@@ -500,22 +561,6 @@ public class KuGouHook {
                 }
             });
 
-            XposedHelpers.findAndHookMethod("android.content.Context", ReflectUtils.hostClassLoader, "startActivity", Intent.class, new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
-                    Intent intent = (Intent) param.args[0];
-                    checkAndBlockBrowserIntent(intent, param);
-                }
-            });
-
-            XposedHelpers.findAndHookMethod("android.content.Context", ReflectUtils.hostClassLoader, "startActivity", Intent.class, android.os.Bundle.class, new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
-                    Intent intent = (Intent) param.args[0];
-                    checkAndBlockBrowserIntent(intent, param);
-                }
-            });
-
             XposedHelpers.findAndHookMethod("android.content.ContextWrapper", ReflectUtils.hostClassLoader, "startActivity", Intent.class, new XC_MethodHook() {
                 @Override
                 protected void beforeHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
@@ -525,14 +570,6 @@ public class KuGouHook {
             });
 
             XposedHelpers.findAndHookMethod("android.content.ContextWrapper", ReflectUtils.hostClassLoader, "startActivity", Intent.class, android.os.Bundle.class, new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
-                    Intent intent = (Intent) param.args[0];
-                    checkAndBlockBrowserIntent(intent, param);
-                }
-            });
-
-            XposedHelpers.findAndHookMethod("android.content.ContextWrapper", ReflectUtils.hostClassLoader, "startActivityForResult", Intent.class, int.class, android.os.Bundle.class, new XC_MethodHook() {
                 @Override
                 protected void beforeHookedMethod(XC_MethodHook.MethodHookParam param) throws Throwable {
                     Intent intent = (Intent) param.args[0];

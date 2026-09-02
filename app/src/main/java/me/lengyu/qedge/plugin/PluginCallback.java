@@ -9,8 +9,10 @@ import me.lengyu.qedge.hook.api.OnSendMsg;
 import me.lengyu.qedge.hook.api.OnTroopJoin;
 import me.lengyu.qedge.hook.api.OnTroopQuit;
 import me.lengyu.qedge.hook.api.OnTroopShutUp;
+import me.lengyu.qedge.plugin.bean.JoinData;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.plugin.bean.PluginInfo;
+import me.lengyu.qedge.plugin.bean.QuitData;
 
 import java.util.Arrays;
 
@@ -42,16 +44,16 @@ public class PluginCallback {
                 new Object[]{new MsgData(msgRecord)}
         );
 
-        troopJoinListener = (troopUin, memberUin) -> runOnBackground(
+        troopJoinListener = (data) -> runOnBackground(
                 "joinGroup",
-                new Class[]{String.class, String.class},
-                new Object[]{troopUin, memberUin}
+                new Class[]{JoinData.class},
+                new Object[]{data}
         );
 
-        troopQuitListener = (troopUin, memberUin) -> runOnBackground(
+        troopQuitListener = (data) -> runOnBackground(
                 "quitGroup",
-                new Class[]{String.class, String.class},
-                new Object[]{troopUin, memberUin}
+                new Class[]{QuitData.class},
+                new Object[]{data}
         );
 
         troopShutUpListener = (troopUin, memberUin, time, opUin) -> runOnBackground(

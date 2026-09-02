@@ -25,6 +25,7 @@ public class FromServiceMsgDispatcher {
     private static boolean hooked = false;
     private static final CopyOnWriteArrayList<DispatcherListener> listeners = new CopyOnWriteArrayList<>();
     private static final CopyOnWriteArrayList<FeedsListener> feedsListeners = new CopyOnWriteArrayList<>();
+    private static final CopyOnWriteArrayList<TroopJoinListener> joinListeners = new CopyOnWriteArrayList<>();
 
     public interface DispatcherListener {
         void onDispatch(String serviceCmd, JSONObject json, FromServiceMsg msg);
@@ -32,6 +33,11 @@ public class FromServiceMsgDispatcher {
 
     public interface FeedsListener {
         void onFeedsResponse(JSONObject json, FromServiceMsg msg);
+    }
+
+    /** 群成员加入监听(基于 MSFServlet 拦截，只上报进群) */
+    public interface TroopJoinListener {
+        void onTroopJoin(String troopUin, String memberUid, String adminUid, int joinType);
     }
 
     public static void registerListener(DispatcherListener listener) {
@@ -55,6 +61,18 @@ public class FromServiceMsgDispatcher {
     public static void unregisterFeedsListener(FeedsListener listener) {
         if (listener != null) {
             feedsListeners.remove(listener);
+        }
+    }
+
+    public static void registerJoinListener(TroopJoinListener listener) {
+        if (listener != null) {
+            joinListeners.add(listener);
+        }
+    }
+
+    public static void unregisterJoinListener(TroopJoinListener listener) {
+        if (listener != null) {
+            joinListeners.remove(listener);
         }
     }
 
@@ -82,8 +100,8 @@ public class FromServiceMsgDispatcher {
 
                     JSONObject json = null;
 
-                    // OlPush 消息（原有的 DispatcherListener）
-                    if (SERVICE_CMD.equals(cmd) && !listeners.isEmpty()) {
+                    // OlPush 消息（原有的 DispatcherListener + 群成员加入 TroopJoinListener）
+                    if (SERVICE_CMD.equals(cmd) && (!listeners.isEmpty() || !joinListeners.isEmpty())) {
                         if (json == null) {
                             ProtoData data = new ProtoData();
                             data.fromBytes(wupBuffer);
@@ -94,6 +112,41 @@ public class FromServiceMsgDispatcher {
                                 listener.onDispatch(cmd, json, fromServiceMsg);
                             } catch (Throwable e) {
                                 LogUtils.e(TAG, "dispatch error: " + e.getMessage());
+                            }
+                        }
+
+                        // 群成员加入：ontype=33 且 type=131(进群)才上报，退群(130)忽略
+                        if (!joinListeners.isEmpty()) {
+                            try {
+                                JSONObject top1 = json.optJSONObject("1");
+                                if (top1 != null) {
+                                    JSONObject msgType = top1.optJSONObject("2");
+                                    int ontype = msgType != null ? msgType.optInt("1", 0) : 0;
+                                    if (ontype == 33) {
+                                        JSONObject json3 = top1.optJSONObject("3");
+                                        if (json3 != null) {
+                                            JSONObject joinInfo = json3.optJSONObject("2");
+                                            if (joinInfo != null && joinInfo.has("3") && joinInfo.opt("5") instanceof String) {
+                                                int type = joinInfo.optInt("4", 0);
+                                                // 130=主动加入群, 131=邀请进群，两者都是入群事件
+                                                if (type == 130 || type == 131) {
+                                                    String troopUin = String.valueOf(joinInfo.optLong("1"));
+                                                    String memberUid = joinInfo.optString("3");
+                                                    String adminUid = joinInfo.optString("5");
+                                                    for (TroopJoinListener l : joinListeners) {
+                                                        try {
+                                                            l.onTroopJoin(troopUin, memberUid, adminUid, type);
+                                                        } catch (Throwable e) {
+                                                            LogUtils.e(TAG, "join dispatch error: " + e.getMessage());
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } catch (Throwable e) {
+                                LogUtils.e(TAG, "join parse error: " + e.getMessage());
                             }
                         }
                     }

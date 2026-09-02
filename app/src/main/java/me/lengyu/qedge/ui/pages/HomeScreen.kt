@@ -876,8 +876,6 @@ private fun HomePage(
                     onCheckedChange = callbacks.onDownloadEmotionToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
-
                 SettingSwitchItem(
                     title = "屏蔽链接信息卡片",
                     subtitle = "收到链接时，自动屏蔽",
