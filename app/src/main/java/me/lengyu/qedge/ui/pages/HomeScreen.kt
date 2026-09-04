@@ -70,8 +70,11 @@ import me.lengyu.qedge.ui.core.theme.Dimens
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.pages.home.HomeCommentInputDialog
 import me.lengyu.qedge.ui.pages.home.HomeCreatePluginDialog
+import me.lengyu.qedge.ui.pages.home.HomeImageSummaryDialog
+import me.lengyu.qedge.ui.pages.home.HomeImageRatioDialog
 import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
 import me.lengyu.qedge.utils.HostInfo
+import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.hook.item.LevelBoost
@@ -128,6 +131,15 @@ fun HomeScreen(
     var copyArkMessage by remember { mutableStateOf(ModuleConfig.getBoolean("copy_ark_message", false)) }
     var longClickSendCard by remember { mutableStateOf(ModuleConfig.getBoolean("long_click_send_card", false)) }
     var repeatMsg by remember { mutableStateOf(ModuleConfig.getBoolean("repeat_msg", false)) }
+    var imageSummaryEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("image_summary", false)) }
+    var imageSummaryMode by remember { mutableStateOf(ModuleConfig.getString("image_summary_mode", "text")) }
+    var imageSummaryTips by remember { mutableStateOf(ModuleConfig.getString("image_summary_tips", "")) }
+    var imageSummaryUrl by remember { mutableStateOf(ModuleConfig.getString("image_summary_url", "")) }
+    var emotionAiTag by remember { mutableStateOf(ModuleConfig.getBoolean("ai_emotion_tag", false)) }
+    var imageRatioEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("image_ratio", false)) }
+    var imageRatioWidth by remember { mutableStateOf(ModuleConfig.getInt("image_ratio_width", 0).toString()) }
+    var imageRatioHeight by remember { mutableStateOf(ModuleConfig.getInt("image_ratio_height", 0).toString()) }
+    var showImageRatioDialog by remember { mutableStateOf(false) }
     var antiQfixPatch by remember { mutableStateOf(ModuleConfig.getBoolean("anti_qfix_patch", false)) }
     var antiReport by remember { mutableStateOf(ModuleConfig.getBoolean("anti_report", false)) }
     var forceVip by remember { mutableStateOf(ModuleConfig.getBoolean("force_vip", false)) }
@@ -144,6 +156,7 @@ fun HomeScreen(
     var moodText by remember { mutableStateOf(LevelBoost.getMoodText()) }
     var showCommentDialog by remember { mutableStateOf(false) }
     var showMoodConfigDialog by remember { mutableStateOf(false) }
+    var showImageSummaryDialog by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
     var keepAlivePixel by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_PIXEL, false)) }
     var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
@@ -339,6 +352,14 @@ fun HomeScreen(
                             copyArkMessage = copyArkMessage,
                             longClickSendCard = longClickSendCard,
                             repeatMsg = repeatMsg,
+                            emotionAiTag = emotionAiTag,
+                            imageRatioEnabled = imageRatioEnabled,
+                            imageRatioWidth = imageRatioWidth,
+                            imageRatioHeight = imageRatioHeight,
+                            imageSummaryEnabled = imageSummaryEnabled,
+                            imageSummaryMode = imageSummaryMode,
+                            imageSummaryTips = imageSummaryTips,
+                            imageSummaryUrl = imageSummaryUrl,
                             antiQfixPatch = antiQfixPatch,
                             antiReport = antiReport,
                             forceVip = forceVip,
@@ -406,6 +427,20 @@ fun HomeScreen(
                                 repeatMsg = it
                                 Thread { ModuleConfig.putBoolean("repeat_msg", it) }.start()
                             },
+                            onEmotionAiTagToggle = {
+                                emotionAiTag = it
+                                Thread { ModuleConfig.putBoolean("ai_emotion_tag", it) }.start()
+                            },
+                            onImageRatioToggle = {
+                                imageRatioEnabled = it
+                                Thread { ModuleConfig.putBoolean("image_ratio", it) }.start()
+                            },
+                            onImageRatioConfigClick = { showImageRatioDialog = true },
+                            onImageSummaryToggle = {
+                                imageSummaryEnabled = it
+                                Thread { ModuleConfig.putBoolean("image_summary", it) }.start()
+                            },
+                            onImageSummaryConfigClick = { showImageSummaryDialog = true },
                             onAntiQfixPatchToggle = {
                                 antiQfixPatch = it
                                 Thread { ModuleConfig.putBoolean("anti_qfix_patch", it) }.start()
@@ -526,6 +561,41 @@ fun HomeScreen(
                 Thread {
                     ModuleConfig.putString(LevelBoost.SP_MOOD_TIME, t)
                     ModuleConfig.putString(LevelBoost.SP_MOOD_TEXT, txt)
+                }.start()
+            }
+        )
+
+        HomeImageRatioDialog(
+            show = showImageRatioDialog,
+            width = imageRatioWidth,
+            height = imageRatioHeight,
+            onDismiss = { showImageRatioDialog = false },
+            onConfirm = { w, h ->
+                imageRatioWidth = w.toString()
+                imageRatioHeight = h.toString()
+                showImageRatioDialog = false
+                Thread {
+                    ModuleConfig.putInt("image_ratio_width", w)
+                    ModuleConfig.putInt("image_ratio_height", h)
+                }.start()
+            }
+        )
+
+        HomeImageSummaryDialog(
+            show = showImageSummaryDialog,
+            mode = imageSummaryMode,
+            tips = imageSummaryTips,
+            url = imageSummaryUrl,
+            onDismiss = { showImageSummaryDialog = false },
+            onConfirm = { m, tips, url ->
+                imageSummaryMode = m
+                imageSummaryTips = tips
+                imageSummaryUrl = url
+                showImageSummaryDialog = false
+                Thread {
+                    ModuleConfig.putString("image_summary_mode", m)
+                    ModuleConfig.putString("image_summary_tips", tips)
+                    ModuleConfig.putString("image_summary_url", url)
                 }.start()
             }
         )
@@ -719,6 +789,14 @@ data class HomePageState(
     val copyArkMessage: Boolean,
     val longClickSendCard: Boolean,
     val repeatMsg: Boolean,
+    val emotionAiTag: Boolean,
+    val imageRatioEnabled: Boolean,
+    val imageRatioWidth: String,
+    val imageRatioHeight: String,
+    val imageSummaryEnabled: Boolean,
+    val imageSummaryMode: String,
+    val imageSummaryTips: String,
+    val imageSummaryUrl: String,
     val antiQfixPatch: Boolean,
     val antiReport: Boolean,
     val forceVip: Boolean,
@@ -753,6 +831,11 @@ class HomePageCallbacks(
     val onCopyArkMessageToggle: (Boolean) -> Unit,
     val onLongClickSendCardToggle: (Boolean) -> Unit,
     val onRepeatMsgToggle: (Boolean) -> Unit,
+    val onEmotionAiTagToggle: (Boolean) -> Unit,
+    val onImageRatioToggle: (Boolean) -> Unit,
+    val onImageRatioConfigClick: () -> Unit,
+    val onImageSummaryToggle: (Boolean) -> Unit,
+    val onImageSummaryConfigClick: () -> Unit,
     val onAntiQfixPatchToggle: (Boolean) -> Unit,
     val onAntiReportToggle: (Boolean) -> Unit,
     val onForceVipToggle: (Boolean) -> Unit,
@@ -869,11 +952,25 @@ private fun HomePage(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
+                val emotionSavePath =
+                    android.os.Environment.getExternalStorageDirectory().absolutePath + "/Download/QQ/QEdge/"
+                val copyCtx = androidx.compose.ui.platform.LocalContext.current
+
                 SettingSwitchItem(
                     title = "表情/泡泡/视频/语音下载",
-                    subtitle = "长按消息保存到相册",
+                    subtitle = "保存至 " + emotionSavePath + "，点击复制",
                     checked = state.downloadEmotion,
-                    onCheckedChange = callbacks.onDownloadEmotionToggle
+                    onCheckedChange = callbacks.onDownloadEmotionToggle,
+                    onClick = {
+                        try {
+                            val cm =
+                                copyCtx.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                            cm.setPrimaryClip(android.content.ClipData.newPlainText("path", emotionSavePath))
+                            android.widget.Toast.makeText(copyCtx, "已复制保存路径", android.widget.Toast.LENGTH_SHORT).show()
+                        } catch (e: Exception) {
+                            LogUtils.e("HomeScreen", "copy save path error: ${e.message}")
+                        }
+                    }
                 )
 
                 SettingSwitchItem(
@@ -937,6 +1034,47 @@ private fun HomePage(
                     subtitle = "点击复读，长按可复制链接、查看原始消息",
                     checked = state.repeatMsg,
                     onCheckedChange = callbacks.onRepeatMsgToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "AI表情标签",
+                    subtitle = "发送纯表情包时自动带上AI表情标签",
+                    checked = state.emotionAiTag,
+                    onCheckedChange = callbacks.onEmotionAiTagToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "篡改发送图片比例",
+                    subtitle = run {
+                        val w = state.imageRatioWidth.toIntOrNull() ?: 0
+                        val h = state.imageRatioHeight.toIntOrNull() ?: 0
+                        if (w > 0 && h > 0) "宽 ${w}px × 高 ${h}px，点击修改" else "未设置宽高，点击配置"
+                    },
+                    checked = state.imageRatioEnabled,
+                    onCheckedChange = callbacks.onImageRatioToggle,
+                    onClick = callbacks.onImageRatioConfigClick
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "图片外显自定义",
+                    subtitle = run {
+                        val modeDesc = if (state.imageSummaryMode == "http") "接口返回" else "随机文案"
+                        val preview = if (state.imageSummaryMode == "http") {
+                            if (state.imageSummaryUrl.isNotEmpty()) state.imageSummaryUrl else "未设置接口"
+                        } else {
+                            if (state.imageSummaryTips.isNotEmpty()) state.imageSummaryTips.take(18) + "…" else "未设置文案"
+                        }
+                        "$modeDesc · $preview"
+                    },
+                    checked = state.imageSummaryEnabled,
+                    onCheckedChange = callbacks.onImageSummaryToggle,
+                    onClick = callbacks.onImageSummaryConfigClick
                 )
 
                 if (HostInfo.isTIM) {

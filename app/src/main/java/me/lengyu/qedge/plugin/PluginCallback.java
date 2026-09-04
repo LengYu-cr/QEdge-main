@@ -9,6 +9,7 @@ import me.lengyu.qedge.hook.api.OnSendMsg;
 import me.lengyu.qedge.hook.api.OnTroopJoin;
 import me.lengyu.qedge.hook.api.OnTroopQuit;
 import me.lengyu.qedge.hook.api.OnTroopShutUp;
+import me.lengyu.qedge.hook.item.ImageSummary;
 import me.lengyu.qedge.plugin.bean.JoinData;
 import me.lengyu.qedge.plugin.bean.MsgData;
 import me.lengyu.qedge.plugin.bean.PluginInfo;
@@ -95,15 +96,17 @@ public class PluginCallback {
                                 }
                             }
 
-                            Object picElement = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(element, "picElement");
-                            if (picElement != null) {
-                                String summary = (String) me.lengyu.qedge.utils.ReflectUtils.getFieldValue(picElement, "summary");
-                                BshMethod method = nameSpace.getMethod("getSummary", new Class[]{String.class});
-                                if (method != null) {
-                                    if (summary == null) summary = "";
-                                    Object result = method.invoke(new Object[]{summary}, interpreter);
-                                    if (result instanceof String) {
-                                        me.lengyu.qedge.utils.ReflectUtils.setFieldValue(picElement, "summary", result);
+                            if (!ImageSummary.isModuleEnabled()) {
+                                Object picElement = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(element, "picElement");
+                                if (picElement != null) {
+                                    String summary = (String) me.lengyu.qedge.utils.ReflectUtils.getFieldValue(picElement, "summary");
+                                    BshMethod method = nameSpace.getMethod("getSummary", new Class[]{String.class});
+                                    if (method != null) {
+                                        if (summary == null) summary = "";
+                                        Object result = method.invoke(new Object[]{summary}, interpreter);
+                                        if (result instanceof String) {
+                                            me.lengyu.qedge.utils.ReflectUtils.setFieldValue(picElement, "summary", result);
+                                        }
                                     }
                                 }
                             }
@@ -136,7 +139,7 @@ public class PluginCallback {
                             }
                         }
                     }
-                    if (hasGetSummary) {
+                    if (hasGetSummary && !ImageSummary.isModuleEnabled()) {
                         Object picElement = me.lengyu.qedge.utils.ReflectUtils.getFieldValue(element, "picElement");
                         if (picElement != null) {
                             String summary = (String) me.lengyu.qedge.utils.ReflectUtils.getFieldValue(picElement, "summary");

@@ -35,7 +35,7 @@ public class OnTroopQuit extends BaseApiHookItem<OnTroopQuit.TroopQuitListener> 
                         boolean updateHeadAndName = (Boolean) param.args[2];
                         // LogUtils.d("OnTroopQuit", "troopUin: " + troopUin + ", memberUin: " + memberUin + ", updateHeadAndName: " + updateHeadAndName);
                         QuitData data = new QuitData(troopUin, memberUin, updateHeadAndName);
-                        LogUtils.i("OnTroopQuit", "quit data: " + data.toString());
+                        // LogUtils.i("OnTroopQuit", "quit data: " + data.toString());
                         notifyListeners(data);
                     } catch (Throwable e) {
                         LogUtils.e("OnTroopQuit", "callback error: " + e.getMessage());

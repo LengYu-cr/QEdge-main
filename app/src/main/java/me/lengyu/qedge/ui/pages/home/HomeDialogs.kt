@@ -15,6 +15,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -372,6 +374,349 @@ fun HomeUpdateLogDialog(
                     Text("关闭", fontSize = 14.sp, color = colors.textPrimary)
                 }
             }
+        }
+    }
+}
+
+/**
+ * 图片外显设置弹窗：选择方式（随机文案 / HTTP接口），并编辑对应配置。
+ */
+@Composable
+fun HomeImageSummaryDialog(
+    show: Boolean,
+    mode: String,
+    tips: String,
+    url: String,
+    onDismiss: () -> Unit,
+    onConfirm: (mode: String, tips: String, url: String) -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var curMode by remember(mode) { mutableStateOf(mode) }
+    var curTips by remember(tips) { mutableStateOf(tips) }
+    var curUrl by remember(url) { mutableStateOf(url) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                "图片外显设置",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "发送图片时，将图片下方外显文本替换为以下内容",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            Text("方式", fontSize = 13.sp, color = colors.textPrimary)
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth()) {
+                ImageSummaryModeOption(
+                    label = "随机文案",
+                    selected = curMode != "http",
+                    onClick = { curMode = "text" },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(10.dp))
+                ImageSummaryModeOption(
+                    label = "接口返回",
+                    selected = curMode == "http",
+                    onClick = { curMode = "http" },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+            if (curMode == "http") {
+                Text("接口地址", fontSize = 13.sp, color = colors.textPrimary)
+                Spacer(modifier = Modifier.height(6.dp))
+                ImageSummaryField(
+                    value = curUrl,
+                    placeholder = "https://example.com/api/summary",
+                    onValueChange = { curUrl = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "每张图片发送前都会请求该接口，直接以返回内容作为外显",
+                    fontSize = 12.sp,
+                    color = colors.textSecondary
+                )
+            } else {
+                Text("文案列表", fontSize = 13.sp, color = colors.textPrimary)
+                Spacer(modifier = Modifier.height(6.dp))
+                ImageSummaryField(
+                    value = curTips,
+                    placeholder = "多条用逗号分隔，例如：奋斗每一天，加油，冲!",
+                    multiLine = true,
+                    onValueChange = { curTips = it }
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    "多条文案每次随机取一条，用逗号(,)分隔",
+                    fontSize = 12.sp,
+                    color = colors.textSecondary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AccentGreen)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onConfirm(curMode, curTips.trim(), curUrl.trim()) }
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "保存",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageSummaryModeOption(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = QEdgeTheme.colors
+    androidx.compose.foundation.layout.Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(12.dp))
+            .background(
+                if (selected) AccentGreen.copy(alpha = 0.15f)
+                else colors.textSecondary.copy(alpha = 0.08f)
+            )
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            label,
+            fontSize = 14.sp,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+            color = if (selected) AccentGreen else colors.textSecondary
+        )
+    }
+}
+
+@Composable
+private fun ImageSummaryField(
+    value: String,
+    placeholder: String,
+    multiLine: Boolean = false,
+    onValueChange: (String) -> Unit
+) {
+    val colors = QEdgeTheme.colors
+    androidx.compose.foundation.layout.Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.textSecondary.copy(alpha = 0.08f))
+            .padding(14.dp)
+    ) {
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            textStyle = TextStyle(fontSize = 14.sp, color = colors.textPrimary),
+            modifier = Modifier.fillMaxWidth(),
+            singleLine = !multiLine,
+            maxLines = if (multiLine) 4 else 1,
+            decorationBox = { innerTextField ->
+                if (value.isEmpty()) {
+                    Text(placeholder, fontSize = 14.sp, color = colors.textSecondary)
+                }
+                innerTextField()
+            }
+        )
+    }
+}
+/**
+ * 篡改发送图片比例设置弹窗：输入宽度、高度（整数）。
+ */
+@Composable
+fun HomeImageRatioDialog(
+    show: Boolean,
+    width: String,
+    height: String,
+    onDismiss: () -> Unit,
+    onConfirm: (width: Int, height: Int) -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var curWidth by remember(width) { mutableStateOf(width) }
+    var curHeight by remember(height) { mutableStateOf(height) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+        ) {
+            Text(
+                "发送图片比例",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "对所有发送的图片强制设置像素宽高（整数）",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            ImageRatioNumberField(
+                label = "宽度 (px)",
+                value = curWidth,
+                placeholder = "例如 1080",
+                onValueChange = { curWidth = it }
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            ImageRatioNumberField(
+                label = "高度 (px)",
+                value = curHeight,
+                placeholder = "例如 1440",
+                onValueChange = { curHeight = it }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "宽高必须为正整数，填 0 或留空则不生效",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AccentGreen)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                val w = curWidth.trim().toIntOrNull() ?: 0
+                                val h = curHeight.trim().toIntOrNull() ?: 0
+                                onConfirm(w, h)
+                            }
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "保存",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun ImageRatioNumberField(
+    label: String,
+    value: String,
+    placeholder: String,
+    onValueChange: (String) -> Unit
+) {
+    val colors = QEdgeTheme.colors
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(label, fontSize = 13.sp, color = colors.textPrimary)
+        Spacer(modifier = Modifier.height(6.dp))
+        androidx.compose.foundation.layout.Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(12.dp))
+                .background(colors.textSecondary.copy(alpha = 0.08f))
+                .padding(14.dp)
+        ) {
+            BasicTextField(
+                value = value,
+                onValueChange = { input ->
+                    // 仅允许数字
+                    onValueChange(input.filter { it.isDigit() })
+                },
+                textStyle = TextStyle(fontSize = 14.sp, color = colors.textPrimary),
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true,
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                decorationBox = { innerTextField ->
+                    if (value.isEmpty()) {
+                        Text(placeholder, fontSize = 14.sp, color = colors.textSecondary)
+                    }
+                    innerTextField()
+                }
+            )
         }
     }
 }

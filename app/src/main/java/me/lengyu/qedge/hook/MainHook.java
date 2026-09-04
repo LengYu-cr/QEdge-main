@@ -47,6 +47,9 @@ import me.lengyu.qedge.hook.item.DisableAIAvatar;
 import me.lengyu.qedge.hook.item.CopyArkMessage;
 import me.lengyu.qedge.hook.item.LongClickSendCard;
 import me.lengyu.qedge.hook.item.RepeatMsg;
+import me.lengyu.qedge.hook.item.ImageSummary;
+import me.lengyu.qedge.hook.item.EmotionAiTag;
+import me.lengyu.qedge.hook.item.ImageRatioOverride;
 
 import java.util.List;
 /**
@@ -83,6 +86,9 @@ public class MainHook {
         HookRegistry.register(new CopyArkMessage());
         HookRegistry.register(new LongClickSendCard());
         HookRegistry.register(new RepeatMsg());
+        HookRegistry.register(ImageSummary.INSTANCE);
+        HookRegistry.register(EmotionAiTag.INSTANCE);
+        HookRegistry.register(ImageRatioOverride.INSTANCE);
         HookRegistry.register(AntiQfixPatch.INSTANCE);
         HookRegistry.register(AntiReport.INSTANCE);
         HookRegistry.register(ForceVip.INSTANCE);

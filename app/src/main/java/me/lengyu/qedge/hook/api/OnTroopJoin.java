@@ -57,7 +57,7 @@ public class OnTroopJoin extends BaseApiHookItem<OnTroopJoin.TroopJoinListener> 
                 }
                 String adminUin = (adminUid == null || adminUid.isEmpty()) ? null : FriendTool.getUinFromUid(adminUid);
                 JoinData data = new JoinData(troopUin, memberUin, joinType, memberUid, adminUin, adminUid);
-                LogUtils.i("OnTroopJoin", "join data: " + data.toString());
+                // LogUtils.i("OnTroopJoin", "join data: " + data.toString());
                 notifyListeners(data);
             } catch (Throwable e) {
                 LogUtils.e("OnTroopJoin", "handleJoin error: " + e.getMessage());
