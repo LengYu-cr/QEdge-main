@@ -50,6 +50,12 @@ import me.lengyu.qedge.hook.item.RepeatMsg;
 import me.lengyu.qedge.hook.item.ImageSummary;
 import me.lengyu.qedge.hook.item.EmotionAiTag;
 import me.lengyu.qedge.hook.item.ImageRatioOverride;
+import me.lengyu.qedge.hook.item.RemoveRiskWebpageBlock;
+import me.lengyu.qedge.hook.item.RemoveAds;
+import me.lengyu.qedge.hook.item.VoiceSpeed;
+import me.lengyu.qedge.hook.item.QLogRedirect;
+import me.lengyu.qedge.hook.item.RemoveQrCodeCheck;
+import me.lengyu.qedge.hook.item.SkipScanWaitTime;
 
 import java.util.List;
 /**
@@ -89,6 +95,12 @@ public class MainHook {
         HookRegistry.register(ImageSummary.INSTANCE);
         HookRegistry.register(EmotionAiTag.INSTANCE);
         HookRegistry.register(ImageRatioOverride.INSTANCE);
+        HookRegistry.register(RemoveRiskWebpageBlock.INSTANCE);
+        HookRegistry.register(RemoveAds.INSTANCE);
+        HookRegistry.register(VoiceSpeed.INSTANCE);
+        HookRegistry.register(QLogRedirect.INSTANCE);
+        HookRegistry.register(RemoveQrCodeCheck.INSTANCE);
+        HookRegistry.register(SkipScanWaitTime.INSTANCE);
         HookRegistry.register(AntiQfixPatch.INSTANCE);
         HookRegistry.register(AntiReport.INSTANCE);
         HookRegistry.register(ForceVip.INSTANCE);

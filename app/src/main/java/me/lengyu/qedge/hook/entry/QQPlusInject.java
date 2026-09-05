@@ -65,7 +65,6 @@ public class QQPlusInject extends BaseApiHookItem {
             }
             
             targetMethod.setAccessible(true);
-            
             XposedBridge.hookMethod(targetMethod, new XC_MethodHook() {
                 @Override
                 protected void beforeHookedMethod(XC_MethodHook.MethodHookParam param) {

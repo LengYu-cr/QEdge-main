@@ -10,6 +10,7 @@ import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation
 import me.lengyu.qedge.hook.base.BaseSwitchHookItem
+import me.lengyu.qedge.utils.HookUtils
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
@@ -84,29 +85,27 @@ class PreventRecall : BaseSwitchHookItem() {
                 hostCL
             )
 
-            XposedHelpers.findAndHookMethod(
+            HookUtils.hookClassMethod(
                 sessionClass, "onMsfPush",
-                String::class.java,
-                ByteArray::class.java,
-                pushExtraInfoClass,
-                object : XC_MethodHook() {
-                    override fun beforeHookedMethod(param: MethodHookParam) {
-                        val cmd = param.args[0] as? String ?: return
-                        try {
-                            if (!isEnabled()) return
-                            val buffer = param.args[1] as? ByteArray ?: return
-                            when (cmd) {
-                                "trpc.msg.register_proxy.RegisterProxy.InfoSyncPush" ->
-                                    handleInfoSyncPush(buffer, param)
-                                "trpc.msg.olpush.OlPushService.MsgPush" ->
-                                    handleMsgPush(buffer, param)
-                            }
-                        } catch (e: Exception) {
-                            LogUtils.e(TAG, "beforeHookedMethod error: ${e.message}")
-                            LogUtils.e(TAG, e)
+                arrayOf(String::class.java, ByteArray::class.java, pushExtraInfoClass),
+                { param ->
+                    val cmd = param.args[0] as? String ?: return@hookClassMethod
+                    try {
+                        if (!isEnabled()) return@hookClassMethod
+                        val buffer = param.args[1] as? ByteArray ?: return@hookClassMethod
+                        when (cmd) {
+                            "trpc.msg.register_proxy.RegisterProxy.InfoSyncPush" ->
+                                handleInfoSyncPush(buffer, param)
+                            "trpc.msg.olpush.OlPushService.MsgPush" ->
+                                handleMsgPush(buffer, param)
                         }
+                    } catch (e: Exception) {
+                        LogUtils.e(TAG, "beforeHookedMethod error: ${e.message}")
+                        LogUtils.e(TAG, e)
                     }
-                })
+                },
+                null
+            )
         } catch (e: Exception) {
             LogUtils.e(TAG, "Hook failed: ${e.message}")
         }
@@ -989,14 +988,10 @@ class PreventRecall : BaseSwitchHookItem() {
                 "com.tencent.mvi.base.mvi.MviUIState",
                 hostCL
             )
-            XposedHelpers.findAndHookMethod(
-                vbClass, "handleUIState", mviUiStateClass,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        onAIOMsgUpdate(param)
-                    }
-                }
-            )
+            HookUtils.hookClassMethod(
+                vbClass, "handleUIState", arrayOf(mviUiStateClass),
+                null
+            ) { param -> onAIOMsgUpdate(param) }
             aioViewHookDone = true
         } catch (e: Exception) {
             LogUtils.e(TAG, "hookAIOMsgUpdate failed: ${e.message}")

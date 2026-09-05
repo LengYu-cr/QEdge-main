@@ -10,4 +10,5 @@ public class QUIButton extends Button {
 
     public void setType(int i) {
     }
+
 }

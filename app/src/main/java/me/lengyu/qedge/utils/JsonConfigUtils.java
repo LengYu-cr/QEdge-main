@@ -225,7 +225,7 @@ public class JsonConfigUtils {
         saveConfigInternal(entry.configFile, snapshot);
         // 写备份
         File backupFile = new File(entry.configFile.getParentFile(),
-                stripExtension(entry.configFile.getName()) + ".json.bak");
+                entry.configFile.getName() + ".bak");
         try {
             String content = snapshot.toString(4);
             try (FileOutputStream fos = new FileOutputStream(backupFile);
@@ -253,7 +253,7 @@ public class JsonConfigUtils {
         if (content == null || content.trim().isEmpty()) {
             // 文件为空或损坏，尝试从备份恢复
             LogUtils.e("JsonConfigUtils", "config file empty/corrupt: " + configFile.getAbsolutePath());
-            File backupFile = new File(configFile.getParentFile(), configName + ".json.bak");
+            File backupFile = new File(configFile.getParentFile(), configName + ".dat.bak");
             if (backupFile.exists()) {
                 String backupContent = readFileContent(backupFile);
                 if (backupContent != null && !backupContent.trim().isEmpty()) {
@@ -276,7 +276,7 @@ public class JsonConfigUtils {
         } catch (JSONException e) {
             LogUtils.e(e);
             // 解析失败，尝试从备份恢复
-            File backupFile = new File(configFile.getParentFile(), configName + ".json.bak");
+            File backupFile = new File(configFile.getParentFile(), configName + ".dat.bak");
             if (backupFile.exists()) {
                 String backupContent = readFileContent(backupFile);
                 if (backupContent != null && !backupContent.trim().isEmpty()) {
@@ -339,16 +339,11 @@ public class JsonConfigUtils {
         }
     }
 
-    private static String stripExtension(String fileName) {
-        int dot = fileName.lastIndexOf('.');
-        return dot > 0 ? fileName.substring(0, dot) : fileName;
-    }
-
     private static File getConfigFile(String absoluteDir, String configName) {
         File dir = new File(absoluteDir);
         if (!dir.exists()) {
             dir.mkdirs();
         }
-        return new File(dir, configName + ".json");
+        return new File(dir, configName + ".dat");
     }
 }

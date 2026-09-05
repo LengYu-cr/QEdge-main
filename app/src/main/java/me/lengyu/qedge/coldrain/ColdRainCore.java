@@ -52,7 +52,7 @@ import me.lengyu.qedge.utils.qq.MsgTool;
  */
 public class ColdRainCore {
     private static final String TAG = "ColdRainCore";
-    private static final String CONFIG_FILE_NAME = "config.json";
+    private static final String CONFIG_FILE_NAME = "config.dat";
     private static volatile ColdRainCore instance;
     private Context context;
     private JSONObject configData;
@@ -123,6 +123,21 @@ public class ColdRainCore {
             baseDir.mkdirs();
         }
         configFile = new File(baseDir, CONFIG_FILE_NAME);
+        // 兼容旧文件：config.json 存在则迁移到 config.dat
+        File legacyConfig = new File(baseDir, "config.json");
+        if (!configFile.exists() && legacyConfig.exists()) {
+            try {
+                java.io.FileInputStream in = new java.io.FileInputStream(legacyConfig);
+                byte[] buf = new byte[(int) legacyConfig.length()];
+                in.read(buf);
+                in.close();
+                java.io.FileOutputStream out = new java.io.FileOutputStream(configFile);
+                out.write(buf);
+                out.close();
+            } catch (Exception e) {
+                LogUtils.e(TAG, "migrate config.json -> .dat error: " + e.getMessage());
+            }
+        }
         
         // 数据目录
         dataDir = new File(baseDir, "data");
@@ -239,8 +254,33 @@ public class ColdRainCore {
     }
 
     // ========== 数据文件操作 ==========
+
+    /** 把 .json 请求映射到 .dat，并对旧 .json 文件做一次性迁移。 */
+    private File resolveDataFile(String fileName) {
+        String targetName = fileName.endsWith(".json")
+                ? fileName.substring(0, fileName.length() - 5) + ".dat" : fileName;
+        File file = new File(dataDir, targetName);
+        if (!file.exists() && !fileName.equals(targetName)) {
+            File legacy = new File(dataDir, fileName);
+            if (legacy.exists()) {
+                try {
+                    java.io.FileInputStream in = new java.io.FileInputStream(legacy);
+                    byte[] buf = new byte[(int) legacy.length()];
+                    in.read(buf);
+                    in.close();
+                    java.io.FileOutputStream out = new java.io.FileOutputStream(file);
+                    out.write(buf);
+                    out.close();
+                } catch (Exception e) {
+                    LogUtils.e(TAG, "migrate data " + fileName + " -> .dat error: " + e.getMessage());
+                }
+            }
+        }
+        return file;
+    }
+
     public JSONObject getDataFile(String fileName) {
-        File file = new File(dataDir, fileName);
+        File file = resolveDataFile(fileName);
         if (!file.exists()) {
             return new JSONObject();
         }
@@ -262,7 +302,7 @@ public class ColdRainCore {
 
     public void saveDataFile(String fileName, JSONObject data) {
         try {
-            File file = new File(dataDir, fileName);
+            File file = resolveDataFile(fileName);
             FileWriter writer = new FileWriter(file);
             writer.write(data.toString(4));
             writer.close();

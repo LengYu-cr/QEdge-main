@@ -122,6 +122,37 @@ public class QQCurrentEnv {
         }
     }
 
+    public static Object fileAssistantService;
+    public static Object getFileAssistantService() {
+        if (fileAssistantService != null) {
+            return fileAssistantService;
+        }
+        try {
+            QQAppInterface appInterface = getQQAppInterface();
+            if (appInterface == null) {
+                return null;
+            }
+            // 从运行时取 QQ 已创建的内核服务，不是 new
+            Object kernelService = appInterface.getRuntimeService(IKernelService.class, "");
+            if (kernelService == null) {
+                return null;
+            }
+            // getFileAssistantService 方法名各版本稳定(IKernelService 接口方法)，但运行时真实返回
+            // 类型是混淆类 com.tencent.qqnt.kernel.api.s，stub 声明为 Object，直接调用会因返回
+            // 类型签名不匹配报 No virtual method，故按稳定方法名反射调用以规避返回类型变动。
+            Method method = ReflectUtils.findMethod(kernelService.getClass(), "getFileAssistantService");
+            if (method == null) {
+                LogUtils.e("QQCurrentEnv", "[getFileAssistantService] method not found");
+                return null;
+            }
+            fileAssistantService = method.invoke(kernelService);
+            return fileAssistantService;
+        } catch (Throwable e) {
+            LogUtils.e("QQCurrentEnv", "[getFileAssistantService] error: " + e.getMessage());
+            return null;
+        }
+    }
+
     public static MsgService getKernelMsgService() {
         if (kernelMsgService != null) {
             return kernelMsgService;

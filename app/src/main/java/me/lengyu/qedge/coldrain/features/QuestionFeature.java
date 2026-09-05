@@ -19,10 +19,10 @@ import me.lengyu.qedge.utils.qq.MsgTool;
 public class QuestionFeature implements ColdRainFeature {
 
     // 数据文件名
-    private static final String FILE_QA_GROUP = "qa_group_%s.json";      // 本群精准问答
-    private static final String FILE_QA_GLOBAL = "qa_global.json";       // 全局精准问答
-    private static final String FILE_FUZZY_GROUP = "fuzzy_group_%s.json"; // 本群模糊问答
-    private static final String FILE_FUZZY_GLOBAL = "fuzzy_global.json";  // 全局模糊问答
+    private static final String FILE_QA_GROUP = "qa_group_%s.dat";      // 本群精准问答
+    private static final String FILE_QA_GLOBAL = "qa_global.dat";       // 全局精准问答
+    private static final String FILE_FUZZY_GROUP = "fuzzy_group_%s.dat"; // 本群模糊问答
+    private static final String FILE_FUZZY_GLOBAL = "fuzzy_global.dat";  // 全局模糊问答
 
     @Override
     public boolean shouldHandle(MsgData msgData) {

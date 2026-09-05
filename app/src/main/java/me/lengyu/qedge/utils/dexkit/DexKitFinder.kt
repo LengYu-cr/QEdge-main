@@ -43,10 +43,10 @@ object DexKitFinder {
 
     @JvmStatic
     fun doFind() {
-        // System.loadLibrary 是同步的原生加载，放到主线程会阻塞宿主启动。
-        // dexkit so 只在 startFind() 的 IO 协程里才真正用到（DexKitBridge.create），
-        // 因此这里不再预加载，改由 startFind() 在后台线程按需加载。
-        me.lengyu.qedge.hook.MainHook.registerHookItems()
+        // 先立即 loadHook：dexkit 缓存为空只影响少数 dexkit 依赖项（其 onInit/onHook 内部有 try-catch，
+        // 不会导致崩溃），入口与基础功能可即时生效，避免"更新后首启入口失效/点击闪退/数据被覆盖"。
+        // 后台查找完成后，loadHook 会用填充好的缓存再补全 dexkit 依赖项。
+        me.lengyu.qedge.hook.MainHook.loadHook()
         showFindDialog()
     }
 

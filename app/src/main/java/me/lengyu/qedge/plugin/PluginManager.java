@@ -58,7 +58,15 @@ public class PluginManager {
     }
 
     private static void loadAutoLoadConfig() {
-        List<String> savedList = ObjectStore.loadList("data", "AutoLoadList.json");
+        List<String> savedList = ObjectStore.loadList("data", "AutoLoadList.dat");
+        if (savedList == null) {
+            // 兼容旧文件：.json 已有数据则迁移到 .dat
+            List<String> legacy = ObjectStore.loadList("data", "AutoLoadList.json");
+            if (legacy != null) {
+                ObjectStore.saveList("data", "AutoLoadList.dat", legacy);
+                savedList = legacy;
+            }
+        }
         if (savedList != null) {
             autoLoadList.clear();
             autoLoadList.addAll(savedList);
@@ -66,7 +74,7 @@ public class PluginManager {
     }
 
     private static void saveAutoLoadConfig() {
-        ObjectStore.saveList("data", "AutoLoadList.json", autoLoadList);
+        ObjectStore.saveList("data", "AutoLoadList.dat", autoLoadList);
     }
 
     public static boolean startPlugin(PluginInfo plugin) {

@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -35,6 +36,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import me.lengyu.qedge.hook.item.LevelBoost
+import me.lengyu.qedge.hook.item.QLogRedirect
 import me.lengyu.qedge.ui.core.theme.AccentGreen
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import org.json.JSONObject
@@ -683,6 +685,113 @@ fun HomeImageRatioDialog(
 }
 
 @Composable
+fun HomeVoiceSpeedDialog(
+    show: Boolean,
+    current: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    val options = listOf("0.5", "1.0", "1.25", "1.5", "2.0")
+    var selected by remember(current) { mutableStateOf(current) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+        ) {
+            Text(
+                "语音消息倍速",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "选择固定播放倍速，开启开关后语音/AMR 消息按此倍速播放",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                options.forEach { opt ->
+                    val isSelected = if (selected.startsWith(opt)) true else selected == opt
+                    androidx.compose.foundation.layout.Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) AccentGreen else colors.cardBackground)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = { selected = opt }
+                            )
+                            .padding(vertical = 14.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            "${opt}×",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = if (isSelected) Color.White else colors.textPrimary
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                androidx.compose.foundation.layout.Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AccentGreen)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onConfirm(selected) }
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "保存",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
 private fun ImageRatioNumberField(
     label: String,
     value: String,
@@ -928,5 +1037,123 @@ private fun CreatePluginField(
                 innerTextField()
             }
         )
+    }
+}
+
+/**
+ * QLog 日志处理模式选择弹窗：关闭 / 拦截 / 重定向 三选一。
+ */
+@Composable
+fun HomeQLogRedirectDialog(
+    show: Boolean,
+    current: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var selected by remember(current) { mutableStateOf(current.ifEmpty { QLogRedirect.MODE_OFF }) }
+
+    data class ModeItem(val value: String, val title: String, val desc: String)
+
+    val modes = listOf(
+        ModeItem(QLogRedirect.MODE_OFF, "关闭", "QQ日志正常输出，不做任何拦截"),
+        ModeItem(QLogRedirect.MODE_REDIRECT, "重定向", "拦截并写入 QEdge/log/QLog/，丢弃原日志"),
+        ModeItem(QLogRedirect.MODE_MUTE, "纯拦截", "直接丢弃QQ日志，不写入任何本地文件")
+    )
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+        ) {
+            Text(
+                "QLog日志处理",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "选择QQ宿主日志的处理模式，点击选项即时生效",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            modes.forEach { item ->
+                val isSelected = selected == item.value
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(if (isSelected) AccentGreen.copy(alpha = 0.12f) else colors.cardBackground.copy(alpha = 0.5f))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                selected = item.value
+                                onConfirm(item.value)
+                                onDismiss()
+                            }
+                        )
+                        .padding(horizontal = 14.dp, vertical = 12.dp)
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        androidx.compose.foundation.layout.Box(
+                            modifier = Modifier
+                                .size(18.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(if (isSelected) AccentGreen else colors.textSecondary.copy(alpha = 0.3f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            if (isSelected) {
+                                androidx.compose.foundation.layout.Box(
+                                    modifier = Modifier
+                                        .size(8.dp)
+                                        .clip(androidx.compose.foundation.shape.CircleShape)
+                                        .background(Color.White)
+                                )
+                            }
+                        }
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            item.title,
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Medium,
+                            color = colors.textPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        item.desc,
+                        fontSize = 12.sp,
+                        color = colors.textSecondary,
+                        modifier = Modifier.padding(start = 30.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.height(8.dp))
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(12.dp))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onDismiss
+                    )
+                    .padding(vertical = 12.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("取消", fontSize = 14.sp, color = colors.textSecondary)
+            }
+        }
     }
 }

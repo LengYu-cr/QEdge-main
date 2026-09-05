@@ -7,7 +7,6 @@ import android.content.Context
 import android.view.View
 import android.widget.ImageView
 import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import me.lengyu.qedge.R
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation
@@ -16,6 +15,7 @@ import me.lengyu.qedge.lifecycle.Parasitics
 import me.lengyu.qedge.ui.components.dialogs.RepeatMsgAction
 import me.lengyu.qedge.ui.components.dialogs.RepeatMsgActionDialog
 import me.lengyu.qedge.ui.components.dialogs.RawTextDialog
+import me.lengyu.qedge.utils.HookUtils
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
@@ -29,6 +29,7 @@ import com.tencent.qqnt.kernel.nativeinterface.MsgElement
 import com.tencent.qqnt.kernel.nativeinterface.MsgRecord
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
+import java.util.ArrayList
 /**
  * @Author 冷雨
  * @Description 消息复读
@@ -93,11 +94,9 @@ class RepeatMsg : BaseSwitchHookItem() {
                 LogUtils.e(TAG, "repeatMsg method not found")
                 return
             }
-            XposedBridge.hookMethod(targetMethod, object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    onHandleIntent(param)
-                }
-            })
+            HookUtils.hookAfter(targetMethod) { param ->
+                onHandleIntent(param)
+            }
         } catch (e: Exception) {
             LogUtils.e(TAG, "onHook failed: ${e.message}")
         }
@@ -178,7 +177,7 @@ class RepeatMsg : BaseSwitchHookItem() {
             // 复制路径：视频（异步获取在线播放地址）
             if (msgData.videoList.size > 0) {
                 actions.add(
-                    RepeatMsgAction("复制路径", "视频(获取在线播放地址)") {
+                    RepeatMsgAction("复制链接", "视频(获取在线播放地址)") {
                         try {
                             val richMediaService = QQCurrentEnv.getRichMediaService()
                             if (richMediaService == null) {
@@ -308,6 +307,104 @@ class RepeatMsg : BaseSwitchHookItem() {
                 )
             }
 
+            // 复制链接：文件消息(msgType==3)，通过 kernel 反查下载直链
+            if (msgData.msgType == 3) {
+                actions.add(
+                    RepeatMsgAction("复制链接", "文件(获取下载链接)") {
+                        try {
+                            val fileElement = msgData.data.elements
+                                ?.firstOrNull { it.fileElement != null }?.fileElement
+                            // FileElement 是宿主类，field 已在 MsgData/MsgTool 使用过，可直接访问
+                            val fileUuid = fileElement?.fileUuid
+                            val fileName = fileElement?.fileName
+                            if (fileUuid.isNullOrEmpty()) {
+                                Toasts.showCustomToast("未找到文件标识(uuid)")
+                                return@RepeatMsgAction
+                            }
+                            Toasts.showCustomToast("正在获取文件下载链接...")
+
+                            val fileAssistantService = QQCurrentEnv.getFileAssistantService()
+                            if (fileAssistantService == null) {
+                                Toasts.showCustomToast("文件助手服务不可用")
+                                return@RepeatMsgAction
+                            }
+                            // getFileAssistantService 返回的是 api 层包装类(com.tencent.qqnt.kernel.api.impl.hl)，
+                            // 它继承自 BaseService，私有字段 service 持有真正的 native
+                            // IKernelFileAssistantService(getFileAssistantModelByUUIDs 等方法在其上)，反射读取。
+                            val nativeService = readFieldViaHierarchy(fileAssistantService, "service")
+                            if (nativeService == null) {
+                                Toasts.showCustomToast("未找到文件助手内核服务")
+                                return@RepeatMsgAction
+                            }
+
+                            // 枚举/参数/回调类都必须用宿主 ClassLoader 的类。模块 stub 是
+                            // compileOnly 不打包，运行时若用模块自己的接口实现类做 callback，宿主内核
+                            // 的 JNI 环境无法识别该类，异步回调阶段会在 native 层直接崩溃。故 callback
+                            // 用宿主接口的动态代理生成。
+                            val hostCL = ReflectUtils.hostClassLoader
+                            val faInfoCallbackClass = XposedHelpers.findClass(
+                                "com.tencent.qqnt.kernel.nativeinterface.IGetFAInfoCallback", hostCL
+                            )
+
+                            val nativeServiceClass = nativeService.javaClass
+                            // getFileAssistantModelByUUIDs(ArrayList<String>, IGetFAInfoCallback)
+                            val method = nativeServiceClass.declaredMethods.firstOrNull { m ->
+                                m.parameterCount == 2 &&
+                                m.parameterTypes[0] == ArrayList::class.java &&
+                                m.name.contains("getFileAssistantModelByUUIDs")
+                            } ?: XposedHelpers.findMethodExact(
+                                nativeServiceClass, "getFileAssistantModelByUUIDs",
+                                ArrayList::class.java, faInfoCallbackClass
+                            )
+                            method.isAccessible = true
+
+                            val uuidList = ArrayList<String>().apply { add(fileUuid) }
+                            val callback = Proxy.newProxyInstance(
+                                hostCL, arrayOf(faInfoCallbackClass)
+                            ) { _, m, args ->
+                                if (m.name == "onResult") {
+                                    val code = (args?.getOrNull(0) as? Int) ?: -1
+                                    val msg = args?.getOrNull(1) as? String
+                                    val modelList = args?.getOrNull(2) as? List<*>
+                                    LogUtils.i(TAG, "file onResult code=$code msg=$msg listSize=${modelList?.size}")
+                                    hostActivity.runOnUiThread {
+                                        runCatching {
+                                            var diag = ""
+                                            val url = if (code == 0 && modelList != null) {
+                                                modelList.firstNotNullOfOrNull { model ->
+                                                    // FileAssistantModel 是宿主类，不能 cast，反射读 extModel.fileUrl
+                                                    val extModel = ReflectUtils.getFieldValue(model, "extModel")
+                                                    val extModelNull = extModel == null
+                                                    val fileUrl = if (extModelNull) null else ReflectUtils.getFieldValue(extModel, "fileUrl") as? String
+                                                    diag += ";extNull=$extModelNull;fileUrl=[$fileUrl];remoteFileId=[${ReflectUtils.getFieldValue(model, "remoteFileId")}]"
+                                                    fileUrl?.takeIf { it.isNotEmpty() }
+                                                }
+                                            } else {
+                                                diag += ";code=$code"
+                                                null
+                                            }
+                                            LogUtils.i(TAG, "file diag$diag")
+                                            if (!url.isNullOrEmpty()) {
+                                                copyToClipboard(hostActivity, url)
+                                                Toasts.showCustomToast(if (fileName.isNullOrEmpty()) "已复制文件下载链接" else "已复制文件下载链接: $fileName")
+                                            } else {
+                                                Toasts.showCustomToast(msg ?: "获取文件下载链接失败$diag")
+                                            }
+                                        }.onFailure { LogUtils.e(TAG, "file onResult error: ${it.message}") }
+                                    }
+                                }
+                                null
+                            }
+
+                            method.invoke(nativeService, uuidList, callback)
+                        } catch (e: Throwable) {
+                            LogUtils.e(TAG, "file copy error: ${e.message}")
+                            Toasts.showCustomToast("获取文件下载链接失败: ${e.message}")
+                        }
+                    }
+                )
+            }
+
             // 复制文本：始终提供
             actions.add(
                 RepeatMsgAction("复制文本") {
@@ -421,6 +518,29 @@ class RepeatMsg : BaseSwitchHookItem() {
         val peerUid = msgRecord.peerUid ?: return
         val contact = MsgTool.makeContact(peerUid, msgRecord.chatType)
         MsgTool.forwardMsg(contact, elements)
+    }
+
+    /**
+     * 沿继承链向上查找并读取字段值(含父类私有字段)。
+     * ReflectUtils.findField 不遍历父类，而 BaseService.service 等私有字段在父类上，
+     * 故此处单独实现。
+     */
+    private fun readFieldViaHierarchy(obj: Any?, fieldName: String): Any? {
+        if (obj == null) return null
+        var clazz: Class<*>? = obj.javaClass
+        while (clazz != null) {
+            try {
+                val field = clazz.getDeclaredField(fieldName)
+                field.isAccessible = true
+                return field.get(obj)
+            } catch (e: NoSuchFieldException) {
+                clazz = clazz.superclass
+            } catch (e: Throwable) {
+                LogUtils.e(TAG, "readFieldViaHierarchy($fieldName) error: ${e.message}")
+                return null
+            }
+        }
+        return null
     }
 
     private fun isDoubleClick(): Boolean {

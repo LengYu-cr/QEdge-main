@@ -8,10 +8,10 @@ import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
-import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedHelpers
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation
 import me.lengyu.qedge.hook.base.BaseSwitchHookItem
+import me.lengyu.qedge.utils.HookUtils
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
@@ -53,21 +53,17 @@ class CopyArkMessage : BaseSwitchHookItem() {
                 "com.tencent.mvi.base.mvi.MviUIState",
                 hostCL
             )
-            XposedHelpers.findAndHookMethod(
-                vbClass, "handleUIState", mviUiStateClass,
-                object : XC_MethodHook() {
-                    override fun afterHookedMethod(param: MethodHookParam) {
-                        onMsgItemUpdate(param)
-                    }
-                }
-            )
+            HookUtils.hookClassMethod(
+                vbClass, "handleUIState", arrayOf(mviUiStateClass),
+                null
+            ) { param -> onMsgItemUpdate(param) }
             aioViewHookDone = true
         } catch (e: Exception) {
             LogUtils.e(TAG, "hookAIOMsgUpdate failed: ${e.message}")
         }
     }
 
-    private fun onMsgItemUpdate(param: XC_MethodHook.MethodHookParam) {
+    private fun onMsgItemUpdate(param: de.robv.android.xposed.XC_MethodHook.MethodHookParam) {
         try {
             if (!isEnabled()) return
 

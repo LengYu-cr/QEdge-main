@@ -4,12 +4,11 @@ import android.app.Activity
 import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
-import de.robv.android.xposed.XC_MethodHook
-import de.robv.android.xposed.XposedBridge
 import de.robv.android.xposed.XposedHelpers
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation
 import me.lengyu.qedge.hook.base.BaseSwitchHookItem
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
+import me.lengyu.qedge.utils.HookUtils
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.qq.QQCurrentEnv
@@ -57,13 +56,11 @@ class LongClickSendCard : BaseSwitchHookItem() {
     private fun hookAIOShow(cl: ClassLoader) {
         try {
             val aioDelegateClass = XposedHelpers.findClass("com.tencent.qqnt.aio.activity.AIODelegate", cl)
-            XposedHelpers.findAndHookMethod(aioDelegateClass, "show", object : XC_MethodHook() {
-                override fun afterHookedMethod(param: MethodHookParam) {
-                    if (!isEnabled()) return
-                    val activity = QQCurrentEnv.getActivity() ?: return
-                    scanAndSetup(activity)
-                }
-            })
+            HookUtils.hookClassMethod(aioDelegateClass, "show", null, null) { param ->
+                if (!isEnabled()) return@hookClassMethod
+                val activity = QQCurrentEnv.getActivity() ?: return@hookClassMethod
+                scanAndSetup(activity)
+            }
         } catch (e: Exception) {
             LogUtils.e(TAG, "hook AIODelegate.show failed: ${e.message}")
         }
@@ -80,16 +77,14 @@ class LongClickSendCard : BaseSwitchHookItem() {
                 val cls = XposedHelpers.findClassIfExists(clsName, cl) ?: continue
                 for (m in cls.declaredMethods) {
                     if (m.name != "bindViewAndData") continue
-                    XposedBridge.hookMethod(m, object : XC_MethodHook() {
-                        override fun afterHookedMethod(param: MethodHookParam) {
-                            if (!isEnabled()) return
-                            try {
-                                setupFromThisObject(param.thisObject)
-                            } catch (e: Exception) {
-                                LogUtils.e(TAG, "binder hook error: ${e.message}")
-                            }
+                    HookUtils.hookAfter(m) { param ->
+                        if (!isEnabled()) return@hookAfter
+                        try {
+                            setupFromThisObject(param.thisObject)
+                        } catch (e: Exception) {
+                            LogUtils.e(TAG, "binder hook error: ${e.message}")
                         }
-                    })
+                    }
                 }
             } catch (e: Exception) {
                 LogUtils.e(TAG, "hook $clsName failed: ${e.message}")

@@ -107,7 +107,12 @@ object Parasitics {
 
             hookIActivityManager()
             hookIPackageManager(ctx, currentActivityThread)
-            
+
+            // 进程早期（Application.onCreate 后）同步注入模块资源，确保首个 Activity
+            // 渲染前宿主 resources 已能解析 0x69 包的模块资源，避免入口图标/设置页
+            // 因 addLoaders 晚于渲染而抛 ResourcesNotFoundException。
+            runCatching { injectModuleResources(ctx.resources) }
+
             initialized = true
         }
     }
@@ -267,7 +272,10 @@ object Parasitics {
     }
 
     fun injectModuleResources(res: Resources?) {
-        if (res == null || runCatching { res.getString(R.string.app_name) }.isSuccess) return
+        if (res == null) return
+        if (runCatching { res.getString(R.string.app_name) }.isSuccess) {
+            return
+        }
         val path = getModulePath() ?: return
 
         if (Build.VERSION.SDK_INT >= 30) {

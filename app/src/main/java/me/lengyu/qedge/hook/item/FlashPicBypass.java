@@ -3,11 +3,10 @@ package me.lengyu.qedge.hook.item;
 import java.lang.reflect.Method;
 
 import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
 import me.lengyu.qedge.hook.base.BaseApiHookItem;
 import me.lengyu.qedge.hook.base.Listener;
+import me.lengyu.qedge.utils.HookUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.ReflectUtils;
@@ -49,17 +48,14 @@ public class FlashPicBypass extends BaseApiHookItem<FlashPicBypass.FlashPicListe
                 if (method.getName().equals("notifyAll")) continue;
                 if (method.getName().equals("wait")) continue;
 
-                XposedBridge.hookMethod(method, new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        try {
-                            int subMsgType = XposedHelpers.getIntField(param.thisObject, "subMsgType");
-                            if (subMsgType == 8194) {
-                                XposedHelpers.setIntField(param.thisObject, "subMsgType", subMsgType & ~8192);
-                            }
-                        } catch (Throwable ignored) {
+                HookUtils.hookBefore(method, param -> {
+                    if (!isEnabled()) return;
+                    try {
+                        int subMsgType = XposedHelpers.getIntField(param.thisObject, "subMsgType");
+                        if (subMsgType == 8194) {
+                            XposedHelpers.setIntField(param.thisObject, "subMsgType", subMsgType & ~8192);
                         }
+                    } catch (Throwable ignored) {
                     }
                 });
                 count++;

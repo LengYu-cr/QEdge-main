@@ -72,6 +72,8 @@ import me.lengyu.qedge.ui.pages.home.HomeCommentInputDialog
 import me.lengyu.qedge.ui.pages.home.HomeCreatePluginDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageSummaryDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageRatioDialog
+import me.lengyu.qedge.ui.pages.home.HomeVoiceSpeedDialog
+import me.lengyu.qedge.ui.pages.home.HomeQLogRedirectDialog
 import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
@@ -79,6 +81,7 @@ import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.hook.item.KeepAliveHook
+import me.lengyu.qedge.hook.item.QLogRedirect
 import me.lengyu.qedge.hook.UserData
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.Box as ComposeBox
@@ -140,10 +143,19 @@ fun HomeScreen(
     var imageRatioWidth by remember { mutableStateOf(ModuleConfig.getInt("image_ratio_width", 0).toString()) }
     var imageRatioHeight by remember { mutableStateOf(ModuleConfig.getInt("image_ratio_height", 0).toString()) }
     var showImageRatioDialog by remember { mutableStateOf(false) }
+    var voiceSpeedEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("voice_speed_enable", false)) }
+    var voiceSpeedValue by remember { mutableStateOf(ModuleConfig.getString("voice_speed_value", "1.5")) }
+    var showVoiceSpeedDialog by remember { mutableStateOf(false) }
+    var qlogRedirectMode by remember { mutableStateOf(ModuleConfig.getString("qlog_redirect_mode", QLogRedirect.MODE_OFF)) }
+    var showQLogRedirectDialog by remember { mutableStateOf(false) }
     var antiQfixPatch by remember { mutableStateOf(ModuleConfig.getBoolean("anti_qfix_patch", false)) }
     var antiReport by remember { mutableStateOf(ModuleConfig.getBoolean("anti_report", false)) }
     var forceVip by remember { mutableStateOf(ModuleConfig.getBoolean("force_vip", false)) }
     var disableAIAvatar by remember { mutableStateOf(ModuleConfig.getBoolean("disable_ai_avatar", false)) }
+    var removeRiskWebpage by remember { mutableStateOf(ModuleConfig.getBoolean("remove_risk_webpage", false)) }
+    var removeQrCodeCheck by remember { mutableStateOf(ModuleConfig.getBoolean("remove_qrcode_check", false)) }
+    var skipScanWaitTime by remember { mutableStateOf(ModuleConfig.getBoolean("skip_scan_wait_time", false)) }
+    var removeAds by remember { mutableStateOf(ModuleConfig.getBoolean("remove_ads", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_CHECKIN_ENABLED, false)) }
@@ -356,6 +368,9 @@ fun HomeScreen(
                             imageRatioEnabled = imageRatioEnabled,
                             imageRatioWidth = imageRatioWidth,
                             imageRatioHeight = imageRatioHeight,
+                            voiceSpeedEnabled = voiceSpeedEnabled,
+                            voiceSpeedValue = voiceSpeedValue,
+                            qlogRedirectMode = qlogRedirectMode,
                             imageSummaryEnabled = imageSummaryEnabled,
                             imageSummaryMode = imageSummaryMode,
                             imageSummaryTips = imageSummaryTips,
@@ -364,6 +379,10 @@ fun HomeScreen(
                             antiReport = antiReport,
                             forceVip = forceVip,
                             disableAIAvatar = disableAIAvatar,
+                            removeRiskWebpage = removeRiskWebpage,
+                            removeQrCodeCheck = removeQrCodeCheck,
+                            skipScanWaitTime = skipScanWaitTime,
+                            removeAds = removeAds,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
                             dailySignEnabled = dailySignEnabled,
                             bigVipCheckinEnabled = bigVipCheckinEnabled,
@@ -436,6 +455,19 @@ fun HomeScreen(
                                 Thread { ModuleConfig.putBoolean("image_ratio", it) }.start()
                             },
                             onImageRatioConfigClick = { showImageRatioDialog = true },
+                            onVoiceSpeedToggle = {
+                                voiceSpeedEnabled = it
+                                Thread { ModuleConfig.putBoolean("voice_speed_enable", it) }.start()
+                            },
+                            onVoiceSpeedConfigClick = { showVoiceSpeedDialog = true },
+                            onQLogRedirectToggle = {
+                                qlogRedirectMode =
+                                    if (it) (if (qlogRedirectMode == QLogRedirect.MODE_OFF) QLogRedirect.MODE_REDIRECT else qlogRedirectMode)
+                                    else QLogRedirect.MODE_OFF
+                                val finalMode = qlogRedirectMode
+                                Thread { ModuleConfig.putString("qlog_redirect_mode", finalMode) }.start()
+                            },
+                            onQLogRedirectModeClick = { showQLogRedirectDialog = true },
                             onImageSummaryToggle = {
                                 imageSummaryEnabled = it
                                 Thread { ModuleConfig.putBoolean("image_summary", it) }.start()
@@ -456,6 +488,22 @@ fun HomeScreen(
                             onDisableAIAvatarToggle = {
                                 disableAIAvatar = it
                                 Thread { ModuleConfig.putBoolean("disable_ai_avatar", it) }.start()
+                            },
+                            onRemoveRiskWebpageToggle = {
+                                removeRiskWebpage = it
+                                Thread { ModuleConfig.putBoolean("remove_risk_webpage", it) }.start()
+                            },
+                            onRemoveQrCodeCheckToggle = {
+                                removeQrCodeCheck = it
+                                Thread { ModuleConfig.putBoolean("remove_qrcode_check", it) }.start()
+                            },
+                            onSkipScanWaitTimeToggle = {
+                                skipScanWaitTime = it
+                                Thread { ModuleConfig.putBoolean("skip_scan_wait_time", it) }.start()
+                            },
+                            onRemoveAdsToggle = {
+                                removeAds = it
+                                Thread { ModuleConfig.putBoolean("remove_ads", it) }.start()
                             },
                             onTimArkCardBypassToggle = {
                                 timArkCardBypass = it
@@ -578,6 +626,28 @@ fun HomeScreen(
                     ModuleConfig.putInt("image_ratio_width", w)
                     ModuleConfig.putInt("image_ratio_height", h)
                 }.start()
+            }
+        )
+
+        HomeVoiceSpeedDialog(
+            show = showVoiceSpeedDialog,
+            current = voiceSpeedValue,
+            onDismiss = { showVoiceSpeedDialog = false },
+            onConfirm = { v ->
+                voiceSpeedValue = v
+                showVoiceSpeedDialog = false
+                Thread { ModuleConfig.putString("voice_speed_value", v) }.start()
+            }
+        )
+
+        HomeQLogRedirectDialog(
+            show = showQLogRedirectDialog,
+            current = qlogRedirectMode,
+            onDismiss = { showQLogRedirectDialog = false },
+            onConfirm = { m ->
+                qlogRedirectMode = m
+                val finalMode = m
+                Thread { ModuleConfig.putString("qlog_redirect_mode", finalMode) }.start()
             }
         )
 
@@ -793,6 +863,9 @@ data class HomePageState(
     val imageRatioEnabled: Boolean,
     val imageRatioWidth: String,
     val imageRatioHeight: String,
+    val voiceSpeedEnabled: Boolean,
+    val voiceSpeedValue: String,
+    val qlogRedirectMode: String,
     val imageSummaryEnabled: Boolean,
     val imageSummaryMode: String,
     val imageSummaryTips: String,
@@ -801,6 +874,10 @@ data class HomePageState(
     val antiReport: Boolean,
     val forceVip: Boolean,
     val disableAIAvatar: Boolean,
+    val removeRiskWebpage: Boolean,
+    val removeQrCodeCheck: Boolean,
+    val skipScanWaitTime: Boolean,
+    val removeAds: Boolean,
     val qzoneCheckinEnabled: Boolean,
     val dailySignEnabled: Boolean,
     val bigVipCheckinEnabled: Boolean,
@@ -834,12 +911,20 @@ class HomePageCallbacks(
     val onEmotionAiTagToggle: (Boolean) -> Unit,
     val onImageRatioToggle: (Boolean) -> Unit,
     val onImageRatioConfigClick: () -> Unit,
+    val onVoiceSpeedToggle: (Boolean) -> Unit,
+    val onVoiceSpeedConfigClick: () -> Unit,
+    val onQLogRedirectToggle: (Boolean) -> Unit,
+    val onQLogRedirectModeClick: () -> Unit,
     val onImageSummaryToggle: (Boolean) -> Unit,
     val onImageSummaryConfigClick: () -> Unit,
     val onAntiQfixPatchToggle: (Boolean) -> Unit,
     val onAntiReportToggle: (Boolean) -> Unit,
     val onForceVipToggle: (Boolean) -> Unit,
     val onDisableAIAvatarToggle: (Boolean) -> Unit,
+    val onRemoveRiskWebpageToggle: (Boolean) -> Unit,
+    val onRemoveQrCodeCheckToggle: (Boolean) -> Unit,
+    val onSkipScanWaitTimeToggle: (Boolean) -> Unit,
+    val onRemoveAdsToggle: (Boolean) -> Unit,
     val onCheckinToggle: (Boolean) -> Unit,
     val onDailySignToggle: (Boolean) -> Unit,
     val onBigVipCheckinToggle: (Boolean) -> Unit,
@@ -1057,6 +1142,19 @@ private fun HomePage(
                     checked = state.imageRatioEnabled,
                     onCheckedChange = callbacks.onImageRatioToggle,
                     onClick = callbacks.onImageRatioConfigClick
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
+                    title = "语音消息倍速播放",
+                    subtitle = run {
+                        val v = state.voiceSpeedValue.toFloatOrNull() ?: 1.5f
+                        "播放倍速 $v x，点击修改"
+                    },
+                    checked = state.voiceSpeedEnabled,
+                    onCheckedChange = callbacks.onVoiceSpeedToggle,
+                    onClick = callbacks.onVoiceSpeedConfigClick
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -1367,6 +1465,59 @@ private fun HomePage(
                     checked = state.disableAIAvatar,
                     onCheckedChange = callbacks.onDisableAIAvatarToggle
                 )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "解除风险网页拦截",
+                    subtitle = "点击消息中链接时不再拦截风险网页",
+                    checked = state.removeRiskWebpage,
+                    onCheckedChange = callbacks.onRemoveRiskWebpageToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "解除扫码限制",
+                    subtitle = "解除长按识别或从相册中扫描二维码时的风险检查",
+                    checked = state.removeQrCodeCheck,
+                    onCheckedChange = callbacks.onRemoveQrCodeCheckToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "跳过扫码确认等待时间",
+                    subtitle = "忽略倒计时，扫码确认按钮可直接点击确认登录",
+                    checked = state.skipScanWaitTime,
+                    onCheckedChange = callbacks.onSkipScanWaitTimeToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "去页面内横幅广告",
+                    subtitle = "清理QQ主界面顶部横幅广告等广告数据源",
+                    checked = state.removeAds,
+                    onCheckedChange = callbacks.onRemoveAdsToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "QLog日志重定向/拦截",
+                    subtitle = when (state.qlogRedirectMode) {
+                        QLogRedirect.MODE_MUTE -> "纯拦截模式：QQ日志被直接丢弃，不写入本地文件，点击选择模式"
+                        QLogRedirect.MODE_REDIRECT -> "重定向模式：QQ日志写入 QEdge/log/QLog/，点击选择模式"
+                        else -> "未开启拦截，QQ日志正常输出，点击选择模式"
+                    },
+                    checked = state.qlogRedirectMode != QLogRedirect.MODE_OFF,
+                    onCheckedChange = callbacks.onQLogRedirectToggle,
+                    onClick = callbacks.onQLogRedirectModeClick
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
             }
         }
         }
