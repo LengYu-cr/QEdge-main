@@ -387,6 +387,56 @@ OnReceiveMsg.INSTANCE.registerListener(msgRecord -> { ... });
 
 **配置**：`repeat_msg`，默认关闭，UI 位于「聊天功能」卡片。
 
+#### 5.5.8 绕过资料卡封禁 `BypassProfileBan`
+
+**配置**：`bypass_profile_ban`，默认关闭，UI 位于「资料卡」卡片。
+
+**功能**：强制显示被封禁用户的 QQ 资料卡主页，绕过封禁拦截弹窗；并修复被 ban 账号资料卡按钮/头像变暗、昵称不显示的问题。
+
+**三个 Hook 出口**：
+
+| Hook 点 | 处理 |
+|---------|------|
+| `ProfileCardForbidAccountHelper.isForbidByAnyType` | HookReplace 强制返回 `false`（匹配任意封禁码） |
+| `ProfileCardForbidAccountHelper.isForbidBySpecifyTypes` | 遍历 `declaredMethods` 按方法名 + 返回 boolean 匹配签名（版本差异，绕过具体参数类型），强制返回 `false` |
+| `FriendProfileCardActivity.updateForbidState` | HookBefore 重置 `ProfileCardInfo.card.isForbidAccount=false`，避免按钮/头像变暗；记录首个有效本地昵称，经 `updateNameArrayByCard` 兜底回填 `strNick` / `nameArray[0]` / `allInOne.nickname` |
+
+字段重置同时清空 `card.forbidCode`，彻底规避服务端下发封禁标记导致的界面禁用态。
+
+#### 5.5.9 解除扫码限制 `RemoveQrCodeCheck`
+
+**配置**：`remove_qrcode_check`，默认关闭。
+
+**功能**：解除长按识别或从相册扫描二维码时的风险校验。
+
+**Hook 点**：`com.tencent.open.agent.QrAgentLoginManager` 的扫码风险检查方法。
+
+**实现**：方法名混淆，通过反射遍历方法，按返回类型 void + 参数组合定位后，在 HookReplace 中通过 HookUtils 遍历参数改写**首个 boolean 参数**为 false，兼容 `(boolean,String,Bundle)` 与 `(QrAgentLoginManager,boolean,String,Bundle)` 两种签名。
+
+#### 5.5.10 跳过扫码确认等待 `SkipScanWaitTime`
+
+**配置**：`skip_scan_wait_time`，默认关闭。
+
+**功能**：扫码登录确认页忽略倒计时，可直接点击「确认」按钮。
+
+**Hook 点**：`com.tencent.biz.qrcode.activity.QRLoginAuthActivity.doOnCreate`。
+
+**实现**：HookAfter 遍历视图查找 `QUIButton`（直接类型匹配，非反射），通过 `setEnabled(true)` + 重置类型（`setType`/清除倒计时相关状态）立即启用确认按钮，主线程 Handler 操作。
+
+#### 5.5.11 QLog 日志处理 `QLogRedirect`
+
+**配置**：`qlog_redirect_mode`（`off`/`mute`/`redirect`），UI 为弹窗三选一，开关控制启停。
+
+**功能**：Hook `com.tencent.qphone.base.util.QLog` 的日志汇总点，三种模式：
+
+| 模式 | 行为 |
+|------|------|
+| `off`（关闭） | 完全放行原日志，不影响 QQ |
+| `mute`（纯拦截） | 丢弃 QQ 所有日志（logcat/beacon/文件），不写任何本地文件 |
+| `redirect`（重定向） | 拦截并丢弃原日志，写入 `QEdge/log/QLog/yyyy-MM-dd_HH.log`（按小时分片） |
+
+写入采用异步队列（`LinkedBlockingQueue` + 单线程消费者），保证 O(1) 不阻塞主线程。
+
 ---
 
 ## 6. DexKit 动态查找

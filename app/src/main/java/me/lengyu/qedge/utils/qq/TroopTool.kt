@@ -275,8 +275,8 @@ object TroopTool : DexKitTask {
         try {
             val now = System.currentTimeMillis() / 1000
             getMemberInfoList(troopUin).forEach { member ->
-                // gagTimeStamp 是 int，直接访问并转 Long
-                val time = member.gagTimeStamp.toLong() - now
+                // gagTimeStamp 本身是 Long，直接相减
+                val time = member.gagTimeStamp - now
                 if (time > 0) {
                     val troopNick = member.troopnick
                     val userName = if (troopNick.isNullOrEmpty()) member.friendnick else troopNick

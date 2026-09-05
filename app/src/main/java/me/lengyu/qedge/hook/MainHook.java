@@ -55,6 +55,7 @@ import me.lengyu.qedge.hook.item.RemoveAds;
 import me.lengyu.qedge.hook.item.VoiceSpeed;
 import me.lengyu.qedge.hook.item.QLogRedirect;
 import me.lengyu.qedge.hook.item.RemoveQrCodeCheck;
+import me.lengyu.qedge.hook.item.BypassProfileBan;
 import me.lengyu.qedge.hook.item.SkipScanWaitTime;
 
 import java.util.List;
@@ -105,6 +106,7 @@ public class MainHook {
         HookRegistry.register(AntiReport.INSTANCE);
         HookRegistry.register(ForceVip.INSTANCE);
         HookRegistry.register(DisableAIAvatar.INSTANCE);
+        HookRegistry.register(BypassProfileBan.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;

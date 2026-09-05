@@ -155,6 +155,7 @@ fun HomeScreen(
     var removeRiskWebpage by remember { mutableStateOf(ModuleConfig.getBoolean("remove_risk_webpage", false)) }
     var removeQrCodeCheck by remember { mutableStateOf(ModuleConfig.getBoolean("remove_qrcode_check", false)) }
     var skipScanWaitTime by remember { mutableStateOf(ModuleConfig.getBoolean("skip_scan_wait_time", false)) }
+    var bypassProfileBan by remember { mutableStateOf(ModuleConfig.getBoolean("bypass_profile_ban", false)) }
     var removeAds by remember { mutableStateOf(ModuleConfig.getBoolean("remove_ads", false)) }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
@@ -382,6 +383,7 @@ fun HomeScreen(
                             removeRiskWebpage = removeRiskWebpage,
                             removeQrCodeCheck = removeQrCodeCheck,
                             skipScanWaitTime = skipScanWaitTime,
+                            bypassProfileBan = bypassProfileBan,
                             removeAds = removeAds,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
                             dailySignEnabled = dailySignEnabled,
@@ -500,6 +502,10 @@ fun HomeScreen(
                             onSkipScanWaitTimeToggle = {
                                 skipScanWaitTime = it
                                 Thread { ModuleConfig.putBoolean("skip_scan_wait_time", it) }.start()
+                            },
+                            onBypassProfileBanToggle = {
+                                bypassProfileBan = it
+                                Thread { ModuleConfig.putBoolean("bypass_profile_ban", it) }.start()
                             },
                             onRemoveAdsToggle = {
                                 removeAds = it
@@ -877,6 +883,7 @@ data class HomePageState(
     val removeRiskWebpage: Boolean,
     val removeQrCodeCheck: Boolean,
     val skipScanWaitTime: Boolean,
+    val bypassProfileBan: Boolean,
     val removeAds: Boolean,
     val qzoneCheckinEnabled: Boolean,
     val dailySignEnabled: Boolean,
@@ -924,6 +931,7 @@ class HomePageCallbacks(
     val onRemoveRiskWebpageToggle: (Boolean) -> Unit,
     val onRemoveQrCodeCheckToggle: (Boolean) -> Unit,
     val onSkipScanWaitTimeToggle: (Boolean) -> Unit,
+    val onBypassProfileBanToggle: (Boolean) -> Unit,
     val onRemoveAdsToggle: (Boolean) -> Unit,
     val onCheckinToggle: (Boolean) -> Unit,
     val onDailySignToggle: (Boolean) -> Unit,
@@ -1491,6 +1499,15 @@ private fun HomePage(
                     subtitle = "忽略倒计时，扫码确认按钮可直接点击确认登录",
                     checked = state.skipScanWaitTime,
                     onCheckedChange = callbacks.onSkipScanWaitTimeToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "绕过资料卡封禁",
+                    subtitle = "强制显示被封禁用户的 QQ 资料卡主页，绕过封禁拦截弹窗",
+                    checked = state.bypassProfileBan,
+                    onCheckedChange = callbacks.onBypassProfileBanToggle
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))

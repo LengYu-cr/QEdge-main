@@ -29,6 +29,15 @@
 | **名片自动回赞** | 收到"资料卡赞 N 次"推送 → 回赞 N 次（上限 20 防刷） |
 | **定时发说说** | 用户自定义 HH:mm + 文本内容，到点自动发布，支持多进程幂等去重（三保险：主进程 Timer + SP 日 key + 成功才写标记） |
 
+### 🪪 资料卡 · 扫码 · 日志（QQ）
+
+| 功能 | 说明 |
+|------|------|
+| **绕过资料卡封禁** | Hook `ProfileCardForbidAccountHelper` 封禁判断，强制返回未封禁状态，强制显示被封禁用户的资料卡主页；并在数据刷新时重置 `Card.isForbidAccount`、回填本地昵称兜底，避免按钮/头像变暗与昵称空缺 |
+| **解除扫码限制** | Hook `QrAgentLoginManager` 扫码风险检查，改写首个 boolean 参数，解除长按识别 / 相册扫描二维码时的风险校验 |
+| **跳过扫码确认等待** | Hook `QRLoginAuthActivity`，直接启用确认按钮（QUIButton）并忽略倒计时，可立即点击确认 |
+| **QLog 日志处理** | Hook `com.tencent.qphone.base.util.QLog`，三种模式：关闭（放行）/ 纯拦截（丢弃 QQ 日志）/ 重定向（拦截并写入 `QEdge/log/QLog/yyyy-MM-dd_HH.log`） |
+
 ### ⚡ 等级加速类（每日 **00:00** 自动执行）
 
 等级加速全部功能走**三重触发**（loadHook 启动 / 开关切换 / 每日 00:00 Timer），并用 `isDoneToday`/`markDoneToday` 幂等去重：
@@ -122,6 +131,10 @@ QEdge/
 │       │   │   ├── FlashPicBypass.java   # 闪照绕过
 │       │   │   ├── TransparentAvatar.kt  # 透明头像
 │       │   │   ├── VideoToBubble.kt      # 视频转泡泡
+│       │   │   ├── BypassProfileBan.kt   # 绕过资料卡封禁（含昵称兜底）
+│       │   │   ├── RemoveQrCodeCheck.kt  # 解除扫码风险限制
+│       │   │   ├── SkipScanWaitTime.java # 跳过扫码确认等待
+│       │   │   ├── QLogRedirect.kt       # QLog 日志拦截/重定向
 │       │   │   └── ...                   # 详见 CodeWiki
 │       │   ├── kk/                       # KK 键盘（im.weshine.keyboard）VIP/去广告 Hook
 │       │   ├── kugou/                    # 酷狗音乐（普通/大字/概念 三版）开屏跳过 + 乐固签名绕过

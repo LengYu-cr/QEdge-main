@@ -40,7 +40,7 @@ object RemoveAds : BaseSwitchHookItem() {
     private fun hookLebaBanner(classLoader: ClassLoader) {
         try {
             val clazz = Class.forName(LABA_BANNER_VIEW, false, classLoader)
-            val method = XposedHelpers.findMethodExact(clazz, "setData", java.util.List::class.java)
+            val method = XposedHelpers.findMethodExact(clazz, "setData", List::class.java)
             HookUtils.hookReplace(method) { param ->
                 if (!isEnabled()) return@hookReplace HookUtils.invokeOriginalMethod(param)
                 // 传入空列表 -> setData 内部走隐藏分支
