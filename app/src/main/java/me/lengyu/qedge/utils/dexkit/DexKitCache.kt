@@ -82,7 +82,18 @@ object DexKitCache {
             cacheMap.forEach { (key, value) ->
                 jsonObject.put(key, value)
             }
-            cacheFile.writeText(jsonObject.toString(4))
+            val content = jsonObject.toString(4)
+            // 原子写：先写临时文件再 rename。QQ 多进程都会执行 find 并写同一缓存文件，
+            // 直接 writeText 会在进程间产生竞态，可能把半写/中间态覆写进磁盘，
+            // 导致下次启动 initCache 读到残缺结果（"有时方法不足，删缓存又完整"）。
+            // renameTo 在同一目录下是原子的，读取方只会看到完整文件或旧完整文件。
+            val tmp = File(parentDir, cacheFile.name + ".tmp")
+            tmp.writeText(content)
+            if (!tmp.renameTo(cacheFile)) {
+                // rename 失败（极少见）回退直接写，保证缓存仍能落地
+                cacheFile.writeText(content)
+                tmp.delete()
+            }
             true
         }.onFailure {
             LogUtils.e("DexKitCache", "saveCache failed: ${it.message}")

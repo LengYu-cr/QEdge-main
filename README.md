@@ -19,6 +19,10 @@
 | 音乐卡片 / 小程序卡片发送 | ✅ | ✅ | ExtraTool.sendMusicCard / sendMiniApp，直接构造 Ark Proto 发送 |
 | 自定义透明头像 | ✅ | ✅ | 无限制，支持 PNG 透明头像|
 | 一键复读 | ✅ | ✅ | 消息气泡旁注入复读入口，点击自动复读该条消息 |
+| 语音消息倍速播放 | ✅ | ✅ | 强制固定倍速播放语音（默认 1.5x，可自定义），hook 底层播放器 `setPlaySpeed` |
+| 篡改发送图片比例 | ✅ | ✅ | 对所有发送的图片元素强制设置 picWidth/picHeight，可自定义宽高 |
+| 图片外显自定义 | ✅ | ✅ | 发送图片时将外显摘要改为随机文案或 HTTP 接口返回内容 |
+| 表情包 AI 标签 | ✅ | ✅ | 发送单图纯表情包时带上「AI表情」标签（picType 1000→2000） |
 
 ### 🛰️ QQ 空间系列
 
@@ -37,6 +41,12 @@
 | **解除扫码限制** | Hook `QrAgentLoginManager` 扫码风险检查，改写首个 boolean 参数，解除长按识别 / 相册扫描二维码时的风险校验 |
 | **跳过扫码确认等待** | Hook `QRLoginAuthActivity`，直接启用确认按钮（QUIButton）并忽略倒计时，可立即点击确认 |
 | **QLog 日志处理** | Hook `com.tencent.qphone.base.util.QLog`，三种模式：关闭（放行）/ 纯拦截（丢弃 QQ 日志）/ 重定向（拦截并写入 `QEdge/log/QLog/yyyy-MM-dd_HH.log`） |
+| **解锁本地会员** | 强制本地 QQ 超级会员/VIP/SVIP，可开启自动语音转文字、解除表情包收藏 500 上限、解除语音发送时长/每日文件上传限制（主页不显示会员） |
+| **屏蔽 QQ秀/AI头像** | Hook 相关判断方法强制返回 false，屏蔽 QQ秀与 AI 头像显示 |
+| **解除风险网页拦截** | 点击消息中链接时不再被 `c.pc.qq.com` 风险页拦截 |
+| **去页面内横幅广告** | 拦截 QQ 主界面顶部横幅（LebaPluginBannerView）等广告数据源 |
+| **禁用 QQ 修复补丁** | 拦截并禁用 QQ 的修复补丁机制 |
+| **禁用 QQ 日志上报** | 在最终 SSO 发送前拦截，禁用 QQ 日志/上报链路 |
 
 ### ⚡ 等级加速类（每日 **00:00** 自动执行）
 
@@ -55,6 +65,14 @@
 - 同一脚本 ID + 版本号**无论作者都驳回**
 - 用户反馈系统：用户提交反馈 → 管理员回复处理结果 → 用户侧可见处理状态与回复
 - 赞助墙：微信/支付宝收款码（赞助说明出现在首页赞助墙列表）
+
+### 💻 电脑代挂（赞助用户）
+
+- 首页顶部「电脑代挂」卡片入口 → 点击跳转浏览器登录页（`v.yuafeng.cn/QEdge/user/hangup.php`）
+- 无需手动填写 QQ 号：登录后台后通过 session 的 `login_qq` 自动获取
+- 扫码（复用 Secluded 的 `get_qrcode.php` / `verify_login.php`）登录后刷在线时长，约 2 小时自动从服务器端下线
+- 服务器端定时任务：每日 00:00 自动上线（`hangup_auto_online.php`）、每 10 分钟检测超时下线（`hangup_check.php`）
+- 自动上线失败记录原因并可通过 `isOnline.php?uin=` 查询在线状态
 
 ### 🎨 模块 UI
 
@@ -135,6 +153,16 @@ QEdge/
 │       │   │   ├── RemoveQrCodeCheck.kt  # 解除扫码风险限制
 │       │   │   ├── SkipScanWaitTime.java # 跳过扫码确认等待
 │       │   │   ├── QLogRedirect.kt       # QLog 日志拦截/重定向
+│       │   │   ├── RemoveAds.kt          # 去页面内横幅广告
+│       │   │   ├── RemoveRiskWebpageBlock.kt  # 解除风险网页拦截
+│       │   │   ├── VoiceSpeed.kt         # 语音消息倍速播放
+│       │   │   ├── ImageRatioOverride.kt # 篡改发送图片比例
+│       │   │   ├── ImageSummary.kt       # 图片外显自定义
+│       │   │   ├── EmotionAiTag.kt       # 表情包 AI 标签
+│       │   │   ├── ForceVip.java         # 解锁本地会员
+│       │   │   ├── DisableAIAvatar.java  # 屏蔽 QQ秀/AI头像
+│       │   │   ├── AntiQfixPatch.java    # 禁用 QQ 修复补丁
+│       │   │   ├── AntiReport.java       # 禁用 QQ 日志上报
 │       │   │   └── ...                   # 详见 CodeWiki
 │       │   ├── kk/                       # KK 键盘（im.weshine.keyboard）VIP/去广告 Hook
 │       │   ├── kugou/                    # 酷狗音乐（普通/大字/概念 三版）开屏跳过 + 乐固签名绕过

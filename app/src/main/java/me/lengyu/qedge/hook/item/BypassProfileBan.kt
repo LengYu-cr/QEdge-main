@@ -94,7 +94,7 @@ object BypassProfileBan : BaseSwitchHookItem() {
                         if (XposedHelpers.getObjectField(allInOne, "nickname").toString().isNullOrBlank()) {
                             XposedHelpers.setObjectField(allInOne, "nickname", nick)
                         }
-                        LogUtils.i(TAG, "昵称兜底生效: $nick")
+                        // LogUtils.i(TAG, "昵称兜底生效: $nick")
                     } catch (_: Throwable) {
                     }
                 }
@@ -131,7 +131,7 @@ object BypassProfileBan : BaseSwitchHookItem() {
                     hookedCount++
                 }
             }
-            LogUtils.i(TAG, "已 Hook FriendProfileCardActivity 刷新出口，重置封禁字段, 方法数=" + hookedCount)
+            // LogUtils.i(TAG, "已 Hook FriendProfileCardActivity 刷新出口，重置封禁字段, 方法数=" + hookedCount)
         } catch (e: Throwable) {
             LogUtils.e(TAG, "hookForbidFieldReset error: ${e.message}")
         }
@@ -177,7 +177,7 @@ object BypassProfileBan : BaseSwitchHookItem() {
                 // 强制返回 false，表示非封禁账号
                 false
             }
-            LogUtils.i(TAG, "已 Hook isForbidByAnyType")
+            // LogUtils.i(TAG, "已 Hook isForbidByAnyType")
         } catch (e: Throwable) {
             LogUtils.e(TAG, "hookForbidHelper error: ${e.message}")
         }
@@ -198,14 +198,14 @@ object BypassProfileBan : BaseSwitchHookItem() {
                 .firstOrNull()
                 ?: error("未找到 isForbidBySpecifyTypes")
 
-            LogUtils.i(TAG, "匹配到 isForbidBySpecifyTypes 签名: " + method.toGenericString())
+            // LogUtils.i(TAG, "匹配到 isForbidBySpecifyTypes 签名: " + method.toGenericString())
 
             HookUtils.hookReplace(method) { param ->
                 if (!isEnabled()) return@hookReplace HookUtils.invokeOriginalMethod(param)
                 // 强制返回 false，不匹配任何封禁码
                 false
             }
-            LogUtils.i(TAG, "已 Hook isForbidBySpecifyTypes")
+            // LogUtils.i(TAG, "已 Hook isForbidBySpecifyTypes")
         } catch (e: Throwable) {
             LogUtils.e(TAG, "hookForbidSpecify error: ${e.message}")
         }

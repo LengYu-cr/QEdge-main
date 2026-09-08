@@ -824,6 +824,56 @@ private fun UserInfoRow(label: String, value: String) {
 }
 
 @Composable
+private fun HangupEntryCard() {
+    val colors = QEdgeTheme.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    QEdgeCard(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null
+                ) {
+                    try {
+                        val intent = android.content.Intent(
+                            android.content.Intent.ACTION_VIEW,
+                            android.net.Uri.parse("https://v.yuafeng.cn/QEdge/user/hangup.php")
+                        ).apply { addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK) }
+                        context.startActivity(intent)
+                    } catch (_: Throwable) {
+                        android.widget.Toast.makeText(context, "无法打开浏览器", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }
+                .padding(20.dp)
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "电脑代挂",
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "登录后刷在线时长，约 2 小时自动下线，仅对赞助用户生效",
+                        fontSize = 13.sp,
+                        color = colors.textSecondary
+                    )
+                }
+                Text(
+                    text = "›",
+                    fontSize = 22.sp,
+                    color = colors.textSecondary
+                )
+            }
+        }
+    }
+}
+
+@Composable
 private fun HomeTabBar(
     selectedTab: Int,
     onTabSelected: (Int) -> Unit,
@@ -962,6 +1012,10 @@ private fun HomePage(
         contentPadding = PaddingValues(bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item(key = "hangup") {
+            HangupEntryCard()
+        }
+
         item(key = "card_qzone") {
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {

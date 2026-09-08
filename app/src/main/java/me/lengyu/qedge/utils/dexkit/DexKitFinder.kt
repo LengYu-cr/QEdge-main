@@ -43,10 +43,12 @@ object DexKitFinder {
 
     @JvmStatic
     fun doFind() {
-        // 先立即 loadHook：dexkit 缓存为空只影响少数 dexkit 依赖项（其 onInit/onHook 内部有 try-catch，
-        // 不会导致崩溃），入口与基础功能可即时生效，避免"更新后首启入口失效/点击闪退/数据被覆盖"。
-        // 后台查找完成后，loadHook 会用填充好的缓存再补全 dexkit 依赖项。
-        me.lengyu.qedge.hook.MainHook.loadHook()
+        // DexKit 必须优先于 hook：
+        //  - registerHookItems() 只把 hook 项注册进 HookRegistry（供下方 startFind 收集全部 DexKitTask），
+        //    但不执行任何 onHook；
+        //  - 查找完成后（方法已就绪）再由 startFind 末尾调用 MainHook.loadHook() 真正执行 onHook。
+        // 避免"方法还没找到就直接 hook"导致的功能缺失/时序错乱。
+        me.lengyu.qedge.hook.MainHook.registerHookItems()
         showFindDialog()
     }
 

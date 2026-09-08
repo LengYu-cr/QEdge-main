@@ -249,6 +249,11 @@ BaseHookItem
 │   ├── PreventRecall / CopyArkMessage      // 防撤回 / 复制卡片
 │   ├── LongClickSendCard / AutoLikeBack    // 长按发卡片 / 名片回赞
 │   ├── RemoveLinkInfo / QZoneLikeTool      // 屏蔽链接卡片 / QZone 打卡·秒赞·日签等
+│   ├── BypassProfileBan / RemoveQrCodeCheck // 绕过资料卡封禁 / 解除扫码限制
+│   ├── SkipScanWaitTime / QLogRedirect     // 跳过扫码确认 / QLog 日志处理
+│   ├── RemoveAds / RemoveRiskWebpageBlock  // 去横幅广告 / 解除风险网页拦截
+│   ├── VoiceSpeed / ImageRatioOverride     // 语音倍速 / 篡改图片比例
+│   ├── ImageSummary / EmotionAiTag         // 图片外显自定义 / 表情包 AI 标签
 │   └── ...
 │
 └── BaseClickableHookItem                   // 可点击菜单项
@@ -436,6 +441,26 @@ OnReceiveMsg.INSTANCE.registerListener(msgRecord -> { ... });
 | `redirect`（重定向） | 拦截并丢弃原日志，写入 `QEdge/log/QLog/yyyy-MM-dd_HH.log`（按小时分片） |
 
 写入采用异步队列（`LinkedBlockingQueue` + 单线程消费者），保证 O(1) 不阻塞主线程。
+
+#### 5.5.12 语音倍速 / 图片比例 / 图片外显 / 表情标签
+
+| 功能 | 类 | 配置键 | 说明 |
+|------|------|------|------|
+| 语音消息倍速播放 | `VoiceSpeed` | `voice_speed_enable` / `voice_speed_value`（默认 1.5） | Hook 底层播放器 `setPlaySpeed`，强制固定倍速，UI 弹窗可自定义 |
+| 篡改发送图片比例 | `ImageRatioOverride` | `image_ratio` / `image_ratio_width` / `image_ratio_height` | 对所有发送的图片元素（picElement）强制设置 picWidth/picHeight，UI 弹窗输入宽高 |
+| 图片外显自定义 | `ImageSummary` | `image_summary` 相关 | 发送图片时将外显摘要改为随机文案或 HTTP 接口返回内容 |
+| 表情包 AI 标签 | `EmotionAiTag` | `emotion_ai_tag` | 发送单图纯表情包（picType=1000）改为 2000 + picSubType=14，带上「AI表情」标签 |
+
+#### 5.5.13 平台级功能（去广告 / 风控 / 会员 / 上报）
+
+| 功能 | 类 | 配置键 | 说明 |
+|------|------|------|------|
+| 去页面内横幅广告 | `RemoveAds` | `remove_ads` | 拦截 QQ 主界面顶部横幅（LebaPluginBannerView）等广告数据源 |
+| 解除风险网页拦截 | `RemoveRiskWebpageBlock` | `remove_risk_webpage` | 点消息链接时不再被 `c.pc.qq.com` 风险页拦截 |
+| 解锁本地会员 | `ForceVip` | `force_vip` | 本地强制超级会员/VIP/SVIP，解锁自动语音转文字、表情收藏 500 上限、语音/文件上传限制（主页不显示） |
+| 屏蔽 QQ秀/AI头像 | `DisableAIAvatar` | `disable_ai_avatar` | Hook 相关 boolean 判断方法强制返回 false |
+| 禁用 QQ 修复补丁 | `AntiQfixPatch` | `anti_qfix_patch` | 拦截并禁用 QQ 的修复补丁机制 |
+| 禁用 QQ 日志上报 | `AntiReport` | `anti_report` | 在最终 SSO 发送前拦截，禁用 QQ 日志/上报链路 |
 
 ---
 
@@ -829,7 +854,7 @@ Hook `VipManager` 的 `isVip()`/`isVipValid()`/`isExpire()`/`isVipValidOrBalance
 ### 14.1 环境与目录
 
 - PHP 7.3+ / MySQL 5.7+ / MariaDB
-- 目录：`admin/`（管理后台）、`user/`（用户中心）、`api/`（REST API，JSON 返回）、`online_plugin/`（脚本平台前端）、`update/`（版本检查）、`heartbeat/`（心跳）
+- 目录：`admin/`（管理后台）、`user/`（用户中心）、`api/`（REST API，JSON 返回）、`online_plugin/`（脚本平台前端）、`update/`（版本检查）、`heartbeat/`（心跳）、`Secluded/`（第三方 QQ 平台登录，供电脑代挂复用出码/验证接口）
 
 ### 14.2 安全特性
 
@@ -846,6 +871,21 @@ Hook `VipManager` 的 `isVip()`/`isVipValid()`/`isExpire()`/`isVipValidOrBalance
 - `users` - 用户表（含 permission: user/admin）
 - `plugins` - 脚本表（plugin_id, plugin_name, version_code, author, desc, download_count, review_status）
 - `plugin_reviews` / `feedback` / `sponsors` / `sessions` - 评论/反馈/赞助/Session
+- `hangup_users` - 电脑代挂表（`qq` PK、`mid`、`start_time`、`auto_online`、`last_fail`、`created_at`）
+
+### 14.4 电脑代挂（QEdge/user/）
+
+纯服务器端逻辑，复用主系统 `require.php` 的数据库连接与赞助判断（`users.is_sponsor` + `sponsor_users`），不占用手机端性能。文件均嵌于 `QEdge/user/`：
+
+| 文件 | 职责 |
+|------|------|
+| `hangup.php` | 代挂页面：未登录自动 302 到 `login.php`；登录后经 session `login_qq` 取 QQ 号；二维码框初始 `display:none`，出码成功后 `inline-block`，登录/失败后隐藏 |
+| `hangup_common.php` | 公共工具：`ensureHangupTable` 建表、`hangupOnline`/`hangupOffline` 上游上线/下线、`hangupSign` 签名 |
+| `hangup_auto_online.php` | 每日 00:00 定时任务：拉起 `auto_online=1` 的账号上线，失败写 `last_fail` |
+| `hangup_check.php` | 每 10 分钟定时任务：下线在线超 2 小时的账号（`start_time` 置 NULL 而非删记录，保留次日自动上线） |
+| `isOnline.php?uin=` | 供模块/后台查询指定 QQ 是否在线（内部调用上游 `uin-list-get`） |
+
+出码与登录复用 `Secluded/get_qrcode.php` 与 `verify_login.php`。非赞助用户触达时立即调用上游 `set-online online=false` 强制下线并提示「仅赞助用户可用」。
 
 ---
 
