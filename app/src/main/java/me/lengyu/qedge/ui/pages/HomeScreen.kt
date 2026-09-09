@@ -79,6 +79,7 @@ import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
+import me.lengyu.qedge.plugin.view.MediaPanelLoader
 import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.hook.item.KeepAliveHook
 import me.lengyu.qedge.hook.item.QLogRedirect
@@ -175,6 +176,8 @@ fun HomeScreen(
     var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
     var keepAliveBackground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_BACKGROUND, false)) }
     var chatSettingEntry by remember { mutableStateOf(ModuleConfig.getString("chat_setting_entry", "more_features")) }
+    var mediaPanelEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(MediaPanelLoader.KEY_ENABLED, false)) }
+    var mediaPanelEntry by remember { mutableStateOf(ModuleConfig.getString(MediaPanelLoader.KEY_ENTRY, "album")) }
 
     // 顶栏下推面板：0=无 1=用户信息 2=更新日志 3=赞助（互斥，点同一按钮收起）
     val currentUin = remember { ModuleConfig.getString("heartbeat_current_uin", "") }
@@ -396,7 +399,9 @@ fun HomeScreen(
                             keepAlivePixel = keepAlivePixel,
                             keepAliveForeground = keepAliveForeground,
                             keepAliveBackground = keepAliveBackground,
-                            chatSettingEntry = chatSettingEntry
+                            chatSettingEntry = chatSettingEntry,
+                            mediaPanelEnabled = mediaPanelEnabled,
+                            mediaPanelEntry = mediaPanelEntry
                         ),
                         callbacks = HomePageCallbacks(
                             onLikeToggle = {
@@ -568,6 +573,14 @@ fun HomeScreen(
                             onChatSettingEntryChange = { newValue ->
                                 chatSettingEntry = newValue
                                 Thread { ModuleConfig.putString("chat_setting_entry", newValue) }.start()
+                            },
+                            onMediaPanelToggle = {
+                                mediaPanelEnabled = it
+                                Thread { ModuleConfig.putBoolean("media_panel_enabled", it) }.start()
+                            },
+                            onMediaPanelEntryChange = { newValue ->
+                                mediaPanelEntry = newValue
+                                Thread { ModuleConfig.putString("media_panel_entry", newValue) }.start()
                             }
                         )
                     )
@@ -858,7 +871,7 @@ private fun HangupEntryCard() {
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = "登录后刷在线时长，约 2 小时自动下线，仅对赞助用户生效",
+                        text = "登录后刷在线时长，约 2 小时自动下线，仅对赞助20元以上用户生效",
                         fontSize = 13.sp,
                         color = colors.textSecondary
                     )
@@ -946,7 +959,9 @@ data class HomePageState(
     val keepAlivePixel: Boolean,
     val keepAliveForeground: Boolean,
     val keepAliveBackground: Boolean,
-    val chatSettingEntry: String
+    val chatSettingEntry: String,
+    val mediaPanelEnabled: Boolean,
+    val mediaPanelEntry: String
 )
 
 class HomePageCallbacks(
@@ -993,7 +1008,9 @@ class HomePageCallbacks(
     val onKeepAlivePixelToggle: (Boolean) -> Unit,
     val onKeepAliveForegroundToggle: (Boolean) -> Unit,
     val onKeepAliveBackgroundToggle: (Boolean) -> Unit,
-    val onChatSettingEntryChange: (String) -> Unit
+    val onChatSettingEntryChange: (String) -> Unit,
+    val onMediaPanelToggle: (Boolean) -> Unit,
+    val onMediaPanelEntryChange: (String) -> Unit
 )
 
 @Composable
@@ -1297,6 +1314,64 @@ private fun HomePage(
                         }
                         // 补齐空位
                         repeat(4 - row.size) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
+
+                Spacer(modifier = Modifier.height(20.dp))
+                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                Spacer(modifier = Modifier.height(16.dp))
+                SettingSwitchItem(
+                    title = "综合面板（表情/语音/视频）",
+                    subtitle = "长按聊天页对应按钮打开综合面板（重启QQ生效）",
+                    checked = state.mediaPanelEnabled,
+                    onCheckedChange = callbacks.onMediaPanelToggle
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    "综合面板入口",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = colors.textPrimary
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    "与脚本菜单入口错开，例如脚本菜单选「更多功能」，面板可选「相册」",
+                    fontSize = 12.sp,
+                    color = colors.textSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                val mediaOptions = MediaPanelLoader.ENTRY_OPTIONS.entries.toList()
+                val mediaChunked = mediaOptions.chunked(4)
+                for (mrow in mediaChunked) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        for ((key, label) in mrow) {
+                            val selected = state.mediaPanelEntry == key
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(if (selected) AccentBlue else colors.background)
+                                    .clickable { callbacks.onMediaPanelEntryChange(key) }
+                                    .padding(vertical = 10.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    label,
+                                    fontSize = 13.sp,
+                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                    color = if (selected) Color.White else colors.textPrimary
+                                )
+                            }
+                        }
+                        repeat(4 - mrow.size) {
                             Spacer(modifier = Modifier.weight(1f))
                         }
                     }

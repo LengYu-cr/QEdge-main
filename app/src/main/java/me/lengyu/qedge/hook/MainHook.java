@@ -29,6 +29,7 @@ import me.lengyu.qedge.hook.base.HookRegistry;
 import me.lengyu.qedge.plugin.bean.PluginInfo;
 import me.lengyu.qedge.plugin.PluginManager;
 import me.lengyu.qedge.plugin.view.ChatSettingLoader;
+import me.lengyu.qedge.plugin.view.MediaPanelLoader;
 import me.lengyu.qedge.hook.HeartbeatManager;
 import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.HookUtils;
@@ -156,6 +157,15 @@ public class MainHook {
                 ChatSettingLoader.loadHook();
             } catch (Throwable e) {
                 LogUtils.e("MainHook", "Failed to load ChatSettingLoader: " + e.getMessage());
+            }
+        });
+
+        // 表情/语音/视频综合面板入口（与脚本菜单独立的配置与入口点）
+        ModuleScope.launchDelayedIO("MediaPanelLoader", 3000, () -> {
+            try {
+                MediaPanelLoader.loadHook();
+            } catch (Throwable e) {
+                LogUtils.e("MainHook", "Failed to load MediaPanelLoader: " + e.getMessage());
             }
         });
 

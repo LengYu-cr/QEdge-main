@@ -139,6 +139,12 @@ object OnlinePluginService {
         if (!targetDir.isDirectory) {
             throw IOException("解压失败: 目标目录未生成 ${targetDir.absolutePath}")
         }
+
+        // 校验解压结果：空目录说明 ZIP 无效，或下载到了错误内容（如服务器返回的 HTML/JSON 页面）
+        val extractedFiles = targetDir.listFiles()
+        if (extractedFiles == null || extractedFiles.isEmpty()) {
+            throw IOException("解压失败: ZIP 为空或不是有效压缩包（可能下载到错误页面）")
+        }
         return targetDir
     }
 

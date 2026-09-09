@@ -118,7 +118,7 @@ object DownloadEmotion : BaseApiHookItem<DownloadEmotion.DownloadEmotionListener
                     }
                     val sb = StringBuilder("已保存到/Tencent/QEdge/")
                     val types = mutableListOf<String>()
-                    if (pttList.isNotEmpty()) types.add("PTT(语音)")
+                    if (pttList.isNotEmpty()) types.add("Ptts(语音)")
                     if (videoList.isNotEmpty()) types.add("Videos(视频)")
                     if (picList.isNotEmpty()) types.add("Pictures(图片)")
                     if (types.isNotEmpty()) sb.append(types.joinToString("+"))
