@@ -1,6 +1,7 @@
 package me.lengyu.qedge.ui.pages.file
 
 import android.media.MediaPlayer
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
@@ -35,7 +37,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -46,7 +47,10 @@ import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.LogUtils
+import me.lengyu.qedge.utils.qq.SilkPlayerProxy
+import com.tencent.mobileqq.qqaudio.audioplayer.SilkPlayer
 import java.io.File
+import java.io.FileInputStream
 import java.util.concurrent.TimeUnit
 
 @Composable
@@ -62,11 +66,16 @@ fun AudioPlayerDialog(
     var fileName by remember { mutableStateOf("") }
     var isPrepared by remember { mutableStateOf(false) }
     var errorMessage by remember { mutableStateOf("") }
+    var dragging by remember { mutableStateOf(false) }
+    var sliderValue by remember { mutableStateOf(0f) }
+    val isSilk = remember(filePath) { isSilkAudio(filePath) }
+    var silkPlayer by remember { mutableStateOf<SilkPlayer?>(null) }
     val mediaPlayer = remember { MediaPlayer() }
 
     LaunchedEffect(filePath) {
         val file = File(filePath)
         fileName = file.name
+        if (isSilk) return@LaunchedEffect
         try {
             mediaPlayer.reset()
             mediaPlayer.setDataSource(filePath)
@@ -93,7 +102,17 @@ fun AudioPlayerDialog(
         val handler = android.os.Handler(android.os.Looper.getMainLooper())
         val updateRunnable = object : Runnable {
             override fun run() {
-                if (isPlaying && isPrepared) {
+                if (isSilk) {
+                    // silk 播放进度 + 完成检测
+                    val sp = silkPlayer
+                    if (sp != null && isPrepared) {
+                        currentPosition = SilkPlayerProxy.currentPosition(sp).toInt()
+                        if (!SilkPlayerProxy.isPlaying(sp)) {
+                            if (duration > 0) currentPosition = duration
+                            isPlaying = false
+                        }
+                    }
+                } else if (isPlaying && isPrepared) {
                     try {
                         currentPosition = mediaPlayer.currentPosition
                     } catch (e: Exception) {
@@ -107,6 +126,8 @@ fun AudioPlayerDialog(
 
         onDispose {
             handler.removeCallbacks(updateRunnable)
+            silkPlayer?.let { SilkPlayerProxy.stop(it) }
+            silkPlayer = null
             try {
                 mediaPlayer.release()
             } catch (e: Exception) {
@@ -116,6 +137,37 @@ fun AudioPlayerDialog(
     }
 
     fun togglePlay() {
+        if (isSilk) {
+            val sp = silkPlayer
+            if (isPlaying) {
+                sp?.let { SilkPlayerProxy.pause(it) }
+                isPlaying = false
+            } else {
+                if (sp != null && isPrepared) {
+                    // 已加载过，从暂停位置继续
+                    if (SilkPlayerProxy.start(sp)) isPlaying = true
+                } else {
+                    val np = SilkPlayerProxy.createPlayer()
+                    if (np == null) {
+                        errorMessage = "无法创建播放器"
+                        return
+                    }
+                    val ok = SilkPlayerProxy.setDataSource(np, filePath) &&
+                        SilkPlayerProxy.prepare(np) &&
+                        SilkPlayerProxy.start(np)
+                    if (ok) {
+                        silkPlayer = np
+                        duration = SilkPlayerProxy.duration(np)
+                        isPrepared = true
+                        isPlaying = true
+                    } else {
+                        SilkPlayerProxy.stop(np)
+                        errorMessage = "播放失败"
+                    }
+                }
+            }
+            return
+        }
         if (!isPrepared) return
         try {
             if (isPlaying) {
@@ -130,6 +182,11 @@ fun AudioPlayerDialog(
     }
 
     fun seekTo(position: Int) {
+        if (isSilk) {
+            silkPlayer?.let { SilkPlayerProxy.seekTo(it, position) }
+            currentPosition = position
+            return
+        }
         if (!isPrepared) return
         try {
             mediaPlayer.seekTo(position)
@@ -248,32 +305,40 @@ fun AudioPlayerDialog(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(20.dp)
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
                     ) {
-                        Slider(
-                            value = if (duration > 0) currentPosition.toFloat() else 0f,
-                            onValueChange = { seekTo(it.toInt()) },
-                            valueRange = 0f..(if (duration > 0) duration.toFloat() else 100f),
-                            colors = SliderDefaults.colors(
-                                thumbColor = colors.accentBlue,
-                                activeTrackColor = colors.accentBlue,
-                                inactiveTrackColor = colors.textSecondary.copy(alpha = 0.2f)
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
+                        val maxDuration = if (duration > 0) duration.toFloat() else 1f
+                        Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(
                                 text = formatTime(currentPosition),
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = colors.textSecondary
+                            )
+                            Slider(
+                                value = if (dragging) sliderValue else currentPosition.toFloat().coerceIn(0f, maxDuration),
+                                onValueChange = {
+                                    sliderValue = it
+                                    dragging = true
+                                },
+                                onValueChangeFinished = {
+                                    dragging = false
+                                    seekTo(sliderValue.toInt())
+                                },
+                                valueRange = 0f..maxDuration,
+                                enabled = isPrepared && duration > 0,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = colors.accentBlue,
+                                    activeTrackColor = colors.accentBlue,
+                                    inactiveTrackColor = colors.textSecondary.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(26.dp)
+                                    .padding(horizontal = 6.dp)
                             )
                             Text(
                                 text = formatTime(duration),
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 color = colors.textSecondary
                             )
                         }
@@ -296,21 +361,20 @@ fun AudioPlayerDialog(
 
                     Box(
                         modifier = Modifier
-                            .size(72.dp)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(colors.accentBlue)
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(colors.accentBlue.copy(alpha = 0.14f))
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
-                                indication = ripple(color = Color.White.copy(alpha = 0.3f)),
+                                indication = ripple(color = colors.accentBlue.copy(alpha = 0.2f)),
                                 onClick = { togglePlay() }
                             ),
                         contentAlignment = Alignment.Center
                     ) {
-                        Icon(
+                        Image(
                             painter = painterResource(if (isPlaying) R.drawable.playing else R.drawable.paused),
                             contentDescription = if (isPlaying) "暂停" else "播放",
-                            modifier = Modifier.size(32.dp),
-                            tint = Color.White
+                            modifier = Modifier.size(32.dp)
                         )
                     }
 
@@ -370,4 +434,22 @@ private fun formatTime(ms: Int): String {
     val minutes = TimeUnit.MILLISECONDS.toMinutes(ms.toLong())
     val seconds = TimeUnit.MILLISECONDS.toSeconds(ms.toLong()) % 60
     return String.format("%d:%02d", minutes, seconds)
+}
+
+/** 判断是否为 silk 音频：文件头 `#!SILK_V3`（兼容 QQ 带 `0x02` 前缀的 10 字节头） */
+private fun isSilkAudio(path: String): Boolean {
+    return try {
+        FileInputStream(path).use { input ->
+            val header = ByteArray(9)
+            if (input.read(header) != 9) return false
+            val ascii = String(header, Charsets.US_ASCII)
+            when {
+                ascii == "#!SILK_V3" -> true
+                header[0] == 0x02.toByte() && ascii.substring(1) == "#!SILK_V3" -> true
+                else -> false
+            }
+        }
+    } catch (e: Throwable) {
+        path.endsWith(".silk", ignoreCase = true)
+    }
 }

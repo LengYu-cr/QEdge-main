@@ -1,5 +1,7 @@
 package me.lengyu.qedge.ui.pages.file
 
+import android.graphics.BitmapFactory
+import android.util.LruCache
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -32,19 +34,91 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.molecules.EmptyStateView
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
 import java.io.File
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.concurrent.Executors
+
+private val DATE_FORMAT = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
+private val fileLoadExecutor = Executors.newSingleThreadExecutor { r ->
+    Thread(r, "FileListLoader").apply { isDaemon = true }
+}
+
+/** 缩略图内存缓存，最多 100 张，避免滚动时重复解码。 */
+private val thumbnailCache = LruCache<String, ImageBitmap>(100)
+
+/** 异步解码图片缩略图（按目标像素采样，防止 OOM）。 */
+private fun decodeThumbnail(path: String, targetPx: Int): ImageBitmap? {
+    return try {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
+
+        var sample = 1
+        val halfW = bounds.outWidth / 2
+        val halfH = bounds.outHeight / 2
+        while (halfW / sample >= targetPx && halfH / sample >= targetPx) {
+            sample *= 2
+        }
+
+        val opts = BitmapFactory.Options().apply { inSampleSize = sample }
+        val bmp = BitmapFactory.decodeFile(path, opts) ?: return null
+        bmp.asImageBitmap()
+    } catch (e: Exception) {
+        null
+    }
+}
+
+@Composable
+private fun ThumbnailImage(
+    path: String,
+    modifier: Modifier = Modifier
+) {
+    var bitmap by remember(path) { mutableStateOf<ImageBitmap?>(thumbnailCache.get(path)) }
+
+    LaunchedEffect(path) {
+        if (bitmap != null) return@LaunchedEffect
+        val bmp = withContext(Dispatchers.IO) { decodeThumbnail(path, 120) }
+        if (bmp != null) {
+            thumbnailCache.put(path, bmp)
+            bitmap = bmp
+        }
+    }
+
+    val bmp = bitmap
+    if (bmp != null) {
+        androidx.compose.foundation.Image(
+            bitmap = bmp,
+            contentDescription = null,
+            modifier = modifier,
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        // 加载中或解码失败时，显示图片占位图标
+        Icon(
+            painter = painterResource(R.drawable.picture),
+            contentDescription = null,
+            modifier = Modifier.size(22.dp),
+            tint = androidx.compose.ui.graphics.Color.White
+        )
+    }
+}
 
 @Composable
 fun FileListPanel(
@@ -277,6 +351,7 @@ private fun FileListItem(
     onLongClick: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
+    val isImageFile = !fileItem.isDirectory && !isParent && FileManagerUtils.isImageFile(fileItem.extension)
 
     Row(
         modifier = Modifier
@@ -298,16 +373,24 @@ private fun FileListItem(
                 .clip(RoundedCornerShape(10.dp))
                 .background(
                     if (isParent) colors.accentBlue.copy(alpha = 0.5f)
+                    else if (isImageFile) colors.cardBackground
                     else colors.accentBlue
                 ),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                painter = painterResource(getFileIcon(fileItem.isDirectory, fileItem.extension)),
-                contentDescription = fileItem.name,
-                modifier = Modifier.size(22.dp),
-                tint = androidx.compose.ui.graphics.Color.White
-            )
+            if (isImageFile) {
+                ThumbnailImage(
+                    path = fileItem.path,
+                    modifier = Modifier.fillMaxSize()
+                )
+            } else {
+                Icon(
+                    painter = painterResource(getFileIcon(fileItem.isDirectory, fileItem.extension)),
+                    contentDescription = fileItem.name,
+                    modifier = Modifier.size(22.dp),
+                    tint = androidx.compose.ui.graphics.Color.White
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(10.dp))
@@ -343,27 +426,44 @@ data class FileItem(
 )
 
 private fun loadFiles(path: String, callback: (List<FileItem>) -> Unit) {
-    Thread {
+    fileLoadExecutor.execute {
         try {
             val dir = File(path)
             if (!dir.exists() || !dir.isDirectory) {
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
                     callback(emptyList())
                 }
-                return@Thread
+                return@execute
             }
 
-            val files = dir.listFiles()?.toList() ?: emptyList()
+            var files = dir.listFiles() ?: emptyArray()
+
+            // Android 11+ 限制 /Android/data 目录访问，listFiles 多半返回空。
+            // 若当前在 /Android/data 且列表为空，手动注入宿主自身包名目录（QQ/TIM 可访问自己的 data）。
+            val isAndroidDataDir = run {
+                val canonical = path.trimEnd('/')
+                canonical.endsWith("/Android/data")
+            }
+            if (isAndroidDataDir && files.isEmpty() && HostInfo.isInHostProcess) {
+                val hostPkg = HostInfo.packageName
+                if (hostPkg.isNotEmpty()) {
+                    files = arrayOf(File(dir, hostPkg))
+                }
+            }
+
+            // 预计算排序键（isDirectory + lowercase name），避免排序时重复计算
             val fileItems = files
-                .sortedWith(compareBy({ !it.isDirectory }, { it.name.lowercase() }))
                 .map { file ->
+                    Triple(file, file.isDirectory.not(), file.name.lowercase())
+                }
+                .sortedWith(compareBy({ it.second }, { it.third }))
+                .map { (file, _, _) ->
                     FileItem(
                         name = file.name,
                         path = file.absolutePath,
                         isDirectory = file.isDirectory,
                         size = if (file.isDirectory) {
-                            val count = file.list()?.size ?: 0
-                            "$count 项"
+                            "文件夹"
                         } else {
                             formatFileSize(file.length())
                         },
@@ -381,7 +481,7 @@ private fun loadFiles(path: String, callback: (List<FileItem>) -> Unit) {
                 callback(emptyList())
             }
         }
-    }.start()
+    }
 }
 
 private fun toggleSelection(
@@ -426,8 +526,10 @@ private fun formatFileSize(size: Long): String {
 }
 
 private fun formatDate(timestamp: Long): String {
-    val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-    return sdf.format(Date(timestamp))
+    // 复用单例 SimpleDateFormat（fileLoadExecutor 为单线程，线程安全）
+    return synchronized(DATE_FORMAT) {
+        DATE_FORMAT.format(Date(timestamp))
+    }
 }
 
 private fun getFileExtension(name: String): String {

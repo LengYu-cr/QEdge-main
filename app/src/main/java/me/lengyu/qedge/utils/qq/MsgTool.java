@@ -1,7 +1,9 @@
 package me.lengyu.qedge.utils.qq;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.lang.reflect.Method;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -293,7 +295,7 @@ public class MsgTool {
                     }
                     int duration = 1000;
 
-                    if (pttPath.toLowerCase().endsWith(".silk") || pttPath.toLowerCase().endsWith(".amr")) {
+                    if (isSilkFile(pttPath)) {
                         QQRecorderUtilsImpl qqRecorderUtilsImpl = new QQRecorderUtilsImpl();
                         duration = qqRecorderUtilsImpl.getFilePlayTime(pttPath);
                     } else {
@@ -756,6 +758,22 @@ public class MsgTool {
         public Pair(K first, V second) {
             this.first = first;
             this.second = second;
+        }
+    }
+
+    /**
+     * 判断是否为 silk 音频（不看后缀）：文件头 "#!SILK_V3"，
+     * 兼容 QQ 导出的带 0x02 前缀的 10 字节头。
+     */
+    private static boolean isSilkFile(String path) {
+        try (FileInputStream input = new FileInputStream(path)) {
+            byte[] header = new byte[9];
+            if (input.read(header) != 9) return false;
+            String ascii = new String(header, StandardCharsets.US_ASCII);
+            if ("#!SILK_V3".equals(ascii)) return true;
+            return header[0] == 0x02 && "#!SILK_V3".equals(ascii.substring(1));
+        } catch (Throwable e) {
+            return path.toLowerCase().endsWith(".silk");
         }
     }
 }

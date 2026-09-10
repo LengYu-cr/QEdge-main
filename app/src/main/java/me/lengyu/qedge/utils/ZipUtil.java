@@ -6,11 +6,14 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Enumeration;
 import java.util.zip.ZipEntry;
-import java.util.zip.ZipInputStream;
+import java.util.zip.ZipException;
+import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
 
 /**
@@ -52,29 +55,47 @@ public final class ZipUtil {
             throw new IOException("创建解压目标文件夹失败: " + desDirectory);
         }
 
-        try (ZipInputStream zis = new ZipInputStream(new FileInputStream(zipFilePath), charset)) {
-            ZipEntry zipEntry;
-            while ((zipEntry = zis.getNextEntry()) != null) {
-                String unzipFilePath = desDirectory + File.separator + zipEntry.getName();
-                File file = new File(unzipFilePath);
-
-                // 防 Zip Slip：确保解出的文件仍在目标目录内
-                if (!file.getCanonicalPath().startsWith(desDir.getCanonicalPath())) {
-                    throw new IOException("非法压缩路径: " + zipEntry.getName());
+        File zipFile = new File(zipFilePath);
+        // 使用 ZipFile 而非 ZipInputStream：
+        // Android 10+ 的 SafeZipPathValidator 会在 getNextEntry 时对空路径("/") entry 抛 ZipException，
+        // 且抛出后流内部已错位无法继续读取，导致部分机型解压失败。
+        // ZipFile 可按 entry 独立读取，跳过非法 entry 不影响后续 entry。
+        try (ZipFile zf = new ZipFile(zipFile)) {
+            Enumeration<? extends ZipEntry> entries = zf.entries();
+            while (entries.hasMoreElements()) {
+                ZipEntry zipEntry = entries.nextElement();
+                String entryName = zipEntry.getName();
+                // 空路径 entry（Android 10+ 会拒绝），直接跳过
+                if (entryName == null || entryName.isEmpty() || "/".equals(entryName)) {
+                    LogUtils.w("ZipUtil", "跳过非法 zip entry(空路径): '" + entryName + "'");
+                    continue;
                 }
 
-                if (zipEntry.isDirectory()) { // 文件夹
-                    mkdir(file);
-                } else { // 文件
-                    // 创建父目录
-                    mkdir(file.getParentFile());
-                    try (BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file))) {
-                        byte[] bytes = new byte[1024];
-                        int readLen;
-                        while ((readLen = zis.read(bytes)) != -1) {
-                            bos.write(bytes, 0, readLen);
+                File file = new File(desDir, entryName);
+
+                // 防 Zip Slip：确保解出的文件仍在目标目录内（同时覆盖绝对路径/.. 穿越）
+                if (!file.getCanonicalPath().startsWith(desDir.getCanonicalPath())) {
+                    throw new IOException("非法压缩路径: " + entryName);
+                }
+
+                try {
+                    if (zipEntry.isDirectory()) { // 文件夹
+                        mkdir(file);
+                    } else { // 文件
+                        // 创建父目录
+                        mkdir(file.getParentFile());
+                        try (InputStream in = zf.getInputStream(zipEntry);
+                             BufferedOutputStream bos = new BufferedOutputStream(new FileOutputStream(file))) {
+                            byte[] bytes = new byte[1024];
+                            int readLen;
+                            while ((readLen = in.read(bytes)) != -1) {
+                                bos.write(bytes, 0, readLen);
+                            }
                         }
                     }
+                } catch (ZipException e) {
+                    // Android 10+ 安全校验拒绝的 entry（绝对路径、.. 等），跳过该 entry 继续解压
+                    LogUtils.w("ZipUtil", "跳过非法 zip entry: '" + entryName + "', " + e.getMessage());
                 }
             }
         }

@@ -4,15 +4,24 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.media.MediaPlayer
+import android.media.MediaMetadataRetriever
+import android.net.Uri
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.graphics.drawable.AnimatedImageDrawable
+import android.util.LruCache
 import android.widget.ImageView
+import android.widget.VideoView
+import java.io.FileInputStream
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,6 +35,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -37,7 +47,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -45,21 +57,29 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import com.tencent.mobileqq.qqaudio.audioplayer.SilkPlayer
+import com.tencent.mobileqq.utils.SilkCodecWrapper
 import me.lengyu.qedge.plugin.view.MediaPanelLoader
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
@@ -68,6 +88,7 @@ import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.utils.qq.MsgTool
 import me.lengyu.qedge.utils.qq.QQCurrentEnv
+import me.lengyu.qedge.utils.qq.SilkPlayerProxy
 import java.io.File
 
 /**
@@ -1119,7 +1140,8 @@ private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (De
                                         else onOpenDetail(DetailTarget.Local(f))
                                     },
                                     onLongClick = { if (!selecting) onSend(f.absolutePath) },
-                                    marked = f.absolutePath in selected
+                                    marked = f.absolutePath in selected,
+                                    videoThumb = if (type == "video") f.absolutePath else null
                                 )
                             }
                         }
@@ -1209,7 +1231,8 @@ private fun AudioRow(
     label: String,
     onClick: () -> Unit,
     onLongClick: (() -> Unit)? = null,
-    marked: Boolean = false
+    marked: Boolean = false,
+    videoThumb: String? = null
 ) {
     val colors = QEdgeTheme.colors
     Row(
@@ -1227,6 +1250,10 @@ private fun AudioRow(
             .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
+        if (videoThumb != null) {
+            VideoThumbnail(videoThumb, 44.dp)
+            Spacer(Modifier.width(12.dp))
+        }
         Text(
             label,
             Modifier.weight(1f),
@@ -1242,6 +1269,68 @@ private fun AudioRow(
             color = colors.accentBlue
         )
     }
+}
+
+/** 本地视频首帧封面（网络视频不处理）。解码在 IO 线程，带内存缓存，滚动不重复解码。 */
+@Composable
+private fun VideoThumbnail(path: String, size: Dp) {
+    val colors = QEdgeTheme.colors
+    val bmp = remember(path) { mutableStateOf<Bitmap?>(null) }
+    LaunchedEffect(path) {
+        bmp.value = withContext(Dispatchers.IO) { extractVideoFrame(path) }
+    }
+    val current = bmp.value
+    if (current != null) {
+        Image(
+            current.asImageBitmap(),
+            contentDescription = null,
+            modifier = Modifier
+                .size(size)
+                .clip(RoundedCornerShape(8.dp)),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        // 解码中/失败：纯色块占位
+        Box(
+            Modifier
+                .size(size)
+                .clip(RoundedCornerShape(8.dp))
+                .background(colors.cardBackground)
+        )
+    }
+}
+
+/** 视频首帧内存缓存（按字节计，上限 8MB） */
+private val videoFrameCache = object : LruCache<String, Bitmap>(8 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: Bitmap) = value.byteCount
+}
+
+/** 提取视频第一帧并缩放，带缓存 */
+private fun extractVideoFrame(path: String): Bitmap? {
+    videoFrameCache.get(path)?.let { return it }
+    return try {
+        val mmr = MediaMetadataRetriever()
+        mmr.setDataSource(path)
+        val frame = mmr.getFrameAtTime(0, MediaMetadataRetriever.OPTION_CLOSEST_SYNC)
+        mmr.release()
+        if (frame != null) {
+            val scaled = scaleDown(frame, 480)
+            if (scaled !== frame) frame.recycle()
+            videoFrameCache.put(path, scaled)
+            scaled
+        } else null
+    } catch (e: Throwable) {
+        null
+    }
+}
+
+/** 等比缩放到最长边不超过 maxSize */
+private fun scaleDown(src: Bitmap, maxSize: Int): Bitmap {
+    val scale = minOf(maxSize.toFloat() / src.width, maxSize.toFloat() / src.height, 1f)
+    if (scale >= 1f) return src
+    val nw = (src.width * scale).toInt().coerceAtLeast(1)
+    val nh = (src.height * scale).toInt().coerceAtLeast(1)
+    return Bitmap.createScaledBitmap(src, nw, nh, true)
 }
 
 @Composable
@@ -1403,9 +1492,34 @@ private fun AudioDetailDialog(
         is DetailTarget.Network -> "在线资源"
     }
 
-    // 语音播放器（视频不播放，无解码库）
+    // 语音/视频播放器
     var player by remember { mutableStateOf<MediaPlayer?>(null) }
+    var silkPlayer by remember { mutableStateOf<SilkPlayer?>(null) }
+    var videoView by remember { mutableStateOf<VideoView?>(null) }
     var playing by remember { mutableStateOf(false) }
+    var prepared by remember { mutableStateOf(false) }
+    var position by remember { mutableLongStateOf(0L) }
+    var duration by remember { mutableLongStateOf(0L) }
+    var dragProgress by remember { mutableStateOf<Float?>(null) }
+    val isSilk = remember(target) { type == "voice" && isSilkAudio(target) }
+
+    // 打开弹窗即读取本地音频时长，无需播放即可显示进度总长
+    LaunchedEffect(target) {
+        if (type == "voice" && target is DetailTarget.Local && !isSilkAudio(target)) {
+            withContext(Dispatchers.IO) {
+                try {
+                    val mmr = android.media.MediaMetadataRetriever()
+                    mmr.setDataSource(target.file.absolutePath)
+                    val d = mmr.extractMetadata(
+                        android.media.MediaMetadataRetriever.METADATA_KEY_DURATION
+                    )?.toLongOrNull() ?: 0L
+                    mmr.release()
+                    if (d > 0) duration = d
+                } catch (e: Throwable) {
+                }
+            }
+        }
+    }
 
     fun releasePlayer() {
         player?.let { p ->
@@ -1413,11 +1527,52 @@ private fun AudioDetailDialog(
             try { p.release() } catch (e: Throwable) {}
         }
         player = null
+        silkPlayer?.let { SilkPlayerProxy.stop(it) }
+        silkPlayer = null
+        videoView?.let { vv ->
+            try { vv.stopPlayback() } catch (e: Throwable) {}
+        }
+        videoView = null
+        prepared = false
         playing = false
+        position = 0
+        duration = 0
     }
 
     DisposableEffect(Unit) {
         onDispose { releasePlayer() }
+    }
+
+    // 播放进度轮询 + silk 播放完成检测（MediaPlayer/VideoView 完成由回调处理）
+    LaunchedEffect(playing) {
+        while (playing) {
+            if (isSilk) {
+                val sp = silkPlayer
+                if (sp != null) {
+                    position = SilkPlayerProxy.currentPosition(sp).toLong()
+                    duration = SilkPlayerProxy.duration(sp).toLong()
+                    if (!SilkPlayerProxy.isPlaying(sp)) {
+                        // 播放结束
+                        if (duration > 0) position = duration
+                        playing = false
+                        break
+                    }
+                }
+            } else if (type == "video") {
+                val vv = videoView
+                if (vv != null) {
+                    position = try { vv.currentPosition.toLong() } catch (e: Throwable) { 0L }
+                    duration = try { vv.duration.toLong() } catch (e: Throwable) { 0L }
+                }
+            } else {
+                val p = player
+                if (p != null) {
+                    position = try { p.currentPosition.toLong() } catch (e: Throwable) { 0L }
+                    duration = try { p.duration.toLong() } catch (e: Throwable) { 0L }
+                }
+            }
+            delay(500)
+        }
     }
 
     Box(
@@ -1479,42 +1634,402 @@ private fun AudioDetailDialog(
             Spacer(Modifier.height(4.dp))
             Text("点击链接可复制", fontSize = 10.sp, color = colors.textSecondary)
 
-            Spacer(Modifier.height(16.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (type == "voice") {
-                    DetailButton(if (playing) "暂停" else "播放", colors.accentGreen, Modifier.weight(1f)) {
-                        if (playing) {
-                            try { player?.pause() } catch (e: Throwable) {}
-                            playing = false
-                        } else {
-                            val p = MediaPlayer()
-                            try {
-                                p.setDataSource(source)
-                                p.setOnPreparedListener { mp -> mp.start() }
-                                p.setOnCompletionListener { mp ->
-                                    try { mp.release() } catch (e: Throwable) {}
-                                    player = null
-                                    playing = false
-                                }
-                                p.setOnErrorListener { mp, _, _ ->
-                                    try { mp.release() } catch (e: Throwable) {}
-                                    player = null
-                                    playing = false
-                                    Toasts.toast("播放失败")
-                                    true
-                                }
-                                p.prepareAsync()
-                                player = p
+            if (type == "video") {
+                Spacer(Modifier.height(20.dp))
+                // 视频预览区（系统 VideoView，本地/网络流均可播放）
+                AndroidView(
+                    factory = { ctx ->
+                        VideoView(ctx).apply {
+                            val uri = when (target) {
+                                is DetailTarget.Local -> Uri.fromFile(target.file)
+                                is DetailTarget.Network -> Uri.parse(target.url)
+                            }
+                            setVideoURI(uri)
+                            setOnPreparedListener { mp ->
+                                mp.isLooping = false
+                                duration = mp.duration.toLong()
+                                prepared = true
+                                mp.start()
                                 playing = true
-                            } catch (e: Throwable) {
-                                try { p.release() } catch (e: Throwable) {}
-                                Toasts.toast("播放失败: " + e.message)
+                            }
+                            setOnCompletionListener { playing = false }
+                            setOnErrorListener { _, _, _ ->
+                                playing = false
+                                Toasts.toast("视频播放失败")
+                                true
+                            }
+                            videoView = this
+                        }
+                    },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(16f / 9f)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(androidx.compose.ui.graphics.Color.Black)
+                )
+                Spacer(Modifier.height(14.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // 播放/暂停按钮（居中）
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(colors.accentGreen.copy(alpha = 0.14f))
+                            .combinedClickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {
+                                    val vv = videoView ?: return@combinedClickable
+                                    if (playing) {
+                                        vv.pause()
+                                        playing = false
+                                    } else {
+                                        // 播放完成后重播
+                                        if (duration > 0 && position >= duration) {
+                                            vv.seekTo(0)
+                                            position = 0
+                                        }
+                                        vv.start()
+                                        playing = true
+                                    }
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painterResource(if (playing) R.drawable.playing else R.drawable.paused),
+                            contentDescription = if (playing) "暂停" else "播放",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+
+                    // 进度条
+                    val maxDuration = duration.coerceAtLeast(1L).toFloat()
+                    val shownProgress = dragProgress ?: if (maxDuration > 0) {
+                        (position.toFloat() / maxDuration).coerceIn(0f, 1f)
+                    } else 0f
+                    SeekBar(
+                        progress = shownProgress,
+                        enabled = maxDuration > 0,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp),
+                        onDrag = { dragProgress = it },
+                        onDragEnd = {
+                            val p = dragProgress
+                            dragProgress = null
+                            if (p != null) {
+                                val targetMs = (p * maxDuration).toInt()
+                                position = targetMs.toLong()
+                                videoView?.let { vv ->
+                                    try { vv.seekTo(targetMs) } catch (e: Throwable) {}
+                                }
                             }
                         }
+                    )
+
+                    Spacer(Modifier.height(2.dp))
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(formatAudioTime(position), fontSize = 11.sp, color = colors.textSecondary)
+                        Text(formatAudioTime(duration), fontSize = 11.sp, color = colors.textSecondary)
                     }
                 }
-                DetailButton("发送", colors.accentBlue, Modifier.weight(1f)) { onSend(source) }
             }
+
+            if (type == "voice") {
+                Spacer(Modifier.height(20.dp))
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    // 播放/暂停按钮（居中）
+                    Box(
+                        Modifier
+                            .size(56.dp)
+                            .clip(CircleShape)
+                            .background(colors.accentGreen.copy(alpha = 0.14f))
+                            .combinedClickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = null,
+                                onClick = {
+                                    togglePlay(
+                                        playing = playing,
+                                        isSilk = isSilk,
+                                        source = source,
+                                        player = player,
+                                        silkPlayer = silkPlayer,
+                                        prepared = prepared,
+                                        onPlayer = { player = it },
+                                        onSilkPlayer = { silkPlayer = it },
+                                        onPlaying = { playing = it },
+                                        onPrepared = { prepared = it }
+                                    )
+                                }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painterResource(if (playing) R.drawable.playing else R.drawable.paused),
+                            contentDescription = if (playing) "暂停" else "播放",
+                            modifier = Modifier.size(28.dp)
+                        )
+                    }
+
+                    Spacer(Modifier.height(14.dp))
+
+                    // 自绘进度条：细轨道 + 小灰点 thumb，交互时放大
+                    val maxDuration = duration.coerceAtLeast(1L).toFloat()
+                    val shownProgress = dragProgress ?: if (maxDuration > 0) {
+                        (position.toFloat() / maxDuration).coerceIn(0f, 1f)
+                    } else 0f
+                    SeekBar(
+                        progress = shownProgress,
+                        enabled = maxDuration > 0,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 2.dp),
+                        onDrag = { dragProgress = it },
+                        onDragEnd = {
+                            val p = dragProgress
+                            dragProgress = null
+                            if (p != null) {
+                                val target = (p * maxDuration).toLong()
+                                position = target
+                                if (isSilk) {
+                                    silkPlayer?.let { SilkPlayerProxy.seekTo(it, target.toInt()) }
+                                } else {
+                                    try { player?.seekTo(target.toInt()) } catch (e: Throwable) {}
+                                }
+                            }
+                        }
+                    )
+
+                    Spacer(Modifier.height(2.dp))
+
+                    Row(
+                        Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(formatAudioTime(position), fontSize = 11.sp, color = colors.textSecondary)
+                        Text(formatAudioTime(duration), fontSize = 11.sp, color = colors.textSecondary)
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(16.dp))
+            DetailButton("发送", colors.accentBlue, Modifier.fillMaxWidth()) { onSend(source) }
+        }
+    }
+}
+
+/**
+ * 自绘迷你进度条：
+ * - 细轨道（灰底 + 主题色进度）
+ * - thumb 为小灰点，拖动/点按时放大，松手恢复
+ */
+@Composable
+private fun SeekBar(
+    progress: Float,
+    enabled: Boolean,
+    modifier: Modifier = Modifier,
+    onDrag: (Float) -> Unit,
+    onDragEnd: () -> Unit
+) {
+    val colors = QEdgeTheme.colors
+    var thumbScale by remember { mutableStateOf(1f) }
+
+    Box(
+        modifier
+            .height(36.dp)
+            .pointerInput(enabled) {
+                detectTapGestures { offset ->
+                    if (enabled) {
+                        onDrag((offset.x / size.width).coerceIn(0f, 1f))
+                        onDragEnd()
+                    }
+                }
+            }
+            .pointerInput(enabled) {
+                detectDragGestures(
+                    onDragStart = { thumbScale = 1.8f },
+                    onDragEnd = {
+                        thumbScale = 1f
+                        onDragEnd()
+                    },
+                    onDragCancel = { thumbScale = 1f },
+                    onDrag = { change, _ ->
+                        change.consume()
+                        if (enabled) {
+                            onDrag((change.position.x / size.width).coerceIn(0f, 1f))
+                        }
+                    }
+                )
+            }
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val trackY = size.height / 2f
+            val trackHeight = 3.dp.toPx()
+            val thumbRadius = if (thumbScale > 1f) 7.dp.toPx() else 4.dp.toPx()
+            val thumbX = (progress * size.width).coerceIn(thumbRadius, size.width - thumbRadius)
+            // 背景轨道
+            drawLine(
+                color = colors.cardBackground,
+                start = Offset(0f, trackY),
+                end = Offset(size.width, trackY),
+                strokeWidth = trackHeight,
+                cap = StrokeCap.Round
+            )
+            // 已播放进度
+            if (thumbX > 0f) {
+                drawLine(
+                    color = colors.accentGreen,
+                    start = Offset(0f, trackY),
+                    end = Offset(thumbX, trackY),
+                    strokeWidth = trackHeight,
+                    cap = StrokeCap.Round
+                )
+            }
+            // thumb 小灰点（拖动时放大）
+            drawCircle(
+                color = colors.textSecondary,
+                radius = thumbRadius,
+                center = Offset(thumbX, trackY)
+            )
+        }
+    }
+}
+
+/** 播放/暂停切换。silk 走 QQ 内置 SilkPlayer，其余走 MediaPlayer。 */
+private fun togglePlay(
+    playing: Boolean,
+    isSilk: Boolean,
+    source: String,
+    player: MediaPlayer?,
+    silkPlayer: SilkPlayer?,
+    prepared: Boolean,
+    onPlayer: (MediaPlayer?) -> Unit,
+    onSilkPlayer: (SilkPlayer?) -> Unit,
+    onPlaying: (Boolean) -> Unit,
+    onPrepared: (Boolean) -> Unit
+) {
+    if (playing) {
+        // 暂停
+        if (isSilk) {
+            silkPlayer?.let { SilkPlayerProxy.pause(it) }
+        } else {
+            try { player?.pause() } catch (e: Throwable) {}
+        }
+        onPlaying(false)
+        return
+    }
+    // 播放
+    if (isSilk) {
+        val sp = silkPlayer
+        if (sp != null && prepared) {
+            // 已加载过，从暂停位置继续
+            if (SilkPlayerProxy.start(sp)) onPlaying(true)
+        } else {
+            val np = SilkPlayerProxy.createPlayer()
+            if (np == null) {
+                Toasts.toast("无法创建播放器")
+                return
+            }
+            val ok = SilkPlayerProxy.setDataSource(np, source) &&
+                SilkPlayerProxy.prepare(np) &&
+                SilkPlayerProxy.start(np)
+            if (ok) {
+                onSilkPlayer(np)
+                onPrepared(true)
+                onPlaying(true)
+            } else {
+                SilkPlayerProxy.stop(np)
+                Toasts.toast("播放失败")
+            }
+        }
+    } else {
+        val p = player
+        if (p != null && prepared) {
+            // 暂停过且已就绪，恢复播放
+            try { p.start() } catch (e: Throwable) { Toasts.toast("播放失败") }
+            onPlaying(true)
+        } else if (p != null) {
+            // 正在 prepareAsync 中，忽略重复点击
+        } else {
+            val np = MediaPlayer()
+            try {
+                np.setDataSource(source)
+                // 仅在 prepare 完成后真正播放并置 playing=true，避免提前进入播放态导致状态错乱
+                np.setOnPreparedListener { mp ->
+                    mp.start()
+                    onPrepared(true)
+                    onPlaying(true)
+                }
+                np.setOnCompletionListener { mp ->
+                    try { mp.release() } catch (e: Throwable) {}
+                    onPlayer(null)
+                    onPrepared(false)
+                    onPlaying(false)
+                }
+                np.setOnErrorListener { mp, _, _ ->
+                    try { mp.release() } catch (e: Throwable) {}
+                    onPlayer(null)
+                    onPrepared(false)
+                    onPlaying(false)
+                    Toasts.toast("播放失败")
+                    true
+                }
+                np.prepareAsync()
+                onPlayer(np)
+            } catch (e: Throwable) {
+                try { np.release() } catch (e2: Throwable) {}
+                onPlayer(null)
+                onPrepared(false)
+                Toasts.toast("播放失败")
+            }
+        }
+    }
+}
+
+/** 毫秒 → mm:ss */
+private fun formatAudioTime(ms: Long): String {
+    val totalSec = (if (ms > 0) ms else 0L) / 1000
+    return String.format("%02d:%02d", totalSec / 60, totalSec % 60)
+}
+
+/**
+ * 判断音频是否为 silk 格式（QQ 语音常用格式，Android MediaPlayer 不支持播放）。
+ * - 本地文件：读取文件头 magic bytes（#!SILK_V3）判断，更准确
+ * - 网络文件：检查 URL 路径是否以 .silk 结尾
+ */
+private fun isSilkAudio(target: DetailTarget): Boolean {
+    return when (target) {
+        is DetailTarget.Local -> {
+            try {
+                FileInputStream(target.file).use { input ->
+                    // QQ 语音文件头有两种：
+                    // 1. 标准格式：    "#!SILK_V3"          (9 字节)
+                    // 2. QQ 实际格式： 0x02 + "#!SILK_V3"   (10 字节, SilkPlayer 内部 skip(10))
+                    val header = ByteArray(10)
+                    val n = input.read(header)
+                    when {
+                        n >= 9 && String(header, 0, 9, Charsets.US_ASCII) == "#!SILK_V3" -> true
+                        n >= 10 && header[0] == 0x02.toByte() &&
+                            String(header, 1, 9, Charsets.US_ASCII) == "#!SILK_V3" -> true
+                        else -> false
+                    }
+                }
+            } catch (e: Exception) {
+                // 读取失败时降级用扩展名判断
+                target.file.extension.equals("silk", ignoreCase = true)
+            }
+        }
+        is DetailTarget.Network -> {
+            // 去掉 query 参数后取扩展名
+            val path = target.url.substringBefore('?')
+            path.substringAfterLast('.', "").equals("silk", ignoreCase = true)
         }
     }
 }

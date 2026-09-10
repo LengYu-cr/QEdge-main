@@ -1,6 +1,10 @@
 package me.lengyu.qedge.ui.pages.file
 
 import android.graphics.BitmapFactory
+import android.graphics.ImageDecoder
+import android.graphics.drawable.AnimatedImageDrawable
+import android.graphics.drawable.BitmapDrawable
+import android.widget.ImageView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTransformGestures
@@ -24,6 +28,7 @@ import androidx.compose.material3.ripple
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -41,6 +46,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import me.lengyu.qedge.R
@@ -48,6 +54,7 @@ import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.LogUtils
 import java.io.File
+import java.io.FileInputStream
 
 @Composable
 fun ImagePreviewDialog(
@@ -57,6 +64,7 @@ fun ImagePreviewDialog(
 ) {
     val colors = QEdgeTheme.colors
     var bitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+    var animatedDrawable by remember { mutableStateOf<AnimatedImageDrawable?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf("") }
     var scale by remember { mutableStateOf(1f) }
@@ -64,24 +72,48 @@ fun ImagePreviewDialog(
     var offsetY by remember { mutableStateOf(0f) }
     var fileName by remember { mutableStateOf("") }
 
+    // 弹窗关闭时停止动图播放，释放资源
+    DisposableEffect(Unit) {
+        onDispose {
+            animatedDrawable?.stop()
+            animatedDrawable = null
+        }
+    }
+
     LaunchedEffect(filePath) {
         val file = File(filePath)
         fileName = file.name
         Thread {
             try {
-                val options = BitmapFactory.Options().apply {
-                    inJustDecodeBounds = true
-                }
-                BitmapFactory.decodeFile(filePath, options)
+                val mainHandler = android.os.Handler(android.os.Looper.getMainLooper())
+                // 通过 magic bytes 判断是否 GIF，不依赖后缀
+                if (isGifFile(file)) {
+                    val source = ImageDecoder.createSource(file)
+                    val drawable = ImageDecoder.decodeDrawable(source)
+                    mainHandler.post {
+                        if (drawable is AnimatedImageDrawable) {
+                            animatedDrawable = drawable
+                            drawable.start()
+                        } else if (drawable is BitmapDrawable) {
+                            bitmap = drawable.bitmap.asImageBitmap()
+                        }
+                        isLoading = false
+                    }
+                } else {
+                    val options = BitmapFactory.Options().apply {
+                        inJustDecodeBounds = true
+                    }
+                    BitmapFactory.decodeFile(filePath, options)
 
-                val sampleSize = calculateInSampleSize(options, 1920, 1920)
-                options.inJustDecodeBounds = false
-                options.inSampleSize = sampleSize
+                    val sampleSize = calculateInSampleSize(options, 1920, 1920)
+                    options.inJustDecodeBounds = false
+                    options.inSampleSize = sampleSize
 
-                val bmp = BitmapFactory.decodeFile(filePath, options)
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    bitmap = bmp.asImageBitmap()
-                    isLoading = false
+                    val bmp = BitmapFactory.decodeFile(filePath, options)
+                    mainHandler.post {
+                        bitmap = bmp.asImageBitmap()
+                        isLoading = false
+                    }
                 }
             } catch (e: Exception) {
                 LogUtils.e(e)
@@ -194,6 +226,35 @@ fun ImagePreviewDialog(
                             text = errorMessage,
                             fontSize = 14.sp,
                             color = colors.accentRed
+                        )
+                    } else if (animatedDrawable != null) {
+                        AndroidView(
+                            factory = { ctx ->
+                                ImageView(ctx).apply {
+                                    setImageDrawable(animatedDrawable)
+                                    scaleType = ImageView.ScaleType.FIT_CENTER
+                                }
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .pointerInput(Unit) {
+                                    detectTransformGestures { _, pan, zoom, _ ->
+                                        scale = (scale * zoom).coerceIn(0.5f, 5f)
+                                        if (scale > 1f) {
+                                            offsetX += pan.x
+                                            offsetY += pan.y
+                                        } else {
+                                            offsetX = 0f
+                                            offsetY = 0f
+                                        }
+                                    }
+                                }
+                                .graphicsLayer(
+                                    scaleX = scale,
+                                    scaleY = scale,
+                                    translationX = offsetX,
+                                    translationY = offsetY
+                                )
                         )
                     } else if (bitmap != null) {
                         androidx.compose.foundation.Image(
@@ -346,4 +407,18 @@ private fun calculateInSampleSize(
     }
 
     return inSampleSize
+}
+
+/** 通过文件头 magic bytes 判断是否为 GIF（GIF87a / GIF89a），不依赖后缀名。 */
+private fun isGifFile(file: File): Boolean {
+    return try {
+        FileInputStream(file).use { input ->
+            val header = ByteArray(6)
+            if (input.read(header) != 6) return false
+            val magic = String(header, Charsets.US_ASCII)
+            magic == "GIF87a" || magic == "GIF89a"
+        }
+    } catch (e: Exception) {
+        false
+    }
 }
