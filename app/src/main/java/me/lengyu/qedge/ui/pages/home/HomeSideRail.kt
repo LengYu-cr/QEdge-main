@@ -66,7 +66,7 @@ internal fun HomeScaffold(
 
     var drawerOpen by remember { mutableStateOf(false) }
 
-    val drawerWidthDp = 200.dp
+    val drawerWidthDp = 110.dp
 
     // 抽屉偏移动画
     val drawerOffset by animateDpAsState(
@@ -84,21 +84,21 @@ internal fun HomeScaffold(
 
     // 遮罩透明度
     val scrimAlpha by animateFloatAsState(
-        targetValue = if (drawerOpen) 0.42f else 0f,
+        targetValue = if (drawerOpen) 0.36f else 0f,
         animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
         label = "scrimAlpha"
     )
 
     // 内容区圆角动画（打开时带圆角）
     val contentCornerRadius by animateDpAsState(
-        targetValue = if (drawerOpen) 28.dp else 0.dp,
+        targetValue = if (drawerOpen) 18.dp else 0.dp,
         animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
         label = "contentRadius"
     )
 
     // 内容区缩放动画
     val contentScale by animateFloatAsState(
-        targetValue = if (drawerOpen) 0.94f else 1f,
+        targetValue = if (drawerOpen) 0.96f else 1f,
         animationSpec = tween(durationMillis = 380, easing = FastOutSlowInEasing),
         label = "contentScale"
     )
@@ -184,26 +184,26 @@ private fun HomeSideRail(
     val batteryState = rememberHomeBatteryState()
 
     Column(
-        modifier = modifier.padding(horizontal = 16.dp, vertical = 36.dp),
+        modifier = modifier.padding(horizontal = 10.dp, vertical = 32.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         // 文案
         Text(
             text = "赠君茉莉，",
             color = contentColor,
-            fontSize = 16.sp,
-            lineHeight = 22.sp,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
             fontWeight = FontWeight.Light
         )
         Text(
             text = "愿君莫离。",
             color = contentColor.copy(alpha = 0.78f),
-            fontSize = 16.sp,
-            lineHeight = 22.sp,
+            fontSize = 14.sp,
+            lineHeight = 20.sp,
             fontWeight = FontWeight.Light
         )
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
         // 电池
         HomeBatteryIndicator(

@@ -2,7 +2,6 @@ package com.tencent.mobileqq.qqaudio.audioplayer;
 
 /**
  * QQ 内置 silk 音频播放器 stub。
- * 仅用于编译期类型引用，运行时由 HybridClassLoader 加载宿主真实类。
  */
 public class SilkPlayer {
     public SilkPlayer() {}

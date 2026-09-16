@@ -440,12 +440,15 @@ private fun formatTime(ms: Int): String {
 private fun isSilkAudio(path: String): Boolean {
     return try {
         FileInputStream(path).use { input ->
-            val header = ByteArray(9)
-            if (input.read(header) != 9) return false
-            val ascii = String(header, Charsets.US_ASCII)
+            // QQ 语音文件头有两种：
+            // 1. 标准格式：    "#!SILK_V3"          (9 字节)
+            // 2. QQ 实际格式： 0x02 + "#!SILK_V3"   (10 字节, SilkPlayer 内部 skip(10))
+            val header = ByteArray(10)
+            val n = input.read(header)
             when {
-                ascii == "#!SILK_V3" -> true
-                header[0] == 0x02.toByte() && ascii.substring(1) == "#!SILK_V3" -> true
+                n >= 9 && String(header, 0, 9, Charsets.US_ASCII) == "#!SILK_V3" -> true
+                n >= 10 && header[0] == 0x02.toByte() &&
+                    String(header, 1, 9, Charsets.US_ASCII) == "#!SILK_V3" -> true
                 else -> false
             }
         }

@@ -14,6 +14,7 @@ import android.util.LruCache
 import android.widget.ImageView
 import android.widget.VideoView
 import java.io.FileInputStream
+import java.util.concurrent.ConcurrentHashMap
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
@@ -33,6 +34,8 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,6 +69,8 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.TextStyle
@@ -129,6 +134,9 @@ fun MediaPanelContent(contact: MediaPanelLoader.PanelContact, onDismiss: () -> U
     // 语音/视频详情弹窗
     var audioDetail by remember { mutableStateOf<DetailTarget?>(null) }
     var audioDetailType by remember { mutableStateOf("voice") }
+
+    // 本地语音/视频重命名后触发面板重新加载
+    var audioRefreshKey by remember { mutableIntStateOf(0) }
 
     // 搜索（结果直接展示在面板内，不再弹窗）
     var searchMode by remember { mutableStateOf(false) }
@@ -279,8 +287,8 @@ fun MediaPanelContent(contact: MediaPanelLoader.PanelContact, onDismiss: () -> U
                     onLongSend = { sendImage(it) },
                     onSearch = { searchType = "img"; searchMode = true }
                 )
-                1 -> AudioPanel("voice", ::sendVoice, onOpenDetail = { t -> audioDetail = t; audioDetailType = "voice" }, onSearch = { searchType = "voice"; searchMode = true })
-                2 -> AudioPanel("video", ::sendVideo, onOpenDetail = { t -> audioDetail = t; audioDetailType = "video" }, onSearch = { searchType = "video"; searchMode = true })
+                1 -> AudioPanel("voice", ::sendVoice, onOpenDetail = { t -> audioDetail = t; audioDetailType = "voice" }, onSearch = { searchType = "voice"; searchMode = true }, refreshTrigger = audioRefreshKey)
+                2 -> AudioPanel("video", ::sendVideo, onOpenDetail = { t -> audioDetail = t; audioDetailType = "video" }, onSearch = { searchType = "video"; searchMode = true }, refreshTrigger = audioRefreshKey)
             }
         }
     }
@@ -313,6 +321,9 @@ fun MediaPanelContent(contact: MediaPanelLoader.PanelContact, onDismiss: () -> U
                     }
                 }
             },
+            onRenamed = { newFile ->
+                galleryFiles = galleryFiles.map { if (it == (target as? DetailTarget.Local)?.file) newFile else it }
+            },
             onDismiss = { detail = null }
         )
     }
@@ -329,6 +340,7 @@ fun MediaPanelContent(contact: MediaPanelLoader.PanelContact, onDismiss: () -> U
                     else -> sendImage(it)
                 }
             },
+            onRenamed = { audioRefreshKey++ },
             onDismiss = { audioDetail = null }
         )
     }
@@ -464,26 +476,42 @@ private fun EmojiPanel(
                         onSearch
                     )
                     if (!selecting) {
-                        Box(
+                        Row(
                             Modifier
                                 .fillMaxWidth()
-                                .padding(start = 16.dp, end = 16.dp, bottom = 6.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(colors.accentBlue)
-                                .combinedClickable(
-                                    interactionSource = remember { MutableInteractionSource() },
-                                    indication = null,
-                                    onClick = { selecting = true }
-                                )
-                                .padding(vertical = 10.dp),
-                            contentAlignment = Alignment.Center
+                                .padding(start = 16.dp, end = 16.dp, bottom = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
                         ) {
+                            // 左侧灰色小字提醒：如何保存/导入图片
                             Text(
-                                "上传图片",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = androidx.compose.ui.graphics.Color.White
+                                "保存：长按图片选「保存」/合集详情「下载图片」\n导入：图片放入 " +
+                                    QQCurrentEnv.getLocalPath() + "Download/QQ/QEdge/Pictures/ 即自动显示",
+                                fontSize = 10.sp,
+                                lineHeight = 14.sp,
+                                color = colors.textSecondary.copy(alpha = 0.8f),
+                                modifier = Modifier.weight(1f)
                             )
+                            Spacer(Modifier.width(10.dp))
+                            // 右侧略小的上传按钮
+                            Box(
+                                Modifier
+                                    .clip(RoundedCornerShape(10.dp))
+                                    .background(colors.accentBlue)
+                                    .combinedClickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null,
+                                        onClick = { selecting = true }
+                                    )
+                                    .padding(horizontal = 14.dp, vertical = 8.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    "上传图片",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = androidx.compose.ui.graphics.Color.White
+                                )
+                            }
                         }
                     }
                     if (galleryFiles.isEmpty()) {
@@ -721,7 +749,7 @@ private fun MediaThumbRow(
                             onLongClick = { onLong(cell) }
                         )
                 ) {
-                    AnimatedImage(cell.image, Modifier.fillMaxSize(), ContentScale.Crop)
+                    AnimatedImage(cell.image, Modifier.fillMaxSize(), ContentScale.Crop, thumbnail = true)
                     if (isMarked(cell)) {
                         Box(
                             Modifier
@@ -1024,7 +1052,7 @@ private fun SearchPage(
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (DetailTarget) -> Unit, onSearch: () -> Unit) {
+private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (DetailTarget) -> Unit, onSearch: () -> Unit, refreshTrigger: Int = 0) {
     val colors = QEdgeTheme.colors
     val scope = rememberCoroutineScope()
 
@@ -1080,6 +1108,13 @@ private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (De
         if (!loaded) {
             loaded = true
             collections = withContext(Dispatchers.IO) { MediaPanelLoader.MediaApi.fetchCollections(type, 200) }
+            localFiles = withContext(Dispatchers.IO) { MediaPanelLoader.MediaFileCache.listFiles(type) }
+        }
+    }
+
+    // 本地文件重命名后重新加载列表
+    LaunchedEffect(refreshTrigger) {
+        if (refreshTrigger > 0) {
             localFiles = withContext(Dispatchers.IO) { MediaPanelLoader.MediaFileCache.listFiles(type) }
         }
     }
@@ -1378,9 +1413,11 @@ private fun MediaDetailDialog(
     onDownload: (String) -> Unit,
     onSend: (String) -> Unit,
     onDelete: () -> Unit,
+    onRenamed: (File) -> Unit,
     onDismiss: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
+    var showRename by remember { mutableStateOf(false) }
 
     Box(
         Modifier
@@ -1459,10 +1496,35 @@ private fun MediaDetailDialog(
                 if (isNetwork) {
                     DetailButton("下载", colors.accentGreen, Modifier.weight(1f)) { onDownload(source) }
                 } else {
+                    DetailButton("重命名", colors.textSecondary, Modifier.weight(1f)) { showRename = true }
                     DetailButton("删除", colors.accentRed, Modifier.weight(1f), onClick = onDelete)
                 }
                 DetailButton("发送", colors.accentBlue, Modifier.weight(1f)) { onSend(source) }
             }
+        }
+    }
+
+    // 本地图片重命名
+    if (showRename) {
+        val f = (target as? DetailTarget.Local)?.file
+        if (f != null) {
+            RenameDialog(
+                oldName = f.name,
+                onConfirm = { newName ->
+                    showRename = false
+                    val parent = f.parentFile
+                    val newFile = if (parent != null) File(parent, newName) else File(newName)
+                    if (newFile.exists()) {
+                        Toasts.toast("文件名已存在")
+                    } else if (f.renameTo(newFile)) {
+                        Toasts.toast("已重命名")
+                        onRenamed(newFile)
+                    } else {
+                        Toasts.toast("重命名失败")
+                    }
+                },
+                onDismiss = { showRename = false }
+            )
         }
     }
 }
@@ -1474,9 +1536,11 @@ private fun AudioDetailDialog(
     target: DetailTarget,
     onCopy: (String) -> Unit,
     onSend: (String) -> Unit,
+    onRenamed: () -> Unit,
     onDismiss: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
+    var showRename by remember { mutableStateOf(false) }
 
     val isNetwork = target is DetailTarget.Network
     val source = when (target) {
@@ -1596,6 +1660,7 @@ private fun AudioDetailDialog(
                     indication = null,
                     onClick = {}
                 )
+                .verticalScroll(rememberScrollState())
                 .padding(20.dp)
         ) {
             Text(
@@ -1820,7 +1885,35 @@ private fun AudioDetailDialog(
             }
 
             Spacer(Modifier.height(16.dp))
+            if (!isNetwork) {
+                DetailButton("重命名", colors.textSecondary, Modifier.fillMaxWidth()) { showRename = true }
+                Spacer(Modifier.height(8.dp))
+            }
             DetailButton("发送", colors.accentBlue, Modifier.fillMaxWidth()) { onSend(source) }
+        }
+    }
+
+    // 本地语音/视频重命名
+    if (showRename) {
+        val f = (target as? DetailTarget.Local)?.file
+        if (f != null) {
+            RenameDialog(
+                oldName = f.name,
+                onConfirm = { newName ->
+                    showRename = false
+                    val parent = f.parentFile
+                    val newFile = if (parent != null) File(parent, newName) else File(newName)
+                    if (newFile.exists()) {
+                        Toasts.toast("文件名已存在")
+                    } else if (f.renameTo(newFile)) {
+                        Toasts.toast("已重命名")
+                        onRenamed()
+                    } else {
+                        Toasts.toast("重命名失败")
+                    }
+                },
+                onDismiss = { showRename = false }
+            )
         }
     }
 }
@@ -2052,6 +2145,55 @@ private fun DetailButton(text: String, color: androidx.compose.ui.graphics.Color
     }
 }
 
+/** 重命名弹窗：预填旧文件名，确认后回调新名字 */
+@Composable
+private fun RenameDialog(
+    oldName: String,
+    onConfirm: (String) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val colors = QEdgeTheme.colors
+    var text by remember { mutableStateOf(oldName) }
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Column(
+            Modifier
+                .fillMaxWidth(0.85f)
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.background)
+                .padding(20.dp)
+        ) {
+            Text("重命名", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = colors.textPrimary)
+            Spacer(Modifier.height(12.dp))
+            BasicTextField(
+                value = text,
+                onValueChange = { text = it },
+                singleLine = true,
+                textStyle = TextStyle(fontSize = 14.sp, color = colors.textPrimary),
+                cursorBrush = androidx.compose.ui.graphics.SolidColor(colors.accentBlue),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(colors.cardBackground, RoundedCornerShape(10.dp))
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            )
+            Spacer(Modifier.height(16.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                DetailButton("取消", colors.textSecondary, Modifier.weight(1f)) { onDismiss() }
+                DetailButton("确定", colors.accentBlue, Modifier.weight(1f)) {
+                    val name = text.trim()
+                    if (name.isNotEmpty() && name != oldName) onConfirm(name)
+                }
+            }
+        }
+    }
+}
+
 @Composable
 private fun rememberDetailSize(target: DetailTarget): String {
     var result by remember(target) { mutableStateOf("计算中…") }
@@ -2092,12 +2234,19 @@ private fun formatSize(bytes: Long): String {
 }
 
 @Composable
-private fun AnimatedImage(target: String?, modifier: Modifier = Modifier, contentScale: ContentScale = ContentScale.Crop) {
+private fun AnimatedImage(
+    target: String?,
+    modifier: Modifier = Modifier,
+    contentScale: ContentScale = ContentScale.Crop,
+    thumbnail: Boolean = false
+) {
     if (target.isNullOrEmpty()) return
-    // 统一解析为本地文件路径（网络图先走缓存下载）
+    // 本地路径（网络图先走缓存下载）
     var localPath by remember(target) { mutableStateOf<String?>(null) }
+    var isGifFlag by remember { mutableStateOf(false) }
+    var bmp by remember { mutableStateOf<ImageBitmap?>(null) }
     LaunchedEffect(target) {
-        localPath = withContext(Dispatchers.IO) {
+        val path = withContext(Dispatchers.IO) {
             try {
                 if (target.startsWith("http")) MediaPanelLoader.MediaImageCache.load(target) else target
             } catch (e: Throwable) {
@@ -2105,11 +2254,26 @@ private fun AnimatedImage(target: String?, modifier: Modifier = Modifier, conten
                 null
             }
         }
+        if (path.isNullOrEmpty()) return@LaunchedEffect
+        localPath = path
+        // isGif 带缓存：避免滚动时反复在主线程同步读文件头
+        isGifFlag = isGifCached(path)
+        if (!isGifFlag) {
+            bmp = withContext(Dispatchers.IO) {
+                if (thumbnail) {
+                    // 网格缩略图：小尺寸解码 + 内存缓存，滚动回来直接命中不重复解码
+                    thumbCache.get(path)
+                        ?: decodeSampledBitmap(path, 200, 200)?.asImageBitmap()
+                            ?.also { thumbCache.put(path, it) }
+                } else {
+                    decodeSampledBitmap(path, 400, 400)?.asImageBitmap()
+                }
+            }
+        }
     }
-    val path = localPath
-    if (path.isNullOrEmpty()) return
-
-    if (isGif(path)) {
+    val path = localPath ?: return
+    if (isGifFlag) {
+        // 动图无法跨 ImageView 复用，按需解码（数量少，可接受）
         val drawable = remember(path) { decodeAnimated(path) }
         if (drawable != null) {
             AndroidView(
@@ -2127,11 +2291,26 @@ private fun AnimatedImage(target: String?, modifier: Modifier = Modifier, conten
             )
         }
     } else {
-        val bmp = rememberBitmap(target)
-        if (bmp != null) {
-            Image(bmp, null, modifier, contentScale = contentScale)
+        val cur = bmp
+        if (cur != null) {
+            Image(cur, null, modifier, contentScale = contentScale)
         }
     }
+}
+
+/** 静态图缩略图内存缓存（网格滚动复用，避免重复解码与 GC 卡顿） */
+private val thumbCache = object : LruCache<String, ImageBitmap>(32 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
+}
+
+/** GIF 判断结果缓存：避免滚动重组时反复同步读文件头 */
+private val gifCache = ConcurrentHashMap<String, Boolean>()
+
+private fun isGifCached(path: String): Boolean {
+    gifCache[path]?.let { return it }
+    val r = isGif(path)
+    gifCache[path] = r
+    return r
 }
 
 private fun decodeAnimated(path: String): android.graphics.drawable.Drawable? {
@@ -2159,29 +2338,6 @@ private fun isGif(path: String): Boolean {
     } catch (e: Throwable) {
         false
     }
-}
-
-@Composable
-private fun rememberBitmap(target: String?): ImageBitmap? {
-    if (target.isNullOrEmpty()) return null
-    var bitmap by remember(target) { mutableStateOf<ImageBitmap?>(null) }
-    LaunchedEffect(target) {
-        bitmap = withContext(Dispatchers.IO) {
-            try {
-                val path = if (target.startsWith("http")) {
-                    MediaPanelLoader.MediaImageCache.load(target)
-                } else {
-                    target
-                }
-                if (path.isNullOrEmpty()) null
-                else decodeSampledBitmap(path, 400, 400)?.asImageBitmap()
-            } catch (e: Throwable) {
-                LogUtils.e("MediaPanelContent", "decode failed: " + e.message)
-                null
-            }
-        }
-    }
-    return bitmap
 }
 
 private fun decodeSampledBitmap(path: String, reqW: Int, reqH: Int): android.graphics.Bitmap? {

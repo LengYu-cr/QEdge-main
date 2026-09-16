@@ -56,6 +56,7 @@ import me.lengyu.qedge.hook.item.RemoveAds;
 import me.lengyu.qedge.hook.item.VoiceSpeed;
 import me.lengyu.qedge.hook.item.QLogRedirect;
 import me.lengyu.qedge.hook.item.RemoveQrCodeCheck;
+import me.lengyu.qedge.hook.item.ForceSpeaker;
 import me.lengyu.qedge.hook.item.BypassProfileBan;
 import me.lengyu.qedge.hook.item.SkipScanWaitTime;
 
@@ -108,6 +109,7 @@ public class MainHook {
         HookRegistry.register(ForceVip.INSTANCE);
         HookRegistry.register(DisableAIAvatar.INSTANCE);
         HookRegistry.register(BypassProfileBan.INSTANCE);
+        HookRegistry.register(ForceSpeaker.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;

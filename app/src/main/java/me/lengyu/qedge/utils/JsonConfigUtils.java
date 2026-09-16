@@ -311,7 +311,7 @@ public class JsonConfigUtils {
         }
     }
 
-    /** 直接写入指定文件（原子操作） */
+    /** 直接写入指定文件（原子操作：rename 在 POSIX 上原子替换目标文件，不会出现瞬时空文件） */
     private static void saveConfigInternal(File configFile, JSONObject json) {
         File tempFile = new File(configFile.getParentFile(), configFile.getName() + ".tmp");
         try {
@@ -322,12 +322,11 @@ public class JsonConfigUtils {
                 writer.flush();
                 fos.getFD().sync();  // 后台线程执行，确保数据落盘
             }
-            // 原子替换：先删目标文件避免 rename 失败
-            configFile.delete();
+            // 直接 renameTo：POSIX rename 原子替换目标文件，不会出现 delete→rename 窗口
+            // 其他进程在任何时刻看到的要么是旧文件要么是新文件，不会是空文件
             if (!tempFile.renameTo(configFile)) {
-                // rename 仍失败时回退到直接覆盖
+                // 极少数情况 rename 失败（跨文件系统等），回退到直接覆盖写
                 LogUtils.e("JsonConfigUtils", "rename failed, fallback to direct write");
-                configFile.delete();
                 try (FileOutputStream fos = new FileOutputStream(configFile);
                      OutputStreamWriter writer = new OutputStreamWriter(fos, StandardCharsets.UTF_8)) {
                     writer.write(content);

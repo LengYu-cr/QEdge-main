@@ -8,6 +8,8 @@ import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -147,6 +149,7 @@ fun HomeScreen(
     var voiceSpeedEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("voice_speed_enable", false)) }
     var voiceSpeedValue by remember { mutableStateOf(ModuleConfig.getString("voice_speed_value", "1.5")) }
     var showVoiceSpeedDialog by remember { mutableStateOf(false) }
+    var forceSpeakerEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("force_speaker", false)) }
     var qlogRedirectMode by remember { mutableStateOf(ModuleConfig.getString("qlog_redirect_mode", QLogRedirect.MODE_OFF)) }
     var showQLogRedirectDialog by remember { mutableStateOf(false) }
     var antiQfixPatch by remember { mutableStateOf(ModuleConfig.getBoolean("anti_qfix_patch", false)) }
@@ -374,6 +377,7 @@ fun HomeScreen(
                             imageRatioHeight = imageRatioHeight,
                             voiceSpeedEnabled = voiceSpeedEnabled,
                             voiceSpeedValue = voiceSpeedValue,
+                            forceSpeakerEnabled = forceSpeakerEnabled,
                             qlogRedirectMode = qlogRedirectMode,
                             imageSummaryEnabled = imageSummaryEnabled,
                             imageSummaryMode = imageSummaryMode,
@@ -467,6 +471,10 @@ fun HomeScreen(
                                 Thread { ModuleConfig.putBoolean("voice_speed_enable", it) }.start()
                             },
                             onVoiceSpeedConfigClick = { showVoiceSpeedDialog = true },
+                            onForceSpeakerToggle = {
+                                forceSpeakerEnabled = it
+                                Thread { ModuleConfig.putBoolean("force_speaker", it) }.start()
+                            },
                             onQLogRedirectToggle = {
                                 qlogRedirectMode =
                                     if (it) (if (qlogRedirectMode == QLogRedirect.MODE_OFF) QLogRedirect.MODE_REDIRECT else qlogRedirectMode)
@@ -574,9 +582,14 @@ fun HomeScreen(
                                 chatSettingEntry = newValue
                                 Thread { ModuleConfig.putString("chat_setting_entry", newValue) }.start()
                             },
-                            onMediaPanelToggle = {
-                                mediaPanelEnabled = it
-                                Thread { ModuleConfig.putBoolean("media_panel_enabled", it) }.start()
+                            onMediaPanelToggle = { enabled ->
+                                mediaPanelEnabled = enabled
+                                if (enabled) {
+                                    // 打开综合面板时联动打开「图片视频语音下载」，方便保存到本地图库
+                                    downloadEmotion = true
+                                    Thread { ModuleConfig.putBoolean("download_emotion", true) }.start()
+                                }
+                                Thread { ModuleConfig.putBoolean(MediaPanelLoader.KEY_ENABLED, enabled) }.start()
                             },
                             onMediaPanelEntryChange = { newValue ->
                                 mediaPanelEntry = newValue
@@ -934,6 +947,7 @@ data class HomePageState(
     val imageRatioHeight: String,
     val voiceSpeedEnabled: Boolean,
     val voiceSpeedValue: String,
+    val forceSpeakerEnabled: Boolean,
     val qlogRedirectMode: String,
     val imageSummaryEnabled: Boolean,
     val imageSummaryMode: String,
@@ -985,6 +999,7 @@ class HomePageCallbacks(
     val onImageRatioConfigClick: () -> Unit,
     val onVoiceSpeedToggle: (Boolean) -> Unit,
     val onVoiceSpeedConfigClick: () -> Unit,
+    val onForceSpeakerToggle: (Boolean) -> Unit,
     val onQLogRedirectToggle: (Boolean) -> Unit,
     val onQLogRedirectModeClick: () -> Unit,
     val onImageSummaryToggle: (Boolean) -> Unit,
@@ -1019,6 +1034,11 @@ private fun HomePage(
     callbacks: HomePageCallbacks
 ) {
     val colors = QEdgeTheme.colors
+    // 手风琴：当前展开的卡片 key，null 表示全部收起
+    var expandedCard by remember { mutableStateOf<String?>(null) }
+    val toggleCard: (String) -> Unit = { key ->
+        expandedCard = if (expandedCard == key) null else key
+    }
 
     // 用 LazyColumn 替代 Column(verticalScroll)：首帧只组合可见的卡片，
     // 屏幕外的卡片滚动到才构建，避免首次进入时一次性布局全部卡片导致的卡顿。
@@ -1034,85 +1054,77 @@ private fun HomePage(
         }
 
         item(key = "card_qzone") {
+        val expanded = expandedCard == "card_qzone"
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    "QQ空间",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "自动点赞、自动评论",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary
+                CardHeader(
+                    title = "QQ空间",
+                    subtitle = "自动点赞、自动评论",
+                    expanded = expanded,
+                    onClick = { toggleCard("card_qzone") }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+                CollapsibleContent(expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                SettingSwitchItem(
-                    title = "空间秒赞",
-                    subtitle = "收到好友动态自动点赞(确保在前台运行)",
-                    checked = state.qzoneAutoLike,
-                    onCheckedChange = callbacks.onLikeToggle
-                )
+                    SettingSwitchItem(
+                        title = "空间秒赞",
+                        subtitle = "收到好友动态自动点赞(确保在前台运行)",
+                        checked = state.qzoneAutoLike,
+                        onCheckedChange = callbacks.onLikeToggle
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItem(
-                    title = "空间秒评",
-                    subtitle = state.commentText,
-                    checked = state.qzoneAutoComment,
-                    onCheckedChange = callbacks.onCommentToggle,
-                    onClick = callbacks.onCommentTextClick
-                )
+                    SettingSwitchItem(
+                        title = "空间秒评",
+                        subtitle = state.commentText,
+                        checked = state.qzoneAutoComment,
+                        onCheckedChange = callbacks.onCommentToggle,
+                        onClick = callbacks.onCommentTextClick
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItem(
-                    title = "定时发说说 +0.5天",
-                    subtitle = run {
-                        val preview = if (state.moodText.length > 18) state.moodText.take(18) + "…" else state.moodText
-                        "${state.moodTime} · $preview"
-                    },
-                    checked = state.moodEnabled,
-                    onCheckedChange = callbacks.onMoodToggle,
-                    onClick = callbacks.onMoodConfigClick
-                )
-
+                    SettingSwitchItem(
+                        title = "定时发说说 +0.5天",
+                        subtitle = run {
+                            val preview = if (state.moodText.length > 18) state.moodText.take(18) + "…" else state.moodText
+                            "${state.moodTime} · $preview"
+                        },
+                        checked = state.moodEnabled,
+                        onCheckedChange = callbacks.onMoodToggle,
+                        onClick = callbacks.onMoodConfigClick
+                    )
+                }
             }
         }
         }
 
         item(key = "card_chat") {
+        val expanded = expandedCard == "card_chat"
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    "聊天功能",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "闪照破解、视频转泡泡等",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary
+                CardHeader(
+                    title = "聊天功能",
+                    subtitle = "闪照破解、视频转泡泡等",
+                    expanded = expanded,
+                    onClick = { toggleCard("card_chat") }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+                CollapsibleContent(expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                SettingSwitchItem(
-                    title = "闪照破解",
-                    subtitle = "闪照直接查看，无需长按",
-                    checked = state.flashPicBypass,
-                    onCheckedChange = callbacks.onFlashPicToggle
-                )
+                    SettingSwitchItem(
+                        title = "闪照破解",
+                        subtitle = "闪照直接查看，无需长按",
+                        checked = state.flashPicBypass,
+                        onCheckedChange = callbacks.onFlashPicToggle
+                    )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
@@ -1239,6 +1251,15 @@ private fun HomePage(
                 Spacer(modifier = Modifier.height(12.dp))
 
                 SettingSwitchItem(
+                    title = "语音强制免提",
+                    subtitle = "语音消息强制扬声器播放，不走听筒",
+                    checked = state.forceSpeakerEnabled,
+                    onCheckedChange = callbacks.onForceSpeakerToggle
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                SettingSwitchItem(
                     title = "图片外显自定义",
                     subtitle = run {
                         val modeDesc = if (state.imageSummaryMode == "http") "接口返回" else "随机文案"
@@ -1325,23 +1346,32 @@ private fun HomePage(
                 Spacer(modifier = Modifier.height(16.dp))
                 SettingSwitchItem(
                     title = "综合面板（表情/语音/视频）",
-                    subtitle = "长按聊天页对应按钮打开综合面板（重启QQ生效）",
+                    subtitle = "打开后长按聊天页对应按钮打开综合面板",
                     checked = state.mediaPanelEnabled,
                     onCheckedChange = callbacks.onMediaPanelToggle
                 )
                 Spacer(modifier = Modifier.height(12.dp))
+                // 入口选择区：开关关闭时禁用（按钮状态与开关联动刷新）
+                val mediaEnabled = state.mediaPanelEnabled
                 Text(
                     "综合面板入口",
                     fontSize = 16.sp,
                     fontWeight = FontWeight.Medium,
-                    color = colors.textPrimary
+                    color = if (mediaEnabled) colors.textPrimary else colors.textSecondary.copy(alpha = 0.6f)
                 )
                 Spacer(modifier = Modifier.height(2.dp))
+                // 主动判断两个入口是否重合：重合则红字警告，不重合显示各自入口名
+                val scriptEntryLabel = ChatSettingLoader.ENTRY_OPTIONS[state.chatSettingEntry] ?: state.chatSettingEntry
+                val mediaEntryLabel = MediaPanelLoader.ENTRY_OPTIONS[state.mediaPanelEntry] ?: state.mediaPanelEntry
+                val entryConflict = state.chatSettingEntry == state.mediaPanelEntry
                 Text(
-                    "与脚本菜单入口错开，例如脚本菜单选「更多功能」，面板可选「相册」",
+                    if (entryConflict) "脚本菜单与综合面板入口均为「$mediaEntryLabel」，长按会冲突，请错开"
+                    else "脚本菜单「$scriptEntryLabel」、面板「$mediaEntryLabel」，长按互不冲突",
                     fontSize = 12.sp,
-                    color = colors.textSecondary,
-                    maxLines = 1,
+                    lineHeight = 16.sp,
+                    color = if (entryConflict) colors.accentRed.copy(alpha = if (mediaEnabled) 1f else 0.5f)
+                    else colors.textSecondary.copy(alpha = if (mediaEnabled) 1f else 0.5f),
+                    maxLines = 2,
                     overflow = TextOverflow.Ellipsis
                 )
                 Spacer(modifier = Modifier.height(12.dp))
@@ -1358,8 +1388,11 @@ private fun HomePage(
                                 modifier = Modifier
                                     .weight(1f)
                                     .clip(RoundedCornerShape(12.dp))
-                                    .background(if (selected) AccentBlue else colors.background)
-                                    .clickable { callbacks.onMediaPanelEntryChange(key) }
+                                    .background(
+                                        if (selected) AccentBlue
+                                        else colors.background.copy(alpha = if (mediaEnabled) 1f else 0.5f)
+                                    )
+                                    .clickable(enabled = mediaEnabled) { callbacks.onMediaPanelEntryChange(key) }
                                     .padding(vertical = 10.dp),
                                 contentAlignment = Alignment.Center
                             ) {
@@ -1367,7 +1400,8 @@ private fun HomePage(
                                     label,
                                     fontSize = 13.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selected) Color.White else colors.textPrimary
+                                    color = if (selected) Color.White
+                                    else colors.textPrimary.copy(alpha = if (mediaEnabled) 1f else 0.5f)
                                 )
                             }
                         }
@@ -1377,296 +1411,350 @@ private fun HomePage(
                     }
                     Spacer(modifier = Modifier.height(8.dp))
                 }
+                }
             }
         }
         }
 
         item(key = "card_profile") {
+        val expanded = expandedCard == "card_profile"
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    "资料卡",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "上传透明头像等，名片回赞",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary
+                CardHeader(
+                    title = "资料卡",
+                    subtitle = "上传透明头像等，名片回赞",
+                    expanded = expanded,
+                    onClick = { toggleCard("card_profile") }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+                CollapsibleContent(expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                SettingSwitchItem(
-                    title = "半透明头像上传",
-                    subtitle = "可上传(群)头像、名片等，不用则关",
-                    checked = state.transparentAvatar,
-                    onCheckedChange = callbacks.onTransparentAvatarToggle
-                )
+                    SettingSwitchItem(
+                        title = "半透明头像上传",
+                        subtitle = "可上传(群)头像、名片等，不用则关",
+                        checked = state.transparentAvatar,
+                        onCheckedChange = callbacks.onTransparentAvatarToggle
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItem(
-                    title = "名片自动回赞",
-                    subtitle = "收到名片点赞自动回赞",
-                    checked = state.profileAutoLikeBack,
-                    onCheckedChange = callbacks.onProfileAutoLikeBackToggle
-                )
+                    SettingSwitchItem(
+                        title = "名片自动回赞",
+                        subtitle = "收到名片点赞自动回赞",
+                        checked = state.profileAutoLikeBack,
+                        onCheckedChange = callbacks.onProfileAutoLikeBackToggle
+                    )
+                }
             }
         }
         }
 
         item(key = "card_level") {
+        val expanded = expandedCard == "card_level"
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    "等级加速",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "00:00时自动空间打卡，qq日签打卡，大会员签到，自动加好友",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary
+                CardHeader(
+                    title = "等级加速",
+                    subtitle = "00:00时自动空间打卡，qq日签打卡，大会员签到，自动加好友",
+                    expanded = expanded,
+                    onClick = { toggleCard("card_level") }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+                CollapsibleContent(expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                SettingSwitchItem(
-                    title = "空间等级签到",
-                    subtitle = "自动执行空间打卡 +0.5天",
-                    checked = state.qzoneCheckinEnabled,
-                    onCheckedChange = callbacks.onCheckinToggle
-                )
+                    SettingSwitchItem(
+                        title = "空间等级签到",
+                        subtitle = "自动执行空间打卡 +0.5天",
+                        checked = state.qzoneCheckinEnabled,
+                        onCheckedChange = callbacks.onCheckinToggle
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItem(
-                    title = "QQ 日签打卡",
-                    subtitle = "自动执行日签打卡 +0.5天",
-                    checked = state.dailySignEnabled,
-                    onCheckedChange = callbacks.onDailySignToggle
-                )
+                    SettingSwitchItem(
+                        title = "QQ 日签打卡",
+                        subtitle = "自动执行日签打卡 +0.5天",
+                        checked = state.dailySignEnabled,
+                        onCheckedChange = callbacks.onDailySignToggle
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItem(
-                    title = "大会员签到",
-                    subtitle = "自动执行（无需开通大会员） +0.5天",
-                    checked = state.bigVipCheckinEnabled,
-                    onCheckedChange = callbacks.onBigVipCheckinToggle
-                )
+                    SettingSwitchItem(
+                        title = "大会员签到",
+                        subtitle = "自动执行（无需开通大会员） +0.5天",
+                        checked = state.bigVipCheckinEnabled,
+                        onCheckedChange = callbacks.onBigVipCheckinToggle
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItem(
-                    title = "自动加好友",
-                    subtitle = "自动添加3个好友 +1.5天",
-                    checked = state.levelBoostEnabled,
-                    onCheckedChange = callbacks.onLevelBoostToggle
-                )
+                    SettingSwitchItem(
+                        title = "自动加好友",
+                        subtitle = "自动添加3个好友 +1.5天",
+                        checked = state.levelBoostEnabled,
+                        onCheckedChange = callbacks.onLevelBoostToggle
+                    )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                SettingSwitchItem(
-                    title = "空间浏览",
-                    subtitle = "浏览好友说说10条 +0.5天",
-                    checked = state.spaceBrowseEnabled,
-                    onCheckedChange = callbacks.onSpaceBrowseToggle
-                )
+                    SettingSwitchItem(
+                        title = "空间浏览",
+                        subtitle = "浏览好友说说10条 +0.5天",
+                        checked = state.spaceBrowseEnabled,
+                        onCheckedChange = callbacks.onSpaceBrowseToggle
+                    )
+                }
             }
         }
         }
 
         item(key = "card_keepalive") {
+        val expanded = expandedCard == "card_keepalive"
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    "应用保活",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "应用保活，保持进程可见，可能会高耗电",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary
+                CardHeader(
+                    title = "应用保活",
+                    subtitle = "应用保活，保持进程可见，可能会高耗电",
+                    expanded = expanded,
+                    onClick = { toggleCard("card_keepalive") }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+                CollapsibleContent(expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("透明悬浮窗", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text("1x1透明悬浮窗，保持进程可见", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("透明悬浮窗", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("1x1透明悬浮窗，保持进程可见", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        }
+                        QEdgeSwitch(checked = state.keepAlivePixel, onCheckedChange = callbacks.onKeepAlivePixelToggle)
                     }
-                    QEdgeSwitch(checked = state.keepAlivePixel, onCheckedChange = callbacks.onKeepAlivePixelToggle)
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("前台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text("高优先级常驻通知，最高保活优先级", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("前台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("高优先级常驻通知，最高保活优先级", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        }
+                        QEdgeSwitch(checked = state.keepAliveForeground, onCheckedChange = callbacks.onKeepAliveForegroundToggle)
                     }
-                    QEdgeSwitch(checked = state.keepAliveForeground, onCheckedChange = callbacks.onKeepAliveForegroundToggle)
-                }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("后台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                        Spacer(modifier = Modifier.height(2.dp))
-                        Text("低优先级通知，轻量保活", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("后台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text("低优先级通知，轻量保活", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                        }
+                        QEdgeSwitch(checked = state.keepAliveBackground, onCheckedChange = callbacks.onKeepAliveBackgroundToggle)
                     }
-                    QEdgeSwitch(checked = state.keepAliveBackground, onCheckedChange = callbacks.onKeepAliveBackgroundToggle)
                 }
             }
         }
         }
 
         item(key = "card_system") {
+        val expanded = expandedCard == "card_system"
         QEdgeCard(modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
-                Text(
-                    "基础配置",
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = colors.textPrimary
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    "禁用QQ修复补丁等系统级功能",
-                    fontSize = 13.sp,
-                    color = colors.textSecondary
+                CardHeader(
+                    title = "基础配置",
+                    subtitle = "禁用QQ修复补丁等系统级功能",
+                    expanded = expanded,
+                    onClick = { toggleCard("card_system") }
                 )
 
-                Spacer(modifier = Modifier.height(16.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+                CollapsibleContent(expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
 
-                SettingSwitchItem(
-                    title = "禁用QQ修复补丁",
-                    subtitle = "拦截并禁用QQ的修复补丁机制",
-                    checked = state.antiQfixPatch,
-                    onCheckedChange = callbacks.onAntiQfixPatchToggle
-                )
+                    SettingSwitchItem(
+                        title = "禁用QQ修复补丁",
+                        subtitle = "拦截并禁用QQ的修复补丁机制",
+                        checked = state.antiQfixPatch,
+                        onCheckedChange = callbacks.onAntiQfixPatchToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "禁用QQ日志上报",
-                    subtitle = "拦截SSO上报并禁用QQ日志",
-                    checked = state.antiReport,
-                    onCheckedChange = callbacks.onAntiReportToggle
-                )
+                    SettingSwitchItem(
+                        title = "禁用QQ日志上报",
+                        subtitle = "拦截SSO上报并禁用QQ日志",
+                        checked = state.antiReport,
+                        onCheckedChange = callbacks.onAntiReportToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "解锁本地会员",
-                    subtitle = "强制本地QQ超级会员/VIP/SVIP，目前可用于开启QQ自带的自动语音转文字、解除表情包收藏500的限制、解除语音发送时长限制、解除每日文件上传限制，其他的自己去测试。会员不会在主页显示。",
-                    checked = state.forceVip,
-                    onCheckedChange = callbacks.onForceVipToggle
-                )
+                    SettingSwitchItem(
+                        title = "解锁本地会员",
+                        subtitle = "强制本地QQ超级会员/VIP/SVIP，目前可用于开启QQ自带的自动语音转文字、解除表情包收藏500的限制、解除语音发送时长限制、解除每日文件上传限制，其他的自己去测试。会员不会在主页显示。",
+                        checked = state.forceVip,
+                        onCheckedChange = callbacks.onForceVipToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "屏蔽QQ秀/AI头像",
-                    subtitle = "屏蔽QQ秀与AI头像相关显示",
-                    checked = state.disableAIAvatar,
-                    onCheckedChange = callbacks.onDisableAIAvatarToggle
-                )
+                    SettingSwitchItem(
+                        title = "屏蔽QQ秀/AI头像",
+                        subtitle = "屏蔽QQ秀与AI头像相关显示",
+                        checked = state.disableAIAvatar,
+                        onCheckedChange = callbacks.onDisableAIAvatarToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "解除风险网页拦截",
-                    subtitle = "点击消息中链接时不再拦截风险网页",
-                    checked = state.removeRiskWebpage,
-                    onCheckedChange = callbacks.onRemoveRiskWebpageToggle
-                )
+                    SettingSwitchItem(
+                        title = "解除风险网页拦截",
+                        subtitle = "点击消息中链接时不再拦截风险网页",
+                        checked = state.removeRiskWebpage,
+                        onCheckedChange = callbacks.onRemoveRiskWebpageToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "解除扫码限制",
-                    subtitle = "解除长按识别或从相册中扫描二维码时的风险检查",
-                    checked = state.removeQrCodeCheck,
-                    onCheckedChange = callbacks.onRemoveQrCodeCheckToggle
-                )
+                    SettingSwitchItem(
+                        title = "解除扫码限制",
+                        subtitle = "解除长按识别或从相册中扫描二维码时的风险检查",
+                        checked = state.removeQrCodeCheck,
+                        onCheckedChange = callbacks.onRemoveQrCodeCheckToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "跳过扫码确认等待时间",
-                    subtitle = "忽略倒计时，扫码确认按钮可直接点击确认登录",
-                    checked = state.skipScanWaitTime,
-                    onCheckedChange = callbacks.onSkipScanWaitTimeToggle
-                )
+                    SettingSwitchItem(
+                        title = "跳过扫码确认等待时间",
+                        subtitle = "忽略倒计时，扫码确认按钮可直接点击确认登录",
+                        checked = state.skipScanWaitTime,
+                        onCheckedChange = callbacks.onSkipScanWaitTimeToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "绕过资料卡封禁",
-                    subtitle = "强制显示被封禁用户的 QQ 资料卡主页，绕过封禁拦截弹窗",
-                    checked = state.bypassProfileBan,
-                    onCheckedChange = callbacks.onBypassProfileBanToggle
-                )
+                    SettingSwitchItem(
+                        title = "绕过资料卡封禁",
+                        subtitle = "强制显示被封禁用户的 QQ 资料卡主页，绕过封禁拦截弹窗",
+                        checked = state.bypassProfileBan,
+                        onCheckedChange = callbacks.onBypassProfileBanToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "去页面内横幅广告",
-                    subtitle = "清理QQ主界面顶部横幅广告等广告数据源",
-                    checked = state.removeAds,
-                    onCheckedChange = callbacks.onRemoveAdsToggle
-                )
+                    SettingSwitchItem(
+                        title = "去页面内横幅广告",
+                        subtitle = "清理QQ主界面顶部横幅广告等广告数据源",
+                        checked = state.removeAds,
+                        onCheckedChange = callbacks.onRemoveAdsToggle
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
 
-                SettingSwitchItem(
-                    title = "QLog日志重定向/拦截",
-                    subtitle = when (state.qlogRedirectMode) {
-                        QLogRedirect.MODE_MUTE -> "纯拦截模式：QQ日志被直接丢弃，不写入本地文件，点击选择模式"
-                        QLogRedirect.MODE_REDIRECT -> "重定向模式：QQ日志写入 QEdge/log/QLog/，点击选择模式"
-                        else -> "未开启拦截，QQ日志正常输出，点击选择模式"
-                    },
-                    checked = state.qlogRedirectMode != QLogRedirect.MODE_OFF,
-                    onCheckedChange = callbacks.onQLogRedirectToggle,
-                    onClick = callbacks.onQLogRedirectModeClick
-                )
+                    SettingSwitchItem(
+                        title = "QLog日志重定向/拦截",
+                        subtitle = when (state.qlogRedirectMode) {
+                            QLogRedirect.MODE_MUTE -> "纯拦截模式：QQ日志被直接丢弃，不写入本地文件，点击选择模式"
+                            QLogRedirect.MODE_REDIRECT -> "重定向模式：QQ日志写入 QEdge/log/QLog/，点击选择模式"
+                            else -> "未开启拦截，QQ日志正常输出，点击选择模式"
+                        },
+                        checked = state.qlogRedirectMode != QLogRedirect.MODE_OFF,
+                        onCheckedChange = callbacks.onQLogRedirectToggle,
+                        onClick = callbacks.onQLogRedirectModeClick
+                    )
 
-                Spacer(modifier = Modifier.height(4.dp))
-
+                    Spacer(modifier = Modifier.height(4.dp))
+                }
             }
         }
         }
+    }
+}
+
+/**
+ * 可折叠内容区：用 expandVertically/shrinkVertically 做高度裁剪动画，
+ * 配合淡入淡出。相比 animateContentSize 只测量一次目标尺寸，
+ * 内容多时不会首帧卡顿，展开时有"自上而下循序展开"的观感。
+ */
+@OptIn(ExperimentalAnimationApi::class)
+@Composable
+private fun CollapsibleContent(
+    expanded: Boolean,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit
+) {
+    AnimatedVisibility(
+        visible = expanded,
+        enter = fadeIn(animationSpec = tween(260)) + expandVertically(
+            animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+            expandFrom = Alignment.Top
+        ),
+        exit = fadeOut(animationSpec = tween(120)) + shrinkVertically(
+            animationSpec = tween(120),
+            shrinkTowards = Alignment.Top
+        ),
+        content = { Column(content = content) }
+    )
+}
+
+/**
+ * 手风琴卡片的可点击标题行：标题 + 副标题 + 右侧展开箭头。
+ * 点击切换卡片的展开/收起状态。
+ */
+@Composable
+private fun CardHeader(title: String, subtitle: String, expanded: Boolean, onClick: () -> Unit) {
+    val colors = QEdgeTheme.colors
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                subtitle,
+                fontSize = 13.sp,
+                color = colors.textSecondary
+            )
+        }
+        // 展开箭头：展开时朝上，收起时朝下
+        Text(
+            text = if (expanded) "˄" else "˅",
+            fontSize = 16.sp,
+            color = colors.textSecondary.copy(alpha = 0.5f),
+            fontWeight = FontWeight.Bold
+        )
     }
 }
 

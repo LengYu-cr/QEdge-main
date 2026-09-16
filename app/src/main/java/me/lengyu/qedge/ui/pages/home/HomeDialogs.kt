@@ -21,7 +21,6 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,11 +38,6 @@ import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.hook.item.QLogRedirect
 import me.lengyu.qedge.ui.core.theme.AccentGreen
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
-import org.json.JSONObject
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.HttpURLConnection
-import java.net.URL
 
 @Composable
 fun HomeCommentInputDialog(
@@ -270,110 +264,6 @@ fun HomeMoodScheduleDialog(
                         fontWeight = FontWeight.Medium,
                         color = if (canConfirm) Color.White else colors.textSecondary
                     )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun HomeUpdateLogDialog(
-    show: Boolean,
-    onDismiss: () -> Unit
-) {
-    if (!show) return
-
-    val colors = QEdgeTheme.colors
-    var logText by remember { mutableStateOf("加载中...") }
-
-    LaunchedEffect(Unit) {
-        Thread {
-            try {
-                val url = URL("https://v.yuafeng.cn/QEdge/update/changelog.php")
-                val connection = url.openConnection() as HttpURLConnection
-                connection.connectTimeout = 5000
-                connection.readTimeout = 5000
-                connection.requestMethod = "GET"
-
-                val reader = BufferedReader(InputStreamReader(connection.inputStream, "UTF-8"))
-                val response = StringBuilder()
-                var line: String?
-                while (reader.readLine().also { line = it } != null) {
-                    response.append(line)
-                }
-                reader.close()
-
-                val json = JSONObject(response.toString())
-                if (json.getInt("code") == 200) {
-                    val data = json.getJSONObject("data")
-                    val changelog = data.getJSONArray("changelog")
-                    val sb = StringBuilder()
-                    for (i in 0 until changelog.length()) {
-                        val entry = changelog.getJSONObject(i)
-                        sb.append("v${entry.getString("version")} (${entry.getString("date")})\n")
-                        val items = entry.getJSONArray("items")
-                        for (j in 0 until items.length()) {
-                            sb.append("• ${items.getString(j)}\n")
-                        }
-                        if (i < changelog.length() - 1) {
-                            sb.append("\n")
-                        }
-                    }
-                    logText = sb.toString()
-                } else {
-                    logText = "获取失败"
-                }
-            } catch (e: Exception) {
-                logText = "获取失败: ${e.message}"
-            }
-        }.start()
-    }
-
-    Dialog(onDismissRequest = onDismiss) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth(0.88f)
-                .clip(RoundedCornerShape(20.dp))
-                .background(colors.cardBackground)
-                .padding(20.dp)
-        ) {
-            Text(
-                "更新日志",
-                fontSize = 20.sp,
-                fontWeight = FontWeight.Bold,
-                color = colors.textPrimary
-            )
-            Spacer(modifier = Modifier.height(12.dp))
-            androidx.compose.foundation.layout.Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(300.dp)
-                    .verticalScroll(rememberScrollState())
-            ) {
-                Text(
-                    logText,
-                    fontSize = 14.sp,
-                    color = colors.textSecondary,
-                    lineHeight = 20.sp
-                )
-            }
-            Spacer(modifier = Modifier.height(20.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                androidx.compose.foundation.layout.Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = null,
-                            onClick = onDismiss
-                        )
-                        .padding(horizontal = 20.dp, vertical = 10.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("关闭", fontSize = 14.sp, color = colors.textPrimary)
                 }
             }
         }

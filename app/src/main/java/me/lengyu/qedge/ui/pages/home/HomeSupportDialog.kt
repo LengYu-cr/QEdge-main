@@ -44,30 +44,34 @@ internal fun HomeSupportDialog(onDismiss: () -> Unit) {
 
             SupportItem(
                 name = "QQ",
-                version = "9.1.78-9.3.30",
+                version = "9.1.78-9.3.55",
                 features = listOf("Java脚本", "文件管理器", "冷雨Java嵌入版", "好玩的模块功能")
             )
             SupportDivider()
             SupportItem(
                 name = "TIM",
-                version = "不知道-4.1.0",
-                features = listOf("Java脚本", "文件管理器", "冷雨Java嵌入版", "不好玩的模块功能")
+                version = "不知道-不知道（大概最新版吧）",
+                features = listOf("Java脚本", "文件管理器", "冷雨Java嵌入版", "好玩的模块功能")
             )
             SupportDivider()
             SupportItem(
                 name = "KK键盘",
-                version = "不知道-4.0.9",
+                version = "全版本",
                 features = listOf(
                     "本地会员全版本通杀",
                     "本地去广告全版本通杀",
-                    "阻止闪退全版本通杀"
+                    "阻止闪退全版本通杀",
+                    "透明头像上传"
                 )
             )
             SupportDivider()
             SupportItem(
                 name = "酷狗大字版",
                 version = "全版本",
-                features = listOf("本地开屏广告全版本通杀（免root）")
+                features = listOf(
+                    "本地开屏广告全版本通杀（免root）",
+                    "透明头像上传"
+                )
             )
             SupportDivider()
             SupportItem(
@@ -81,6 +85,25 @@ internal fun HomeSupportDialog(onDismiss: () -> Unit) {
                 version = "全版本",
                 features = listOf("本地会员全版本通杀（需要root）")
             )
+            SupportDivider()
+            SupportItem(
+                name = "无痛单词",
+                version = "全版本",
+                features = listOf("本地会员全版本通杀")
+            )
+            SupportDivider()
+            SupportItem(
+                name = "设备信息X",
+                version = "全版本",
+                features = listOf("本地会员全版本通杀(需要root)")
+            )
+            SupportDivider()
+            SupportItem(
+                name = "一个木函",
+                version = "全版本",
+                features = listOf("本地会员全版本通杀")
+            )
+
 
             Spacer(modifier = Modifier.height(16.dp))
             Row(
