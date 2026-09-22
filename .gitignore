@@ -1,0 +1,60 @@
+# ============================================================
+# QEdge 项目 .gitignore
+# 保留：app/src/main（模块源码） + QEdge后台/QEdge/（网页源代码）
+# 忽略：构建产物、临时文件、APK、签名、IDE配置、参考项目、备份文件
+# ============================================================
+
+# ---------- Android Gradle 构建系统 ----------
+.gradle/
+build/
+**/build/
+captures/
+.externalNativeBuild/
+.cxx/
+local.properties
+app/src.zip
+*.hprof
+
+# ---------- 签名密钥（任何位置都不入库）----------
+*.jks
+*.keystore
+*.p12
+*.pem
+
+# ---------- 二进制依赖（libs/*.jar/*.aar，从 Maven 拉取即可不入库）----------
+libs/**/*.jar
+libs/**/*.aar
+!libs/.gitkeep
+
+# ---------- Android APK / Dex / 反编译工作区 ----------
+*.apk
+*.aab
+*.ap_
+*.dex
+
+# ---------- IDE / 编辑器工作区（不共享个人配置）----------
+.idea/
+.vscode/
+.trae/
+.trae-cn/
+*.iml
+misc.xml
+deploymentTargetDropDown.xml
+render.experimental.xml
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---------- 备份 / 临时 / 日志 ----------
+*.bak
+*.tmp
+*.log
+*.zip
+build_info.txt
+build_output.txt
+build.log
+# ---------- 参考项目（不是 QEdge 自身源码）----------
+QFun-main/
+QStory/
+# ---------- PHP 不入库----------
+QEdge后台/

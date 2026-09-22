@@ -1,0 +1,458 @@
+package me.lengyu.qedge.ui.pages.file
+
+import android.media.MediaPlayer
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ripple
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
+import me.lengyu.qedge.R
+import me.lengyu.qedge.ui.components.atoms.QEdgeCard
+import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.LogUtils
+import me.lengyu.qedge.utils.qq.SilkPlayerProxy
+import com.tencent.mobileqq.qqaudio.audioplayer.SilkPlayer
+import java.io.File
+import java.io.FileInputStream
+import java.util.concurrent.TimeUnit
+
+@Composable
+fun AudioPlayerDialog(
+    filePath: String,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colors = QEdgeTheme.colors
+    var isPlaying by remember { mutableStateOf(false) }
+    var currentPosition by remember { mutableStateOf(0) }
+    var duration by remember { mutableStateOf(0) }
+    var fileName by remember { mutableStateOf("") }
+    var isPrepared by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+    var dragging by remember { mutableStateOf(false) }
+    var sliderValue by remember { mutableStateOf(0f) }
+    val isSilk = remember(filePath) { isSilkAudio(filePath) }
+    var silkPlayer by remember { mutableStateOf<SilkPlayer?>(null) }
+    val mediaPlayer = remember { MediaPlayer() }
+
+    LaunchedEffect(filePath) {
+        val file = File(filePath)
+        fileName = file.name
+        if (isSilk) return@LaunchedEffect
+        try {
+            mediaPlayer.reset()
+            mediaPlayer.setDataSource(filePath)
+            mediaPlayer.prepareAsync()
+            mediaPlayer.setOnPreparedListener {
+                duration = it.duration
+                isPrepared = true
+            }
+            mediaPlayer.setOnCompletionListener {
+                isPlaying = false
+                currentPosition = 0
+            }
+            mediaPlayer.setOnErrorListener { _, _, _ ->
+                errorMessage = "播放失败"
+                false
+            }
+        } catch (e: Exception) {
+            LogUtils.e(e)
+            errorMessage = "加载失败: ${e.message}"
+        }
+    }
+
+    DisposableEffect(Unit) {
+        val handler = android.os.Handler(android.os.Looper.getMainLooper())
+        val updateRunnable = object : Runnable {
+            override fun run() {
+                if (isSilk) {
+                    // silk 播放进度 + 完成检测
+                    val sp = silkPlayer
+                    if (sp != null && isPrepared) {
+                        currentPosition = SilkPlayerProxy.currentPosition(sp).toInt()
+                        if (!SilkPlayerProxy.isPlaying(sp)) {
+                            if (duration > 0) currentPosition = duration
+                            isPlaying = false
+                        }
+                    }
+                } else if (isPlaying && isPrepared) {
+                    try {
+                        currentPosition = mediaPlayer.currentPosition
+                    } catch (e: Exception) {
+                        LogUtils.e(e)
+                    }
+                }
+                handler.postDelayed(this, 500)
+            }
+        }
+        handler.postDelayed(updateRunnable, 500)
+
+        onDispose {
+            handler.removeCallbacks(updateRunnable)
+            silkPlayer?.let { SilkPlayerProxy.stop(it) }
+            silkPlayer = null
+            try {
+                mediaPlayer.release()
+            } catch (e: Exception) {
+                LogUtils.e(e)
+            }
+        }
+    }
+
+    fun togglePlay() {
+        if (isSilk) {
+            val sp = silkPlayer
+            if (isPlaying) {
+                sp?.let { SilkPlayerProxy.pause(it) }
+                isPlaying = false
+            } else {
+                if (sp != null && isPrepared) {
+                    // 已加载过，从暂停位置继续
+                    if (SilkPlayerProxy.start(sp)) isPlaying = true
+                } else {
+                    val np = SilkPlayerProxy.createPlayer()
+                    if (np == null) {
+                        errorMessage = "无法创建播放器"
+                        return
+                    }
+                    val ok = SilkPlayerProxy.setDataSource(np, filePath) &&
+                        SilkPlayerProxy.prepare(np) &&
+                        SilkPlayerProxy.start(np)
+                    if (ok) {
+                        silkPlayer = np
+                        duration = SilkPlayerProxy.duration(np)
+                        isPrepared = true
+                        isPlaying = true
+                    } else {
+                        SilkPlayerProxy.stop(np)
+                        errorMessage = "播放失败"
+                    }
+                }
+            }
+            return
+        }
+        if (!isPrepared) return
+        try {
+            if (isPlaying) {
+                mediaPlayer.pause()
+            } else {
+                mediaPlayer.start()
+            }
+            isPlaying = !isPlaying
+        } catch (e: Exception) {
+            LogUtils.e(e)
+        }
+    }
+
+    fun seekTo(position: Int) {
+        if (isSilk) {
+            silkPlayer?.let { SilkPlayerProxy.seekTo(it, position) }
+            currentPosition = position
+            return
+        }
+        if (!isPrepared) return
+        try {
+            mediaPlayer.seekTo(position)
+            currentPosition = position
+        } catch (e: Exception) {
+            LogUtils.e(e)
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            dismissOnBackPress = true,
+            dismissOnClickOutside = true
+        )
+    ) {
+        Box(
+            modifier = modifier
+                .fillMaxSize()
+                .background(colors.background)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .windowInsetsPadding(WindowInsets.statusBars)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(RoundedCornerShape(16.dp))
+                            .background(colors.cardBackground)
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(color = colors.ripple),
+                                onClick = onDismiss
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_chevron_right),
+                            contentDescription = "返回",
+                            modifier = Modifier
+                                .size(24.dp)
+                                .rotate(180f),
+                            tint = colors.textPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(12.dp))
+                    Text(
+                        text = "音乐播放",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    QEdgeCard(
+                        modifier = Modifier
+                            .size(200.dp)
+                    ) {
+                        Box(
+                            modifier = Modifier.fillMaxSize(),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                painter = painterResource(R.drawable.music),
+                                contentDescription = "音乐",
+                                modifier = Modifier.size(100.dp),
+                                tint = colors.accentBlue
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+
+                    Text(
+                        text = fileName,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        maxLines = 2
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    Text(
+                        text = "音频文件",
+                        fontSize = 13.sp,
+                        color = colors.textSecondary
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(32.dp))
+
+                QEdgeCard(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 24.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 10.dp)
+                    ) {
+                        val maxDuration = if (duration > 0) duration.toFloat() else 1f
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = formatTime(currentPosition),
+                                fontSize = 11.sp,
+                                color = colors.textSecondary
+                            )
+                            Slider(
+                                value = if (dragging) sliderValue else currentPosition.toFloat().coerceIn(0f, maxDuration),
+                                onValueChange = {
+                                    sliderValue = it
+                                    dragging = true
+                                },
+                                onValueChangeFinished = {
+                                    dragging = false
+                                    seekTo(sliderValue.toInt())
+                                },
+                                valueRange = 0f..maxDuration,
+                                enabled = isPrepared && duration > 0,
+                                colors = SliderDefaults.colors(
+                                    thumbColor = colors.accentBlue,
+                                    activeTrackColor = colors.accentBlue,
+                                    inactiveTrackColor = colors.textSecondary.copy(alpha = 0.2f)
+                                ),
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(26.dp)
+                                    .padding(horizontal = 6.dp)
+                            )
+                            Text(
+                                text = formatTime(duration),
+                                fontSize = 11.sp,
+                                color = colors.textSecondary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    PlayControlButton(
+                        iconRes = R.drawable.last,
+                        onClick = { seekTo((currentPosition - 10000).coerceAtLeast(0)) }
+                    )
+
+                    Spacer(modifier = Modifier.width(32.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .size(60.dp)
+                            .clip(CircleShape)
+                            .background(colors.accentBlue.copy(alpha = 0.14f))
+                            .clickable(
+                                interactionSource = remember { MutableInteractionSource() },
+                                indication = ripple(color = colors.accentBlue.copy(alpha = 0.2f)),
+                                onClick = { togglePlay() }
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(if (isPlaying) R.drawable.playing else R.drawable.paused),
+                            contentDescription = if (isPlaying) "暂停" else "播放",
+                            modifier = Modifier.size(32.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(32.dp))
+
+                    PlayControlButton(
+                        iconRes = R.drawable.next,
+                        onClick = { seekTo((currentPosition + 10000).coerceAtMost(duration)) }
+                    )
+                }
+
+                if (errorMessage.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        text = errorMessage,
+                        fontSize = 13.sp,
+                        color = colors.accentRed,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.weight(1f))
+            }
+        }
+    }
+}
+
+@Composable
+private fun PlayControlButton(
+    iconRes: Int,
+    onClick: () -> Unit
+) {
+    val colors = QEdgeTheme.colors
+    Box(
+        modifier = Modifier
+            .size(52.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .background(colors.cardBackground)
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = ripple(color = colors.ripple),
+                onClick = onClick
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            painter = painterResource(iconRes),
+            contentDescription = null,
+            modifier = Modifier.size(24.dp),
+            tint = colors.textPrimary
+        )
+    }
+}
+
+private fun formatTime(ms: Int): String {
+    if (ms <= 0) return "0:00"
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(ms.toLong())
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(ms.toLong()) % 60
+    return String.format("%d:%02d", minutes, seconds)
+}
+
+/** 判断是否为 silk 音频：文件头 `#!SILK_V3`（兼容 QQ 带 `0x02` 前缀的 10 字节头） */
+private fun isSilkAudio(path: String): Boolean {
+    return try {
+        FileInputStream(path).use { input ->
+            // QQ 语音文件头有两种：
+            // 1. 标准格式：    "#!SILK_V3"          (9 字节)
+            // 2. QQ 实际格式： 0x02 + "#!SILK_V3"   (10 字节, SilkPlayer 内部 skip(10))
+            val header = ByteArray(10)
+            val n = input.read(header)
+            when {
+                n >= 9 && String(header, 0, 9, Charsets.US_ASCII) == "#!SILK_V3" -> true
+                n >= 10 && header[0] == 0x02.toByte() &&
+                    String(header, 1, 9, Charsets.US_ASCII) == "#!SILK_V3" -> true
+                else -> false
+            }
+        }
+    } catch (e: Throwable) {
+        path.endsWith(".silk", ignoreCase = true)
+    }
+}

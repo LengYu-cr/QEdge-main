@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">QEdge</string>
+    <string name="plugin_name">JavaPlugin</string>
+    <string name="xposed_description">基于XPosed的多功能模块，作用于QQ,TIM,KK键盘,傲软抠图,酷狗,无痛单词,一个木函,设备信息X等应用</string>
+</resources>
