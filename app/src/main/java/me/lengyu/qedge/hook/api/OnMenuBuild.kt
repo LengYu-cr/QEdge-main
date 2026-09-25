@@ -106,7 +106,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
                         val label = (param.thisObject as Any).getObjectByTypeOrNull<String>()
                             ?: return@hookReplace param.invokeOriginal()
                         if (!label.startsWith(PREFIX)) return@hookReplace param.invokeOriginal()
-                        return@hookReplace R.drawable.ic_launcher
+                        return@hookReplace R.mipmap.ic_launcher
                     }
                     // LogUtils.d("OnMenuBuild", "[TIM] hookIcon 成功: ${m.name}()I")
                 } catch (t: Throwable) {
@@ -290,7 +290,7 @@ object OnMenuBuild : BaseApiHookItem<OnMenuBuild.MenuClickListener>(), DexKitTas
         iconSize: Int
     ): android.widget.ImageView {
         return android.widget.ImageView(context).apply {
-            setImageResource(R.drawable.ic_launcher)
+            setImageResource(R.mipmap.ic_launcher)
             scaleType = android.widget.ImageView.ScaleType.FIT_CENTER
             layoutParams = android.widget.LinearLayout.LayoutParams(iconSize, iconSize)
         }

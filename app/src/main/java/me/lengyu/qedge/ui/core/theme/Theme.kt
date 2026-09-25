@@ -11,6 +11,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import me.lengyu.qedge.utils.HostInfo
+import me.lengyu.qedge.utils.ModuleConfig
 
 private val LightColorScheme = lightColorScheme(
     primary = AccentBlue, onPrimary = Color.White,
@@ -77,8 +78,27 @@ val ForcedDarkColors = QEdgeColors(
     isDark = true
 )
 
+/** 背景图模式：开关打开且已选图（与 HomeScreen 的判定保持一致） */
+fun isBgImageActive(): Boolean =
+    ModuleConfig.getBoolean("bg_image_enabled", false) &&
+        ModuleConfig.getString("bg_image_uri", "").isNotEmpty()
+
+/**
+ * 模块主题解析，与模块首页保持一致：
+ * theme = -1 跟随系统/宿主夜间模式，0 强制亮色，1 强制暗色；背景图模式下固定暗色玻璃。
+ *
+ * 宿主进程内的弹窗（脚本菜单、媒体面板等）必须走这里，不能直接用 [HostInfo.isDarkTheme]，
+ * 否则模块设为暗色而 QQ 处于亮色时会渲染成亮色背景。
+ */
+fun resolveDarkTheme(): Boolean = when {
+    isBgImageActive() -> true
+    ModuleConfig.getInt("theme", -1) == 1 -> true
+    ModuleConfig.getInt("theme", -1) == 0 -> false
+    else -> HostInfo.isDarkTheme()
+}
+
 @Composable
-fun QEdgeTheme(darkTheme: Boolean = HostInfo.isDarkTheme(), content: @Composable () -> Unit) {
+fun QEdgeTheme(darkTheme: Boolean = resolveDarkTheme(), content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
 
     @Composable

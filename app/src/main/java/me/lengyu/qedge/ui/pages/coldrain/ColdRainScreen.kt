@@ -48,6 +48,7 @@ import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.atoms.QEdgeSwitch
 import me.lengyu.qedge.ui.core.theme.AccentBlue
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.ui.core.theme.isBgImageActive
 import me.lengyu.qedge.ui.widget.glass.GlassBackdropHost
 
 @Composable
@@ -80,10 +81,14 @@ fun ColdRainScreen(
     var showWelcomeQuitDialog by remember { mutableStateOf(false) }
     var showHourlyCustomDialog by remember { mutableStateOf(false) }
 
+    // 自定义背景图由页面容器画在底层，页面自己再铺一层不透明主题底色会把图整块盖住；
+    // 无背景图时保持原来的主题底色，行为不变
+    val pageBackground = if (isBgImageActive()) Modifier else Modifier.background(colors.background)
+
     Column(
         modifier = modifier
             .fillMaxSize()
-            .background(colors.background)
+            .then(pageBackground)
             .windowInsetsPadding(WindowInsets.statusBars)
     ) {
         Column(

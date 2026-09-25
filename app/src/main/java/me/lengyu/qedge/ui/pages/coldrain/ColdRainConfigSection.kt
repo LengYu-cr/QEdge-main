@@ -79,7 +79,7 @@ fun ColdRainConfigSection(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        painterResource(R.drawable.ic_launcher),
+                        painterResource(R.mipmap.ic_launcher),
                         "冷雨Java",
                         Modifier.size(28.dp),
                         Color.White

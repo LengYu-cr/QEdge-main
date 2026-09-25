@@ -170,7 +170,7 @@ object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
             when {
                 params[i] == Int::class.java -> {
                     if (intCount == 1) {
-                        args.add(R.drawable.ic_launcher)
+                        args.add(R.mipmap.ic_launcher)
                         intCount++
                     } else {
                         args.add(0)

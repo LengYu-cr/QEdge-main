@@ -111,7 +111,7 @@ private fun WelcomeContent(
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_launcher),
+                            painter = painterResource(R.mipmap.ic_launcher),
                             contentDescription = null,
                             tint = Color.Unspecified,
                             modifier = Modifier.size(48.dp)

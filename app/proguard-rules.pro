@@ -47,20 +47,12 @@
 -keepclassmembers public class * extends com.google.protobuf.MessageLite {*;}
 -keepclassmembers public class * extends com.google.protobuf.MessageOrBuilder {*;}
 
-# DexKit - 保持不变
--dontwarn com.swiftchains.**
--keep class com.swiftchains.** { *; }
+# DexKit 的 keep 规则由 AAR 自带的 proguard.txt 提供，无需在此重复
 
 # 液态玻璃库 - 内部大量反射与 AGSL 运行时着色器，需全量保留
+# （me.lengyu.qedge.** 已在上方统一 keep，glass 子包无需单独声明）
 -dontwarn com.liquidglass.**
 -keep class com.liquidglass.java.miba.** { *; }
--keep class me.lengyu.qedge.ui.widget.glass.** { *; }
-
-# ByteBuddy - 保持不变
--keep class net.bytebuddy.** { *; }
-
-# KavaRef references this reflection type, which is absent from Android SDK stubs.
--dontwarn java.lang.reflect.AnnotatedType
 
 # =====================
 # 通用保持规则

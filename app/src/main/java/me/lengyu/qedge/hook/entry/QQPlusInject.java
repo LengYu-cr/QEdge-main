@@ -77,7 +77,7 @@ public class QQPlusInject extends BaseApiHookItem {
                             Object originListener = param.args[2];
                             
                             Object qrItem = XposedHelpers.newInstance(MenuItemCls, 
-                                new Object[]{Integer.valueOf(R.string.app_name), "QEdge", "QEdge", Integer.valueOf(R.drawable.ic_launcher)});
+                                new Object[]{Integer.valueOf(R.string.app_name), "QEdge", "QEdge", Integer.valueOf(R.mipmap.ic_launcher)});
                             menuList.add(0, qrItem);
                             
                             Object newListener = Proxy.newProxyInstance(

@@ -104,6 +104,21 @@ internal fun HomeScaffold(
 
     val toggleDrawer: () -> Unit = { drawerOpen = !drawerOpen }
 
+    val scrimInteraction = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+
+    // 遮罩层的点击关闭：只在抽屉打开时挂 clickable。
+    // Compose 命中测试不看 enabled，关闭时若仍挂着 clickable，
+    // 这个全屏节点会独占命中路径，把内容区（汉堡按钮等）的点击全部吞掉。
+    val scrimClickModifier = if (drawerOpen) {
+        Modifier.clickable(
+            interactionSource = scrimInteraction,
+            indication = null,
+            onClick = { drawerOpen = false }
+        )
+    } else {
+        Modifier
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -128,18 +143,13 @@ internal fun HomeScaffold(
         }
 
         // ========== 遮罩层 ==========
-        // 常驻 + 图层 alpha：淡入淡出不需要重组，关闭时不可点击、不拦截触摸
+        // 常驻 + 图层 alpha：淡入淡出不需要重组；关闭时不挂 clickable，避免拦截触摸
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer { alpha = scrimAlpha }
                 .background(Color.Black.copy(alpha = 0.36f))
-                .clickable(
-                    enabled = drawerOpen,
-                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                    indication = null,
-                    onClick = { drawerOpen = false }
-                )
+                .then(scrimClickModifier)
         )
 
         // ========== 侧滑抽屉 ==========

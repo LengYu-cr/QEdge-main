@@ -215,11 +215,11 @@ private fun QEdgeGlassCard(
         Box(
             modifier = modifier
                 .shadow(
-                    elevation = 14.dp,
+                    elevation = 11.dp,
                     shape = shape,
                     clip = false,
-                    ambientColor = Color.Black.copy(alpha = if (dark) 0.55f else 0.22f),
-                    spotColor = Color.Black.copy(alpha = if (dark) 0.55f else 0.22f)
+                    ambientColor = Color.Black.copy(alpha = if (dark) 0.42f else 0.16f),
+                    spotColor = Color.Black.copy(alpha = if (dark) 0.42f else 0.16f)
                 )
                 .graphicsLayer {
                     scaleX = pressScale

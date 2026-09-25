@@ -26,9 +26,6 @@ android {
         versionName = "0.2.7"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        vectorDrawables {
-            useSupportLibrary = true
-        }
         ndk {
             // 仅保留 64 位 arm64，去掉 v7a 减小体积；32 位设备在 XposedEntry 处拦截提示
             abiFilters += listOf("arm64-v8a")
@@ -83,6 +80,11 @@ android {
             // 去除依赖 jar 打进来的无用资源：Rhino 调试/工具(test.js 等)、protobuf 源描述文本
             excludes += "org/mozilla/javascript/tools/**"
             excludes += "google/protobuf/**"
+            // Rhino 只内置了英文与法语两套消息，模块面向中文用户，法语文案用不到
+            excludes += "org/mozilla/javascript/resources/Messages_fr.properties"
+            // 依赖 jar 的版本标记与 LICENSE 副本，与安装包运行无关
+            excludes += "META-INF/*.version"
+            excludes += "META-INF/androidx/**/LICENSE.txt"
             // kotlinx-coroutines 自带的协程调试探针元数据，release 用不到，纯冗余
             excludes += "DebugProbesKt.bin"
         }
