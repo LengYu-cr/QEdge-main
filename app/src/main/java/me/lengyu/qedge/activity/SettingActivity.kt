@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -36,6 +37,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -49,6 +51,7 @@ import me.lengyu.qedge.ui.pages.coldrain.ColdRainConfig
 import me.lengyu.qedge.ui.core.compatibility.QEdgeCenterDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.services.OnlinePluginService
+import me.lengyu.qedge.ui.widget.glass.GlassBackdropHost
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.HostInfo
@@ -75,6 +78,19 @@ class SettingActivity : ComponentActivity() {
         @Suppress("DEPRECATION")
         window.setSoftInputMode(android.view.WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE)
         setupTheme()
+        // 自定义背景图生效：窗口底色提前切黑，别让主题底色在首帧前闪出来；
+        // 同时后台预热解码，尽量赶在第一帧组合前把图备好
+        val bgImageUri = ModuleConfig.getString("bg_image_uri", "")
+        if (ModuleConfig.getBoolean("bg_image_enabled", false) && bgImageUri.isNotEmpty()) {
+            window.setBackgroundDrawable(
+                android.graphics.drawable.ColorDrawable(
+                    me.lengyu.qedge.ui.core.theme.DarkBackground.toArgb()
+                )
+            )
+            Thread {
+                me.lengyu.qedge.ui.pages.BgImageCache.load(applicationContext, bgImageUri)
+            }.start()
+        }
         try {
             mainHookClass = Class.forName("me.lengyu.qedge.hook.MainHook")
         } catch (e: ClassNotFoundException) {
@@ -88,6 +104,16 @@ class SettingActivity : ComponentActivity() {
         }
         
         setupUI()
+        attachGlassNav()
+    }
+
+    /**
+     * 把液态玻璃导航条挂到 Activity 的 content 上。
+     * 必须在 setContent 之后调用：此时 content 的第一个子 View 才是 Compose 内容。
+     */
+    private fun attachGlassNav() {
+        val contentRoot = findViewById<android.view.ViewGroup>(android.R.id.content)
+        GlassBackdropHost.attach(this, contentRoot, isDarkTheme)
     }
 
     private fun setupTheme() {
@@ -170,7 +196,7 @@ class SettingActivity : ComponentActivity() {
         callMainHookMethod("createPlugin", type, name, desc, author, version)
     }
 
-    private fun downloadPlugin(plugin: me.lengyu.qedge.ui.pages.OnlinePluginItem) {
+    private fun downloadPlugin(plugin: me.lengyu.qedge.ui.pages.home.OnlinePluginItem) {
         Thread {
             try {
                 OnlinePluginService.downloadPlugin(
@@ -341,6 +367,11 @@ class SettingActivity : ComponentActivity() {
             val initialPage = intent.getStringExtra("page") ?: getSavedPage()
             var currentPage by remember { mutableStateOf(initialPage) }
 
+            // 液态玻璃导航条只属于模块首页，其它页面隐藏
+            LaunchedEffect(currentPage) {
+                GlassBackdropHost.get()?.setVisible(currentPage == "plugin")
+            }
+
             fun refreshPlugins() {
                 list.clear()
                 list.addAll(getPluginList())
@@ -457,6 +488,7 @@ class SettingActivity : ComponentActivity() {
 
     override fun onDestroy() {
         processDataForCurrent("save")
+        GlassBackdropHost.detach()
         super.onDestroy()
     }
 }

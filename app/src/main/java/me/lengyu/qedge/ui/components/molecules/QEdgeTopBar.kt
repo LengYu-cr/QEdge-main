@@ -2,9 +2,6 @@ package me.lengyu.qedge.ui.components.molecules
 
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,10 +12,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
-import androidx.compose.material3.ripple
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -70,6 +65,7 @@ fun QEdgeTopBar(
         if (showBackButton) {
             QEdgeCard(
                 modifier = Modifier.size(40.dp),
+                glass = true,
                 animateContentSize = false,
                 onClick = onBackClick
             ) {
@@ -97,126 +93,102 @@ fun QEdgeTopBar(
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (showCreateButton) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(colors.accentGreen)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(color = colors.ripple),
-                            onClick = onCreateClick
-                        ),
-                    contentAlignment = Alignment.Center
+                QEdgeCard(
+                    modifier = Modifier.size(40.dp),
+                    glass = true,
+                    animateContentSize = false,
+                    onClick = onCreateClick
                 ) {
-                    Text("+", fontSize = 22.sp, color = androidx.compose.ui.graphics.Color.White)
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Text("+", fontSize = 22.sp, color = colors.accentGreen)
+                    }
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }
 
             if (showDocButton) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(colors.cardBackground)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(color = colors.ripple),
-                            onClick = onDocClick
-                        ),
-                    contentAlignment = Alignment.Center
+                QEdgeCard(
+                    modifier = Modifier.size(40.dp),
+                    glass = true,
+                    animateContentSize = false,
+                    onClick = onDocClick
                 ) {
-                    Text("📖", fontSize = 18.sp)
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Text("📖", fontSize = 18.sp)
+                    }
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }
 
             if (showAvatarButton) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(colors.cardBackground)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(color = colors.ripple),
-                            onClick = onAvatarClick
-                        ),
-                    contentAlignment = Alignment.Center
+                QEdgeCard(
+                    modifier = Modifier.size(40.dp),
+                    glass = true,
+                    animateContentSize = false,
+                    onClick = onAvatarClick
                 ) {
-                    if (avatarBitmap != null) {
-                        androidx.compose.foundation.Image(
-                            bitmap = avatarBitmap.asImageBitmap(),
-                            contentDescription = "用户头像",
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clip(RoundedCornerShape(20.dp))
-                        )
-                    } else {
-                        Text("👤", fontSize = 18.sp)
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        if (avatarBitmap != null) {
+                            androidx.compose.foundation.Image(
+                                bitmap = avatarBitmap.asImageBitmap(),
+                                contentDescription = "用户头像",
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(20.dp))
+                            )
+                        } else {
+                            Text("👤", fontSize = 18.sp)
+                        }
                     }
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }
 
             if (showUpdateLogButton) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(colors.cardBackground)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(color = colors.ripple),
-                            onClick = onUpdateLogClick
-                        ),
-                    contentAlignment = Alignment.Center
+                QEdgeCard(
+                    modifier = Modifier.size(40.dp),
+                    glass = true,
+                    animateContentSize = false,
+                    onClick = onUpdateLogClick
                 ) {
-                    Text("📝", fontSize = 18.sp)
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Text("📝", fontSize = 18.sp)
+                    }
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }
 
             if (showSponsorButton) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(colors.cardBackground)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(color = colors.ripple),
-                            onClick = onSponsorClick
-                        ),
-                    contentAlignment = Alignment.Center
+                QEdgeCard(
+                    modifier = Modifier.size(40.dp),
+                    glass = true,
+                    animateContentSize = false,
+                    onClick = onSponsorClick
                 ) {
-                    Text("☕", fontSize = 18.sp)
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Text("☕", fontSize = 18.sp)
+                    }
                 }
                 Spacer(modifier = Modifier.width(10.dp))
             }
 
             if (showThemeButton) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(colors.cardBackground)
-                        .clickable(
-                            interactionSource = remember { MutableInteractionSource() },
-                            indication = ripple(color = colors.ripple),
-                            onClick = onThemeToggle
-                        ),
-                    contentAlignment = Alignment.Center
+                QEdgeCard(
+                    modifier = Modifier.size(40.dp),
+                    glass = true,
+                    animateContentSize = false,
+                    onClick = onThemeToggle
                 ) {
-                    Icon(
-                        painterResource(if (isDarkTheme) R.drawable.ic_sun else R.drawable.ic_moon),
-                        "Toggle theme",
-                        Modifier
-                            .size(24.dp)
-                            .rotate(rotation),
-                        colors.textPrimary
-                    )
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        Icon(
+                            painterResource(if (isDarkTheme) R.drawable.ic_sun else R.drawable.ic_moon),
+                            "Toggle theme",
+                            Modifier
+                                .size(24.dp)
+                                .rotate(rotation),
+                            colors.textPrimary
+                        )
+                    }
                 }
             }
         }
@@ -226,23 +198,19 @@ fun QEdgeTopBar(
 @Composable
 fun TopBarIconButton(iconRes: Int, contentDescription: String, onClick: () -> Unit) {
     val colors = QEdgeTheme.colors
-    Box(
-        modifier = Modifier
-            .size(44.dp)
-            .clip(RoundedCornerShape(18.dp))
-            .background(colors.cardBackground)
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = ripple(color = colors.ripple),
-                onClick = onClick
-            ),
-        contentAlignment = Alignment.Center
+    QEdgeCard(
+        modifier = Modifier.size(44.dp),
+        glass = true,
+        animateContentSize = false,
+        onClick = onClick
     ) {
-        Icon(
-            painterResource(iconRes),
-            contentDescription,
-            Modifier.size(24.dp),
-            colors.textPrimary
-        )
+        Box(modifier = Modifier.size(44.dp), contentAlignment = Alignment.Center) {
+            Icon(
+                painterResource(iconRes),
+                contentDescription,
+                Modifier.size(24.dp),
+                colors.textPrimary
+            )
+        }
     }
 }

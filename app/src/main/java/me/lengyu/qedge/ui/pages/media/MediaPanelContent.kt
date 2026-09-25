@@ -520,11 +520,13 @@ private fun EmojiPanel(
                             else "本地图库为空，可在网络图库详情中下载保存"
                         )
                     } else {
+                        // chunked 结果缓存，避免每次重组重新分块并生成新列表
+                        val galleryRows = remember(galleryFiles) { galleryFiles.chunked(5) }
                         LazyColumn(
                             Modifier.weight(1f).padding(horizontal = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(galleryFiles.chunked(5)) { row ->
+                            items(galleryRows) { row ->
                                 MediaThumbRow(
                                     row.map { MediaCell(it.absolutePath, it.absolutePath, null) },
                                     onTap = { cell ->
@@ -602,11 +604,12 @@ private fun EmojiPanel(
                 if (collectionItems.isEmpty()) {
                     EmptyHint("该合集暂无资源")
                 } else {
+                    val itemRows = remember(collectionItems) { collectionItems.chunked(5) }
                     LazyColumn(
                         Modifier.weight(1f).padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        items(collectionItems.chunked(5)) { row ->
+                        items(itemRows) { row ->
                             MediaThumbRow(
                                 row.map { MediaCell(it.url, it.url, null) },
                                 onTap = { cell ->
@@ -651,6 +654,7 @@ private fun EmojiPanel(
         }
         else -> {
             // 主界面：本地图库 + 热门合集
+            val collectionRows = remember(collections) { collections.chunked(5) }
             LazyColumn(
                 Modifier.fillMaxSize().padding(horizontal = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -687,7 +691,7 @@ private fun EmojiPanel(
                 if (collections.isEmpty()) {
                     item { EmptyHint("暂无服务器合集") }
                 } else {
-                    items(collections.chunked(5)) { row ->
+                    items(collectionRows) { row ->
                         MediaThumbRow(
                             row.map {
                                 MediaCell(
@@ -1015,13 +1019,14 @@ private fun SearchPage(
             if (viewItems.isEmpty()) {
                 EmptyHint("该合集暂无资源")
             } else if (type == "img") {
+                val viewRows = remember(viewItems) { viewItems.chunked(5) }
                 LazyColumn(
                     Modifier
                         .weight(1f)
                         .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    items(viewItems.chunked(5)) { row ->
+                    items(viewRows) { row ->
                         MediaThumbRow(
                             row.map { MediaCell(it.url, it.url, null) },
                             onTap = { cell -> onOpenDetail(cell.key) },

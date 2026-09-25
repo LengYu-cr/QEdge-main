@@ -53,7 +53,19 @@ object QLogRedirect : BaseSwitchHookItem() {
     private val queue: BlockingQueue<String> = LinkedBlockingQueue(8192)
     private var writerThread: Thread? = null
 
-    private fun getMode(): String = ModuleConfig.getString(KEY_MODE, MODE_OFF)
+    /** 模式缓存：每条 QQ 日志都进配置锁是类锁争用的放大器，缓存后热路径零配置读 */
+    @Volatile
+    private var cachedMode: String? = null
+
+    private fun getMode(): String {
+        cachedMode?.let { return it }
+        return ModuleConfig.getString(KEY_MODE, MODE_OFF).also { cachedMode = it }
+    }
+
+    /** 配置写入后调用，使 hook 线程下次读到新模式 */
+    fun invalidateModeCache() {
+        cachedMode = null
+    }
 
     private fun isActive() = getMode() != MODE_OFF
 

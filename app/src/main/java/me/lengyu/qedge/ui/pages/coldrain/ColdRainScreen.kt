@@ -48,6 +48,7 @@ import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.atoms.QEdgeSwitch
 import me.lengyu.qedge.ui.core.theme.AccentBlue
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.ui.widget.glass.GlassBackdropHost
 
 @Composable
 fun ColdRainScreen(
@@ -89,7 +90,7 @@ fun ColdRainScreen(
             modifier = Modifier
                 .weight(1f)
                 .verticalScroll(scrollState)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(start = 16.dp, top = 12.dp, end = 16.dp, bottom = GlassBackdropHost.CONTENT_BOTTOM_DP.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             QEdgeCard(modifier = Modifier.fillMaxWidth()) {

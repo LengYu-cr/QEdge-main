@@ -61,6 +61,22 @@ val LocalQEdgeColors = staticCompositionLocalOf {
     )
 }
 
+/** 背景图模式固定配色：有背景图时不再跟随明暗主题，统一走暗色玻璃风格 */
+val ForcedDarkColors = QEdgeColors(
+    background = DarkBackground,
+    cardBackground = DarkCardBackground,
+    textPrimary = DarkTextPrimary,
+    // 背景图上 0xFF86868B 的灰字对比度不足看不清，提亮到 0xFFC7C7CC（仅背景图模式）
+    textSecondary = Color(0xFFC7C7CC),
+    ripple = DarkRipple,
+    switchTrackOn = SwitchTrackOnDark,
+    switchTrackOff = SwitchTrackOffDark,
+    accentGreen = AccentGreenDark,
+    accentBlue = AccentBlue,
+    accentRed = AccentRed,
+    isDark = true
+)
+
 @Composable
 fun QEdgeTheme(darkTheme: Boolean = HostInfo.isDarkTheme(), content: @Composable () -> Unit) {
     val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme

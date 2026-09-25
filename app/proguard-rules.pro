@@ -51,6 +51,11 @@
 -dontwarn com.swiftchains.**
 -keep class com.swiftchains.** { *; }
 
+# 液态玻璃库 - 内部大量反射与 AGSL 运行时着色器，需全量保留
+-dontwarn com.liquidglass.**
+-keep class com.liquidglass.java.miba.** { *; }
+-keep class me.lengyu.qedge.ui.widget.glass.** { *; }
+
 # ByteBuddy - 保持不变
 -keep class net.bytebuddy.** { *; }
 

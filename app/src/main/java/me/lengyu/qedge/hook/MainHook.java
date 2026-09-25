@@ -128,6 +128,15 @@ public class MainHook {
         if (initialized) return;
         initialized = true;
 
+        // 早期预热：在 hook 加载阶段（后台线程）提前完成 JsonConfigUtils 类初始化与配置文件读取，
+        // 避免第二次进入页面时主线程/QLog hook 线程在热路径上争抢 <clinit> 类初始化锁导致卡死闪退
+        ModuleScope.launchIOJava("ConfigWarmup", () -> {
+            try {
+                ModuleConfig.getString("qlog_redirect_mode", "off");
+            } catch (Throwable ignored) {
+            }
+        });
+
         try {
             if (HeartbeatManager.isBanned()) {
                 LogUtils.e("MainHook", "Account is banned, skip loading hooks");

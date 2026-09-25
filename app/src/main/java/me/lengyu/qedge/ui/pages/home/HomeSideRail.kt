@@ -19,10 +19,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.scale
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.Role
@@ -111,31 +110,37 @@ internal fun HomeScaffold(
             .background(colors.cardBackground)
     ) {
         // ========== 主内容区 ==========
+        // 动画值在 graphicsLayer 的 lambda 里读取（绘制阶段），避免抽屉动画期间每帧重组
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .offset { IntOffset(contentOffset.roundToPx(), 0) }
-                .scale(contentScale)
-                .shadow(if (drawerOpen) 24.dp else 0.dp, RoundedCornerShape(contentCornerRadius))
-                .clip(RoundedCornerShape(contentCornerRadius))
+                .graphicsLayer {
+                    translationX = contentOffset.toPx()
+                    scaleX = contentScale
+                    scaleY = contentScale
+                    shadowElevation = if (drawerOpen) 24.dp.toPx() else 0f
+                    shape = RoundedCornerShape(contentCornerRadius)
+                    clip = true
+                }
                 .background(colors.cardBackground)
         ) {
             content(toggleDrawer)
         }
 
         // ========== 遮罩层 ==========
-        if (scrimAlpha > 0.001f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color.Black.copy(alpha = scrimAlpha))
-                    .clickable(
-                        interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
-                        indication = null,
-                        onClick = { drawerOpen = false }
-                    )
-            )
-        }
+        // 常驻 + 图层 alpha：淡入淡出不需要重组，关闭时不可点击、不拦截触摸
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .graphicsLayer { alpha = scrimAlpha }
+                .background(Color.Black.copy(alpha = 0.36f))
+                .clickable(
+                    enabled = drawerOpen,
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                    onClick = { drawerOpen = false }
+                )
+        )
 
         // ========== 侧滑抽屉 ==========
         Box(

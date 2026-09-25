@@ -272,6 +272,7 @@ fun HomeMoodScheduleDialog(
 
 /**
  * 图片外显设置弹窗：选择方式（随机文案 / HTTP接口），并编辑对应配置。
+ * 接口方式下可选择返回格式（纯文本 / JSON），JSON 时填写解析字段路径。
  */
 @Composable
 fun HomeImageSummaryDialog(
@@ -279,8 +280,10 @@ fun HomeImageSummaryDialog(
     mode: String,
     tips: String,
     url: String,
+    format: String,
+    field: String,
     onDismiss: () -> Unit,
-    onConfirm: (mode: String, tips: String, url: String) -> Unit
+    onConfirm: (mode: String, tips: String, url: String, format: String, field: String) -> Unit
 ) {
     if (!show) return
 
@@ -288,6 +291,8 @@ fun HomeImageSummaryDialog(
     var curMode by remember(mode) { mutableStateOf(mode) }
     var curTips by remember(tips) { mutableStateOf(tips) }
     var curUrl by remember(url) { mutableStateOf(url) }
+    var curFormat by remember(format) { mutableStateOf(format.ifEmpty { "text" }) }
+    var curField by remember(field) { mutableStateOf(field) }
 
     Dialog(onDismissRequest = onDismiss) {
         Column(
@@ -339,12 +344,48 @@ fun HomeImageSummaryDialog(
                     placeholder = "https://example.com/api/summary",
                     onValueChange = { curUrl = it }
                 )
+
+                Spacer(modifier = Modifier.height(14.dp))
+                Text("返回格式", fontSize = 13.sp, color = colors.textPrimary)
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    "每张图片发送前都会请求该接口，直接以返回内容作为外显",
-                    fontSize = 12.sp,
-                    color = colors.textSecondary
-                )
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    ImageSummaryModeOption(
+                        label = "纯文本",
+                        selected = curFormat != "json",
+                        onClick = { curFormat = "text" },
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    ImageSummaryModeOption(
+                        label = "JSON",
+                        selected = curFormat == "json",
+                        onClick = { curFormat = "json" },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(14.dp))
+                if (curFormat == "json") {
+                    Text("解析字段", fontSize = 13.sp, color = colors.textPrimary)
+                    Spacer(modifier = Modifier.height(6.dp))
+                    ImageSummaryField(
+                        value = curField,
+                        placeholder = "例如 data.msg 或 msg",
+                        onValueChange = { curField = it }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "按 . 逐级取值，支持数组下标，例如 data.list[0].msg",
+                        fontSize = 12.sp,
+                        color = colors.textSecondary
+                    )
+                } else {
+                    Text(
+                        "每张图片发送前都会请求该接口，直接以返回内容作为外显",
+                        fontSize = 12.sp,
+                        color = colors.textSecondary
+                    )
+                }
             } else {
                 Text("文案列表", fontSize = 13.sp, color = colors.textPrimary)
                 Spacer(modifier = Modifier.height(6.dp))
@@ -388,7 +429,7 @@ fun HomeImageSummaryDialog(
                         .clickable(
                             interactionSource = remember { MutableInteractionSource() },
                             indication = null,
-                            onClick = { onConfirm(curMode, curTips.trim(), curUrl.trim()) }
+                            onClick = { onConfirm(curMode, curTips.trim(), curUrl.trim(), curFormat, curField.trim()) }
                         )
                         .padding(horizontal = 20.dp, vertical = 10.dp),
                     contentAlignment = Alignment.Center
