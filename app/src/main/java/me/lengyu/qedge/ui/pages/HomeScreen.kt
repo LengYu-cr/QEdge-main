@@ -83,6 +83,7 @@ import me.lengyu.qedge.ui.core.theme.LocalQEdgeColors
 import androidx.compose.runtime.CompositionLocalProvider
 import me.lengyu.qedge.ui.pages.home.HomeCommentInputDialog
 import me.lengyu.qedge.ui.pages.home.HomeCreatePluginDialog
+import me.lengyu.qedge.ui.pages.home.HomeEntrySelectDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageSummaryDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageRatioDialog
 import me.lengyu.qedge.ui.pages.home.HomeVoiceSpeedDialog
@@ -91,6 +92,7 @@ import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
+import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.plugin.view.MediaPanelLoader
 import me.lengyu.qedge.hook.item.LevelBoost
@@ -210,6 +212,7 @@ fun HomeScreen(
     var copyArkMessage by remember { mutableStateOf(ModuleConfig.getBoolean("copy_ark_message", false)) }
     var longClickSendCard by remember { mutableStateOf(ModuleConfig.getBoolean("long_click_send_card", false)) }
     var repeatMsg by remember { mutableStateOf(ModuleConfig.getBoolean("repeat_msg", false)) }
+    var repeatMsgIcon by remember { mutableStateOf(ModuleConfig.getString("repeat_msg_icon", "")) }
     var imageSummaryEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("image_summary", false)) }
     var imageSummaryMode by remember { mutableStateOf(ModuleConfig.getString("image_summary_mode", "text")) }
     var imageSummaryTips by remember { mutableStateOf(ModuleConfig.getString("image_summary_tips", "")) }
@@ -239,6 +242,8 @@ fun HomeScreen(
     var bypassProfileBan by remember { mutableStateOf(ModuleConfig.getBoolean("bypass_profile_ban", false)) }
     var removeAds by remember { mutableStateOf(ModuleConfig.getBoolean("remove_ads", false)) }
     var forceModuleToast by remember { mutableStateOf(ModuleConfig.getBoolean("force_module_toast", false)) }
+    var forceInputNoLimit by remember { mutableStateOf(ModuleConfig.getBoolean("force_input_no_limit", false)) }
+    var forceFullScreenBtnShow by remember { mutableStateOf(ModuleConfig.getBoolean("force_fullscreen_btn_show", false)) }
     var bgImageEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("bg_image_enabled", false)) }
     var bgImageUri by remember { mutableStateOf(ModuleConfig.getString("bg_image_uri", "")) }
     // 换图固定覆盖同一文件、uri 不变，靠版本号驱动 remember 重算并使缓存失效
@@ -256,6 +261,7 @@ fun HomeScreen(
                     }
                     ModuleConfig.putBoolean("bg_image_enabled", true)
                     ModuleConfig.putString("bg_image_uri", file.absolutePath)
+                    Toasts.toast("自定义背景已设置")
                     // State 必须在主线程更新，且需使缓存失效 + 版本递增才能刷新显示
                     android.os.Handler(android.os.Looper.getMainLooper()).post {
                         BgImageCache.invalidate()
@@ -266,6 +272,30 @@ fun HomeScreen(
                 } catch (_: Throwable) {
                 }
             }.start()
+        }
+    }
+    // 复读按钮自定义图标：拷贝到模块数据目录永久保存；未选择（取消）则清空，恢复默认图标
+    val repeatMsgIconPicker = rememberLauncherForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+        if (uri != null) {
+            Thread {
+                try {
+                    val file = java.io.File("${HostInfo.getModuleDataPath()}data", "repeat_icon.img")
+                    file.parentFile?.mkdirs()
+                    localContext.contentResolver.openInputStream(uri)?.use { input ->
+                        file.outputStream().use { output -> input.copyTo(output) }
+                    }
+                    ModuleConfig.putString("repeat_msg_icon", file.absolutePath)
+                    Toasts.toast("复读图标已设置")
+                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                        repeatMsgIcon = file.absolutePath
+                    }
+                } catch (_: Throwable) {
+                }
+            }.start()
+        } else {
+            Thread { ModuleConfig.putString("repeat_msg_icon", "") }.start()
+            repeatMsgIcon = ""
+            Toasts.toast("未选择图片，已恢复默认图标")
         }
     }
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
@@ -282,6 +312,8 @@ fun HomeScreen(
     var showMoodConfigDialog by remember { mutableStateOf(false) }
     var showImageSummaryDialog by remember { mutableStateOf(false) }
     var showCreateDialog by remember { mutableStateOf(false) }
+    var showChatEntryDialog by remember { mutableStateOf(false) }
+    var showMediaEntryDialog by remember { mutableStateOf(false) }
     var keepAlivePixel by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_PIXEL, false)) }
     var keepAliveForeground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_FOREGROUND, false)) }
     var keepAliveBackground by remember { mutableStateOf(ModuleConfig.getBoolean(KeepAliveHook.SP_BACKGROUND, false)) }
@@ -407,9 +439,11 @@ fun HomeScreen(
         GlassBackdropHost.get()?.setSelected(selectedTab, true)
     }
 
-    // 有背景图时不分亮暗：整页（含弹窗）固定走暗色玻璃风格；无背景图则跟随当前主题
+    // 有背景图时不分亮暗：整页固定走暗色玻璃风格；无背景图则跟随当前主题
     val bgImageActive = bgImageEnabled && bgImageUri.isNotEmpty()
     val effectiveColors = if (bgImageActive) ForcedDarkColors else colors
+    // 弹窗配色：取主题原始亮暗，不套自定义背景的强制暗色（弹窗叠在背景图上不好看）
+    val dialogColors = colors
 
     // 底部导航条是 Compose 外的独立 View，配色跟随页面有效配色：
     // 有背景图固定暗色，否则随明暗主题切换（之前只在 attach 时设置过一次）
@@ -530,6 +564,7 @@ fun HomeScreen(
                             copyArkMessage = copyArkMessage,
                             longClickSendCard = longClickSendCard,
                             repeatMsg = repeatMsg,
+                            repeatMsgIcon = repeatMsgIcon,
                             emotionAiTag = emotionAiTag,
                             imageRatioEnabled = imageRatioEnabled,
                             imageRatioWidth = imageRatioWidth,
@@ -556,6 +591,8 @@ fun HomeScreen(
                             bypassProfileBan = bypassProfileBan,
                             removeAds = removeAds,
                             forceModuleToast = forceModuleToast,
+                            forceInputNoLimit = forceInputNoLimit,
+                            forceFullScreenBtnShow = forceFullScreenBtnShow,
                             bgImageEnabled = bgImageEnabled,
                             bgImageUri = bgImageUri,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
@@ -590,6 +627,8 @@ fun HomeScreen(
                             onRemoveLinkInfoToggle = {
                                 removeLinkInfo = it
                                 Thread { ModuleConfig.putBoolean("remove_linkinfo", it) }.start()
+                                // 钩子只在启动时按配置安装，开启后需重启才生效
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
                             },
                             onDownloadEmotionToggle = {
                                 downloadEmotion = it
@@ -598,6 +637,8 @@ fun HomeScreen(
                             onTransparentAvatarToggle = {
                                 transparentAvatar = it
                                 Thread { ModuleConfig.putBoolean("transparent_avatar", it) }.start()
+                                // 钩子只在启动时按配置安装，开启后需重启才生效
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
                             },
                             onVideoToBubbleToggle = {
                                 videoToBubble = it
@@ -623,13 +664,22 @@ fun HomeScreen(
                                 repeatMsg = it
                                 Thread { ModuleConfig.putBoolean("repeat_msg", it) }.start()
                             },
+                            onRepeatMsgIconClick = {
+                                repeatMsgIconPicker.launch(
+                                    PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                )
+                            },
                             onEmotionAiTagToggle = {
                                 emotionAiTag = it
                                 Thread { ModuleConfig.putBoolean("ai_emotion_tag", it) }.start()
+                                // 与图片外显自定义冲突，仅提醒不拦截
+                                if (it && imageRatioEnabled) Toasts.toast("与「图片外显自定义」同时开启可能冲突")
                             },
                             onImageRatioToggle = {
                                 imageRatioEnabled = it
                                 Thread { ModuleConfig.putBoolean("image_ratio", it) }.start()
+                                // 与AI表情标签冲突，仅提醒不拦截
+                                if (it && emotionAiTag) Toasts.toast("与「AI表情标签」同时开启可能冲突")
                             },
                             onImageRatioConfigClick = { showImageRatioDialog = true },
                             onVoiceSpeedToggle = {
@@ -705,6 +755,16 @@ fun HomeScreen(
                                 forceModuleToast = it
                                 Thread { ModuleConfig.putBoolean("force_module_toast", it) }.start()
                             },
+                            onForceInputNoLimitToggle = {
+                                forceInputNoLimit = it
+                                Thread { ModuleConfig.putBoolean("force_input_no_limit", it) }.start()
+                                // 钩子只在启动时按配置安装，开启后需重启才生效
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
+                            },
+                            onForceFullScreenBtnShowToggle = {
+                                forceFullScreenBtnShow = it
+                                Thread { ModuleConfig.putBoolean("force_fullscreen_btn_show", it) }.start()
+                            },
                             onBgImageToggle = { enable ->
                                 if (enable) {
                                     if (bgImageUri.isNotEmpty()) {
@@ -731,6 +791,8 @@ fun HomeScreen(
                             onTimArkCardBypassToggle = {
                                 timArkCardBypass = it
                                 Thread { ModuleConfig.putBoolean("tim_ark_card_bypass", it) }.start()
+                                // 钩子只在启动时按配置安装，开启后需重启才生效
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
                             },
                             onProfileAutoLikeBackToggle = {
                                 profileAutoLikeBack = it
@@ -786,6 +848,7 @@ fun HomeScreen(
                                 chatSettingEntry = newValue
                                 Thread { ModuleConfig.putString("chat_setting_entry", newValue) }.start()
                             },
+                            onChatSettingEntryClick = { showChatEntryDialog = true },
                             onMediaPanelToggle = { enabled ->
                                 mediaPanelEnabled = enabled
                                 if (enabled) {
@@ -798,7 +861,8 @@ fun HomeScreen(
                             onMediaPanelEntryChange = { newValue ->
                                 mediaPanelEntry = newValue
                                 Thread { ModuleConfig.putString("media_panel_entry", newValue) }.start()
-                            }
+                            },
+                            onMediaPanelEntryClick = { showMediaEntryDialog = true }
                         )
                     )
                     1 -> JavaPluginsPage(
@@ -844,6 +908,8 @@ fun HomeScreen(
             )
         }
 
+        // 弹窗区域单独用主题原始亮暗配色：不跟随自定义背景的强制暗色
+        CompositionLocalProvider(LocalQEdgeColors provides dialogColors) {
         HomeCommentInputDialog(
             show = showCommentDialog,
             commentText = qzoneCommentText,
@@ -912,6 +978,32 @@ fun HomeScreen(
             }
         )
 
+        HomeEntrySelectDialog(
+            show = showChatEntryDialog,
+            title = "聊天页脚本菜单入口",
+            subtitle = "选择长按聊天页哪个按钮打开脚本菜单，点击选项即时生效（重启QQ生效）",
+            options = ChatSettingLoader.ENTRY_OPTIONS,
+            current = chatSettingEntry,
+            onDismiss = { showChatEntryDialog = false },
+            onConfirm = { v ->
+                chatSettingEntry = v
+                Thread { ModuleConfig.putString("chat_setting_entry", v) }.start()
+            }
+        )
+
+        HomeEntrySelectDialog(
+            show = showMediaEntryDialog,
+            title = "综合面板入口",
+            subtitle = "选择长按聊天页哪个按钮打开综合面板，需与脚本菜单入口错开",
+            options = MediaPanelLoader.ENTRY_OPTIONS,
+            current = mediaPanelEntry,
+            onDismiss = { showMediaEntryDialog = false },
+            onConfirm = { v ->
+                mediaPanelEntry = v
+                Thread { ModuleConfig.putString("media_panel_entry", v) }.start()
+            }
+        )
+
         HomeImageSummaryDialog(
             show = showImageSummaryDialog,
             mode = imageSummaryMode,
@@ -945,6 +1037,7 @@ fun HomeScreen(
                     showCreateDialog = false
                 }
         )
+        }
         }
     }
 }

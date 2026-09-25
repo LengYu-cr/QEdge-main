@@ -286,9 +286,13 @@ internal fun HomePage(
 
                 SettingSwitchItem(
                     title = "消息复读",
-                    subtitle = "点击复读，长按可复制链接、查看原始消息",
+                    subtitle = if (state.repeatMsgIcon.isNotEmpty())
+                        "已自定义按钮图标，点击更换（打开后不选图则恢复默认）"
+                    else
+                        "点击复读，长按可复制链接、查看原始消息 · 点击此行自定义按钮图标",
                     checked = state.repeatMsg,
-                    onCheckedChange = callbacks.onRepeatMsgToggle
+                    onCheckedChange = callbacks.onRepeatMsgToggle,
+                    onClick = callbacks.onRepeatMsgIconClick
                 )
 
                 Spacer(modifier = Modifier.height(12.dp))
@@ -370,56 +374,12 @@ internal fun HomePage(
                 HorizontalDivider(color = colors.textSecondary.copy(0.08f))
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text(
-                    "聊天页脚本菜单入口",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = colors.textPrimary
+                val scriptEntryLabel = ChatSettingLoader.ENTRY_OPTIONS[state.chatSettingEntry] ?: state.chatSettingEntry
+                SettingClickItem(
+                    title = "聊天页脚本菜单入口",
+                    subtitle = "当前「$scriptEntryLabel」· 长按聊天页对应按钮打开脚本菜单（重启QQ生效），点击更改",
+                    onClick = callbacks.onChatSettingEntryClick
                 )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    "长按聊天页对应按钮打开脚本菜单（重启QQ生效）",
-                    fontSize = 12.sp,
-                    color = colors.textSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-
-                val chunked = remember { ChatSettingLoader.ENTRY_OPTIONS.entries.toList().chunked(4) }
-                for (row in chunked) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        for ((key, label) in row) {
-                            val selected = state.chatSettingEntry == key
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (selected) AccentBlue else colors.background
-                                    )
-                                    .clickable { callbacks.onChatSettingEntryChange(key) }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    label,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selected) Color.White else colors.textPrimary
-                                )
-                            }
-                        }
-                        // 补齐空位
-                        repeat(4 - row.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
 
                 Spacer(modifier = Modifier.height(20.dp))
                 HorizontalDivider(color = colors.textSecondary.copy(0.08f))
@@ -431,65 +391,40 @@ internal fun HomePage(
                     onCheckedChange = callbacks.onMediaPanelToggle
                 )
                 Spacer(modifier = Modifier.height(12.dp))
-                // 入口选择区：开关关闭时禁用（按钮状态与开关联动刷新）
+                // 入口选择行：开关关闭时禁用（点击弹纵向单选弹窗，两入口重合时红字警告）
                 val mediaEnabled = state.mediaPanelEnabled
-                Text(
-                    "综合面板入口",
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = if (mediaEnabled) colors.textPrimary else colors.textSecondary.copy(alpha = 0.6f)
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                // 主动判断两个入口是否重合：重合则红字警告，不重合显示各自入口名
-                val scriptEntryLabel = ChatSettingLoader.ENTRY_OPTIONS[state.chatSettingEntry] ?: state.chatSettingEntry
                 val mediaEntryLabel = MediaPanelLoader.ENTRY_OPTIONS[state.mediaPanelEntry] ?: state.mediaPanelEntry
                 val entryConflict = state.chatSettingEntry == state.mediaPanelEntry
-                Text(
-                    if (entryConflict) "脚本菜单与综合面板入口均为「$mediaEntryLabel」，长按会冲突，请错开"
-                    else "脚本菜单「$scriptEntryLabel」、面板「$mediaEntryLabel」，长按互不冲突",
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    color = if (entryConflict) colors.accentRed.copy(alpha = if (mediaEnabled) 1f else 0.5f)
-                    else colors.textSecondary.copy(alpha = if (mediaEnabled) 1f else 0.5f),
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                SettingClickItem(
+                    title = "综合面板入口",
+                    subtitle = if (entryConflict)
+                        "脚本菜单与综合面板入口均为「$mediaEntryLabel」，长按会冲突，请错开 · 点击更改"
+                    else
+                        "当前「$mediaEntryLabel」· 点击更改",
+                    enabled = mediaEnabled,
+                    subtitleColor = if (entryConflict)
+                        colors.accentRed.copy(alpha = if (mediaEnabled) 1f else 0.5f)
+                    else null,
+                    onClick = callbacks.onMediaPanelEntryClick
                 )
-                Spacer(modifier = Modifier.height(12.dp))
-                val mediaChunked = remember { MediaPanelLoader.ENTRY_OPTIONS.entries.toList().chunked(4) }
-                for (mrow in mediaChunked) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        for ((key, label) in mrow) {
-                            val selected = state.mediaPanelEntry == key
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .clip(RoundedCornerShape(12.dp))
-                                    .background(
-                                        if (selected) AccentBlue
-                                        else colors.background.copy(alpha = if (mediaEnabled) 1f else 0.5f)
-                                    )
-                                    .clickable(enabled = mediaEnabled) { callbacks.onMediaPanelEntryChange(key) }
-                                    .padding(vertical = 10.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    label,
-                                    fontSize = 13.sp,
-                                    fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                    color = if (selected) Color.White
-                                    else colors.textPrimary.copy(alpha = if (mediaEnabled) 1f else 0.5f)
-                                )
-                            }
-                        }
-                        repeat(4 - mrow.size) {
-                            Spacer(modifier = Modifier.weight(1f))
-                        }
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "解除输入框字数上限",
+                    subtitle = "解除聊天输入框字数限制，可输入超长文本（重启QQ生效）",
+                    checked = state.forceInputNoLimit,
+                    onCheckedChange = callbacks.onForceInputNoLimitToggle
+                )
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                SettingSwitchItem(
+                    title = "强制显示输入框全屏按钮",
+                    subtitle = "强制全屏输入按钮始终显示，不随行数隐藏",
+                    checked = state.forceFullScreenBtnShow,
+                    onCheckedChange = callbacks.onForceFullScreenBtnShowToggle
+                )
                 }
             }
         }

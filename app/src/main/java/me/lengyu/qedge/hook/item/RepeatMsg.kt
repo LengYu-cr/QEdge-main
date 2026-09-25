@@ -4,6 +4,8 @@ import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.view.View
 import android.widget.ImageView
 import de.robv.android.xposed.XC_MethodHook
@@ -41,11 +43,52 @@ class RepeatMsg : BaseSwitchHookItem() {
     companion object {
         private const val TAG = "RepeatMsg"
         private const val SP_KEY = "repeat_msg"
+        private const val ICON_SP_KEY = "repeat_msg_icon"
 
         @Volatile
         private var cachedTargetMethod: Method? = null
         @Volatile
         private var hasSearched = false
+
+        // 自定义图标按 路径+修改时间 缓存：换图时文件被原地覆盖（路径不变），靠 lastModified 失效
+        @Volatile
+        private var cachedIconKey: String? = null
+        @Volatile
+        private var cachedIconBitmap: Bitmap? = null
+
+        /**
+         * 读取用户在首页选择的自定义图标（路径存 ModuleConfig）。
+         * 未设置、文件不存在或解码失败均返回 null，回退到默认图标。
+         * 大图按 256px 采样解码，避免整张照片解进内存（按钮只有几十 dp）。
+         */
+        fun loadCustomIcon(): Bitmap? {
+            val path = ModuleConfig.getString(ICON_SP_KEY, "")
+            if (path.isEmpty()) {
+                cachedIconKey = null
+                cachedIconBitmap = null
+                return null
+            }
+
+            val file = java.io.File(path)
+            if (!file.exists()) return null
+            val key = "$path:${file.lastModified()}"
+            if (key == cachedIconKey) return cachedIconBitmap
+
+            val bitmap = try {
+                val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(path, bounds)
+                var sample = 1
+                while (bounds.outWidth / sample > 256 || bounds.outHeight / sample > 256) {
+                    sample *= 2
+                }
+                BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+            } catch (_: Throwable) {
+                null
+            }
+            cachedIconKey = key
+            cachedIconBitmap = bitmap
+            return bitmap
+        }
 
         fun isEnabled(): Boolean {
             return ModuleConfig.getBoolean(SP_KEY, false)
@@ -122,7 +165,13 @@ class RepeatMsg : BaseSwitchHookItem() {
 
             repeatView.apply {
                 visibility = View.VISIBLE
-                setImageResource(R.drawable.repeat)
+                // 用户在首页选过图则用自定义图标，否则用默认图标
+                val customIcon = loadCustomIcon()
+                if (customIcon != null) {
+                    setImageBitmap(customIcon)
+                } else {
+                    setImageResource(R.drawable.repeat)
+                }
                 setOnClickListener {
                     // LogUtils.d(TAG, "repeatView clicked")
                     if (isDoubleClick()) return@setOnClickListener

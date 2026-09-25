@@ -46,7 +46,6 @@ object QZoneLikeTool : DexKitTask {
             val cookie = "uin=$cookieUin; skey=$skey; p_uin=$cookieUin; p_skey=$pSkey"
 
             val result = httpPostForm(urlStr, postData, cookie)
-            LogUtils.d(TAG, "doLike result: $result")
             result.contains("\"ret\":0") || result.contains("\"code\":0")
         }.onFailure {
             LogUtils.e(TAG, "doLike error: ${it.message}")
@@ -94,7 +93,6 @@ object QZoneLikeTool : DexKitTask {
                 "}"
 
             val result = httpPostJson(urlStr, jsonBody, cookie)
-            LogUtils.d(TAG, "doComment result: $result")
             result.contains("\"ret\":0") || result.contains("\"code\":0")
         }.onFailure {
             LogUtils.e(TAG, "doComment error: ${it.message}")

@@ -62,6 +62,8 @@ import me.lengyu.qedge.hook.item.SkipScanWaitTime;
 import me.lengyu.qedge.hook.item.DisableWebSecurityCheck;
 import me.lengyu.qedge.hook.item.DisableSecCheck;
 import me.lengyu.qedge.hook.item.ForceModuleToast;
+import me.lengyu.qedge.hook.item.ForceInputNoLimit;
+import me.lengyu.qedge.hook.item.ForceFullScreenBtnShow;
 
 import java.util.List;
 /**
@@ -116,6 +118,8 @@ public class MainHook {
         HookRegistry.register(DisableWebSecurityCheck.INSTANCE);
         HookRegistry.register(DisableSecCheck.INSTANCE);
         HookRegistry.register(ForceModuleToast.INSTANCE);
+        HookRegistry.register(ForceInputNoLimit.INSTANCE);
+        HookRegistry.register(ForceFullScreenBtnShow.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;

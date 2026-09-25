@@ -42,7 +42,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
-import me.lengyu.qedge.hook.HeartbeatManager
 import me.lengyu.qedge.ui.pages.PluginData
 import me.lengyu.qedge.ui.pages.HomeScreen
 import me.lengyu.qedge.ui.pages.FileManagerScreen
@@ -97,14 +96,35 @@ class SettingActivity : ComponentActivity() {
             LogUtils.e(e)
         }
         
+        // 这里不再启动心跳：心跳由宿主进程固定调度，重复启动会立刻补发一次
+        // 同步请求，进入设置页时会卡一下
+
+        setupUI()
+        attachGlassNav()
+        showPendingUpdateDialog()
+    }
+
+    /**
+     * 检查心跳落盘的更新数据，有更新则弹更新日志弹窗。
+     * 心跳只写数据不弹窗，只有进入设置页才提示。
+     */
+    private fun showPendingUpdateDialog() {
         try {
-            HeartbeatManager.getInstance().startHeartbeat()
+            if (!me.lengyu.qedge.hook.UserData.hasUpdateInfo()) return
+            val version = me.lengyu.qedge.hook.UserData.getUpdateVersion()
+            me.lengyu.qedge.ui.components.dialogs.UpdateDialog(
+                this,
+                version,
+                me.lengyu.qedge.hook.UserData.getUpdateLog(),
+                me.lengyu.qedge.hook.UserData.getUpdateApk(),
+                Runnable {
+                    ModuleConfig.putString("ignored_version", version)
+                    me.lengyu.qedge.hook.UserData.clearUpdateInfo()
+                }
+            ).show()
         } catch (e: Throwable) {
             LogUtils.e(e)
         }
-        
-        setupUI()
-        attachGlassNav()
     }
 
     /**

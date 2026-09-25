@@ -69,7 +69,6 @@ object TimArkCardBypass : BaseApiHookItem<TimArkCardBypass.TimArkCardBypassListe
         try {
             val cached = runCatching { requireClass(KEY_ARK_CONFIG_MODEL) }.getOrNull()
             if (cached != null) {
-                LogUtils.d(TAG, "findArkConfigModelClass: DexKitCache 命中 -> ${cached.name}")
                 return cached
             }
         } catch (_: Throwable) { }

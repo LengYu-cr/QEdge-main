@@ -13,7 +13,6 @@ import com.tencent.common.app.AppInterface;
 import com.tencent.common.app.BaseApplicationImpl;
 
 import me.lengyu.qedge.hook.base.HookRegistry;
-import me.lengyu.qedge.ui.components.dialogs.UpdateDialog;
 import me.lengyu.qedge.ui.components.dialogs.WelcomeDialog;
 import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
@@ -160,7 +159,10 @@ public class HeartbeatManager {
                     if (!version.isEmpty() && !apkUrl.isEmpty()) {
                         String ignoredVersion = ModuleConfig.INSTANCE.getString("ignored_version", "");
                         if (!version.equals(ignoredVersion)) {
-                            showUpdateDialog(version, updateLog, apkUrl);
+                            // 只落盘更新数据，进入设置页时再弹更新日志
+                            UserData.setUpdateInfo(version, updateLog, apkUrl);
+                            // 温柔提醒，不打断使用
+                            Toasts.toast("发现新版本 " + version + "，进入设置页可查看更新日志");
                         }
                     }
                 }
@@ -168,28 +170,6 @@ public class HeartbeatManager {
         } catch (Exception e) {
             LogUtils.e("HeartbeatManager", "Parse response failed: " + e.getMessage());
         }
-    }
-
-    private void showUpdateDialog(String version, String updateLog, String apkUrl) {
-        runOnMainThread(() -> {
-            try {
-                android.app.Activity activity = QQCurrentEnv.getActivity();
-                if (activity != null) {
-                    UpdateDialog dialog = new UpdateDialog(
-                            activity,
-                            version,
-                            updateLog,
-                            apkUrl,
-                            () -> {
-                                ModuleConfig.INSTANCE.putString("ignored_version", version);
-                            }
-                    );
-                    dialog.show();
-                }
-            } catch (Exception e) {
-                LogUtils.e("HeartbeatManager", "Show update dialog failed: " + e.getMessage());
-            }
-        });
     }
 
     private void showWelcomeDialog(String initialPassword, String currentUin) {

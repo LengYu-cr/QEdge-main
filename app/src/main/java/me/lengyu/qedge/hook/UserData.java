@@ -22,6 +22,11 @@ public class UserData {
     private static final String K_UPLOAD_PERMISSION = "user_upload_permission_";
     private static final String K_REVIEW_PERMISSION = "user_review_permission_";
 
+    // 更新信息（模块级，不按 uin 隔离）：心跳发现新版本时写入，进入设置页时读取弹更新日志
+    private static final String K_UPDATE_VERSION = "user_update_version";
+    private static final String K_UPDATE_LOG = "user_update_log";
+    private static final String K_UPDATE_APK = "user_update_apk";
+
     private UserData() {
     }
 
@@ -99,5 +104,34 @@ public class UserData {
 
     public static boolean hasReviewPermission(String uin) {
         return ModuleConfig.INSTANCE.getBoolean(K_REVIEW_PERMISSION + uin, false);
+    }
+
+    /** 心跳发现新版本时写入更新数据（版本/更新日志/下载地址） */
+    public static void setUpdateInfo(String version, String updateLog, String apkUrl) {
+        ModuleConfig.INSTANCE.putString(K_UPDATE_VERSION, version == null ? "" : version);
+        ModuleConfig.INSTANCE.putString(K_UPDATE_LOG, updateLog == null ? "" : updateLog);
+        ModuleConfig.INSTANCE.putString(K_UPDATE_APK, apkUrl == null ? "" : apkUrl);
+    }
+
+    /** 是否存在待展示的更新数据（版本与下载地址均非空） */
+    public static boolean hasUpdateInfo() {
+        return !getUpdateVersion().isEmpty() && !getUpdateApk().isEmpty();
+    }
+
+    public static String getUpdateVersion() {
+        return ModuleConfig.INSTANCE.getString(K_UPDATE_VERSION, "");
+    }
+
+    public static String getUpdateLog() {
+        return ModuleConfig.INSTANCE.getString(K_UPDATE_LOG, "");
+    }
+
+    public static String getUpdateApk() {
+        return ModuleConfig.INSTANCE.getString(K_UPDATE_APK, "");
+    }
+
+    /** 清除更新数据（用户忽略该版本后调用，避免反复弹窗） */
+    public static void clearUpdateInfo() {
+        setUpdateInfo("", "", "");
     }
 }

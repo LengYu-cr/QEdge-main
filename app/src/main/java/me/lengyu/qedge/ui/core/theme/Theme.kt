@@ -71,7 +71,8 @@ val ForcedDarkColors = QEdgeColors(
     textSecondary = Color(0xFFC7C7CC),
     ripple = DarkRipple,
     switchTrackOn = SwitchTrackOnDark,
-    switchTrackOff = SwitchTrackOffDark,
+    // 背景图模式：关闭态轨道用半透明，透出背景图，避免在照片上糊一块黑色
+    switchTrackOff = Color.White.copy(alpha = 0.28f),
     accentGreen = AccentGreenDark,
     accentBlue = AccentBlue,
     accentRed = AccentRed,
@@ -85,13 +86,15 @@ fun isBgImageActive(): Boolean =
 
 /**
  * 模块主题解析，与模块首页保持一致：
- * theme = -1 跟随系统/宿主夜间模式，0 强制亮色，1 强制暗色；背景图模式下固定暗色玻璃。
+ * theme = -1 跟随系统/宿主夜间模式，0 强制亮色，1 强制暗色。
  *
  * 宿主进程内的弹窗（脚本菜单、媒体面板等）必须走这里，不能直接用 [HostInfo.isDarkTheme]，
  * 否则模块设为暗色而 QQ 处于亮色时会渲染成亮色背景。
+ *
+ * 注意：背景图模式不在这里强制暗色——页面的暗色由 HomeScreen 的 ForcedDarkColors 单独处理，
+ * 弹窗应跟随用户主题配置（默认亮色），否则开启背景图后所有弹窗都会变成黑色。
  */
 fun resolveDarkTheme(): Boolean = when {
-    isBgImageActive() -> true
     ModuleConfig.getInt("theme", -1) == 1 -> true
     ModuleConfig.getInt("theme", -1) == 0 -> false
     else -> HostInfo.isDarkTheme()

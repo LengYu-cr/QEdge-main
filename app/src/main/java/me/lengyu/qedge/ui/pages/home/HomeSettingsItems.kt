@@ -216,6 +216,55 @@ internal fun SettingSwitchItem(
     }
 }
 
+/** 纯点击设置行：标题 + 副标题 + 右侧箭头，无开关（入口选择等点击弹窗的场景） */
+@Composable
+internal fun SettingClickItem(
+    title: String,
+    subtitle: String,
+    enabled: Boolean = true,
+    subtitleColor: Color? = null,
+    onClick: () -> Unit
+) {
+    val colors = QEdgeTheme.colors
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = enabled,
+                onClick = onClick
+            ),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                title,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (enabled) colors.textPrimary else colors.textSecondary.copy(alpha = 0.6f)
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                subtitle,
+                fontSize = 12.sp,
+                color = subtitleColor
+                    ?: colors.textSecondary.copy(alpha = if (enabled) 1f else 0.6f),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        Spacer(modifier = Modifier.width(8.dp))
+        Text(
+            "›",
+            fontSize = 18.sp,
+            fontWeight = FontWeight.Bold,
+            color = colors.textSecondary.copy(alpha = 0.5f)
+        )
+    }
+}
+
 @Composable
 internal fun UpdateLogCard() {
     val colors = QEdgeTheme.colors

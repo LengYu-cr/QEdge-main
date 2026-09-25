@@ -120,6 +120,7 @@ data class HomePageState(
     val copyArkMessage: Boolean,
     val longClickSendCard: Boolean,
     val repeatMsg: Boolean,
+    val repeatMsgIcon: String,
     val emotionAiTag: Boolean,
     val imageRatioEnabled: Boolean,
     val imageRatioWidth: String,
@@ -146,6 +147,8 @@ data class HomePageState(
     val bypassProfileBan: Boolean,
     val removeAds: Boolean,
     val forceModuleToast: Boolean,
+    val forceInputNoLimit: Boolean,
+    val forceFullScreenBtnShow: Boolean,
     val bgImageEnabled: Boolean,
     val bgImageUri: String,
     val qzoneCheckinEnabled: Boolean,
@@ -180,6 +183,7 @@ data class HomePageCallbacks(
     val onCopyArkMessageToggle: (Boolean) -> Unit,
     val onLongClickSendCardToggle: (Boolean) -> Unit,
     val onRepeatMsgToggle: (Boolean) -> Unit,
+    val onRepeatMsgIconClick: () -> Unit,
     val onEmotionAiTagToggle: (Boolean) -> Unit,
     val onImageRatioToggle: (Boolean) -> Unit,
     val onImageRatioConfigClick: () -> Unit,
@@ -202,6 +206,8 @@ data class HomePageCallbacks(
     val onBypassProfileBanToggle: (Boolean) -> Unit,
     val onRemoveAdsToggle: (Boolean) -> Unit,
     val onForceModuleToastToggle: (Boolean) -> Unit,
+    val onForceInputNoLimitToggle: (Boolean) -> Unit,
+    val onForceFullScreenBtnShowToggle: (Boolean) -> Unit,
     val onBgImageToggle: (Boolean) -> Unit,
     val onBgImagePickClick: () -> Unit,
     val onCheckinToggle: (Boolean) -> Unit,
@@ -215,6 +221,8 @@ data class HomePageCallbacks(
     val onKeepAliveForegroundToggle: (Boolean) -> Unit,
     val onKeepAliveBackgroundToggle: (Boolean) -> Unit,
     val onChatSettingEntryChange: (String) -> Unit,
+    val onChatSettingEntryClick: () -> Unit,
     val onMediaPanelToggle: (Boolean) -> Unit,
-    val onMediaPanelEntryChange: (String) -> Unit
+    val onMediaPanelEntryChange: (String) -> Unit,
+    val onMediaPanelEntryClick: () -> Unit
 )
