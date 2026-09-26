@@ -1,10 +1,14 @@
 package me.lengyu.qedge.ui.pages.media
 
+import android.Manifest
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.media.MediaPlayer
 import android.media.MediaMetadataRetriever
+import android.os.Build
 import android.net.Uri
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
@@ -79,6 +83,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -122,6 +128,9 @@ fun MediaPanelContent(contact: MediaPanelLoader.PanelContact, onDismiss: () -> U
     var collections by remember { mutableStateOf<List<MediaPanelLoader.MediaCollection>>(emptyList()) }
     var collectionsLoaded by remember { mutableStateOf(false) }
     var galleryFiles by remember { mutableStateOf<List<File>>(emptyList()) }
+    // 本地图库按文件夹分组：null = 图库根目录，否则是当前进入的子文件夹
+    var galleryFolder by remember { mutableStateOf<File?>(null) }
+    var galleryFolders by remember { mutableStateOf<List<File>>(emptyList()) }
 
     // 导航：0=主界面 1=本地图库 2=某合集详情
     var nav by remember { mutableIntStateOf(0) }
@@ -193,9 +202,14 @@ fun MediaPanelContent(contact: MediaPanelLoader.PanelContact, onDismiss: () -> U
         }
     }
 
-    LaunchedEffect(nav) {
+    LaunchedEffect(nav, galleryFolder) {
         if (nav == 1) {
-            galleryFiles = withContext(Dispatchers.IO) { listGalleryFiles() }
+            val folder = galleryFolder
+            val (folders, files) = withContext(Dispatchers.IO) {
+                listDirEntries(folder ?: File(MediaPanelLoader.MediaImageCache.galleryDir()))
+            }
+            galleryFolders = folders
+            galleryFiles = files
         } else if (nav == 2 && currentCollection != null) {
             val c = currentCollection
             if (c != null) {
@@ -277,11 +291,18 @@ fun MediaPanelContent(contact: MediaPanelLoader.PanelContact, onDismiss: () -> U
                     nav = nav,
                     collections = collections,
                     galleryFiles = galleryFiles,
+                    galleryFolders = galleryFolders,
+                    galleryFolder = galleryFolder,
                     collection = currentCollection,
                     collectionItems = collectionItems,
-                    onOpenLocal = { nav = 1 },
+                    onOpenLocal = { galleryFolder = null; nav = 1 },
                     onOpenCollection = { c -> currentCollection = c; nav = 2 },
-                    onBack = { nav = 0; currentCollection = null },
+                    onEnterFolder = { galleryFolder = it },
+                    onLeaveFolder = {
+                        galleryFolder = galleryFolder?.parentFile
+                            ?.takeIf { it.absolutePath != MediaPanelLoader.MediaImageCache.galleryDir() }
+                    },
+                    onBack = { nav = 0; currentCollection = null; galleryFolder = null },
                     onTapItem = { detail = DetailTarget.Network(it) },
                     onTapLocal = { detail = DetailTarget.Local(it) },
                     onLongSend = { sendImage(it) },
@@ -377,10 +398,14 @@ private fun EmojiPanel(
     nav: Int,
     collections: List<MediaPanelLoader.MediaCollection>,
     galleryFiles: List<File>,
+    galleryFolders: List<File>,
+    galleryFolder: File?,
     collection: MediaPanelLoader.MediaCollection?,
     collectionItems: List<MediaPanelLoader.MediaItem>,
     onOpenLocal: () -> Unit,
     onOpenCollection: (MediaPanelLoader.MediaCollection) -> Unit,
+    onEnterFolder: (File) -> Unit,
+    onLeaveFolder: () -> Unit,
     onBack: () -> Unit,
     onTapItem: (String) -> Unit,
     onTapLocal: (File) -> Unit,
@@ -395,7 +420,6 @@ private fun EmojiPanel(
     var selecting by remember { mutableStateOf(false) }
     var selected by remember { mutableStateOf(setOf<String>()) }
     var showTagDialog by remember { mutableStateOf(false) }
-    var uploading by remember { mutableStateOf(false) }
 
     // 网络图集多选下载状态
     var netSelecting by remember { mutableStateOf(false) }
@@ -430,34 +454,15 @@ private fun EmojiPanel(
     }
 
     fun doUpload(collection: String, tags: List<String>) {
-        if (selected.isEmpty() || collection.isEmpty() || uploading) return
+        if (selected.isEmpty() || collection.isEmpty()) return
         val paths = selected.toList()
         val uin = QQCurrentEnv.getCurrentUin()
-        uploading = true
-        scope.launch(Dispatchers.IO) {
-            val result = try {
-                MediaPanelLoader.MediaApi.uploadImages(collection, paths, tags, "img", uin)
-            } catch (e: Throwable) {
-                LogUtils.e("MediaPanelContent", "upload failed: " + e.message)
-                MediaPanelLoader.UploadResult(0, paths.size)
-            }
-            withContext(Dispatchers.Main) {
-                uploading = false
-                showTagDialog = false
-                if (result.success > 0) {
-                    val msg = if (result.failed > 0) {
-                        "上传成功 ${result.success} 张，失败 ${result.failed} 张"
-                    } else {
-                        "上传成功 ${result.success} 张"
-                    }
-                    Toasts.toast(msg)
-                    selecting = false
-                    selected = emptySet()
-                } else {
-                    Toasts.toast("上传失败，共 ${result.failed} 张")
-                }
-            }
-        }
+        // 先退出选择态（避免重复点击），再交给模块级作用域异步上传：关掉面板也继续，完成时再提示
+        selected = emptySet()
+        selecting = false
+        showTagDialog = false
+        Toasts.toast("表情开始上传 ${paths.size} 张，可关闭面板等待完成")
+        MediaPanelLoader.MediaUploader.upload(collection, paths, tags, "img", uin)
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -466,12 +471,13 @@ private fun EmojiPanel(
                 // 本地图库
                 Column(Modifier.fillMaxSize()) {
                     PanelHeader(
-                        "本地图库",
+                        galleryFolder?.name ?: "本地图库",
                         {
                             selecting = false
                             selected = emptySet()
                             showTagDialog = false
-                            onBack()
+                            // 在子文件夹里返回上一层，否则退出本地图库
+                            if (galleryFolder != null) onLeaveFolder() else onBack()
                         },
                         onSearch
                     )
@@ -514,19 +520,26 @@ private fun EmojiPanel(
                             }
                         }
                     }
-                    if (galleryFiles.isEmpty()) {
+                    if (galleryFiles.isEmpty() && galleryFolders.isEmpty()) {
                         EmptyHint(
-                            if (selecting) "本地图库为空"
-                            else "本地图库为空，可在网络图库详情中下载保存"
+                            when {
+                                galleryFolder != null -> "此文件夹为空"
+                                selecting -> "本地图库为空"
+                                else -> "本地图库为空，可在网络图库详情中下载保存"
+                            }
                         )
                     } else {
                         // chunked 结果缓存，避免每次重组重新分块并生成新列表
+                        val folderRows = remember(galleryFolders) { galleryFolders.chunked(5) }
                         val galleryRows = remember(galleryFiles) { galleryFiles.chunked(5) }
                         LazyColumn(
                             Modifier.weight(1f).padding(horizontal = 16.dp),
                             verticalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            items(galleryRows) { row ->
+                            items(folderRows, key = { row -> "dir:" + row.first().absolutePath }) { row ->
+                                FolderTileRow(row, onTap = onEnterFolder)
+                            }
+                            items(galleryRows, key = { row -> "img:" + row.first().absolutePath }) { row ->
                                 MediaThumbRow(
                                     row.map { MediaCell(it.absolutePath, it.absolutePath, null) },
                                     onTap = { cell ->
@@ -553,16 +566,14 @@ private fun EmojiPanel(
                                 selected = emptySet()
                             }
                             DetailButton(
-                                if (uploading) "上传中…" else "上传 (${selected.size})",
+                                "上传 (${selected.size})",
                                 colors.accentBlue,
                                 Modifier.weight(1f)
                             ) {
-                                if (!uploading) {
-                                    if (selected.isEmpty()) {
-                                        Toasts.toast("请先选择要上传的图片")
-                                    } else {
-                                        showTagDialog = true
-                                    }
+                                if (selected.isEmpty()) {
+                                    Toasts.toast("请先选择要上传的图片")
+                                } else {
+                                    showTagDialog = true
                                 }
                             }
                         }
@@ -843,6 +854,78 @@ private fun PanelHeader(title: String, onBack: () -> Unit, onSearch: (() -> Unit
     }
 }
 
+/** 文件夹行：本地语音/视频列表里的子文件夹 */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FolderRow(name: String, onClick: () -> Unit) {
+    val colors = QEdgeTheme.colors
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(colors.cardBackground)
+            .combinedClickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                onClick = onClick
+            )
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Image(painterResource(R.drawable.folder), contentDescription = null, modifier = Modifier.size(20.dp))
+        Spacer(Modifier.width(10.dp))
+        Text(
+            name,
+            Modifier.weight(1f),
+            fontSize = 14.sp,
+            color = colors.textPrimary,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text("›", fontSize = 18.sp, color = colors.accentBlue)
+    }
+}
+
+/** 文件夹格子：本地图库网格里的子文件夹，与图片格子等宽 */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FolderTileRow(folders: List<File>, onTap: (File) -> Unit) {
+    val colors = QEdgeTheme.colors
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        folders.forEach { dir ->
+            Column(Modifier.weight(1f)) {
+                Box(
+                    Modifier
+                        .aspectRatio(1f)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(colors.cardBackground)
+                        .combinedClickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = { onTap(dir) }
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(painterResource(R.drawable.folder), contentDescription = null, modifier = Modifier.size(32.dp))
+                }
+                Text(
+                    dir.name,
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    color = colors.textPrimary,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        // 补足空位，保持和图片格子一样的列宽
+        repeat((5 - folders.size).coerceAtLeast(0)) { Spacer(Modifier.weight(1f)) }
+    }
+}
+
 @Composable
 private fun EmptyHint(text: String) {
     val colors = QEdgeTheme.colors
@@ -1059,11 +1142,14 @@ private fun SearchPage(
 @Composable
 private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (DetailTarget) -> Unit, onSearch: () -> Unit, refreshTrigger: Int = 0) {
     val colors = QEdgeTheme.colors
-    val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     var collections by remember(type) { mutableStateOf<List<MediaPanelLoader.MediaCollection>>(emptyList()) }
     var loaded by remember(type) { mutableStateOf(false) }
     var localFiles by remember(type) { mutableStateOf<List<File>>(emptyList()) }
+    // 本地资源按文件夹分组：null = 根目录（Ptts / Videos），否则是当前进入的子文件夹
+    var currentDir by remember(type) { mutableStateOf<File?>(null) }
+    var folders by remember(type) { mutableStateOf<List<File>>(emptyList()) }
     var nav by remember(type) { mutableIntStateOf(0) }
     var current by remember(type) { mutableStateOf<MediaPanelLoader.MediaCollection?>(null) }
     var items by remember(type) { mutableStateOf<List<MediaPanelLoader.MediaItem>>(emptyList()) }
@@ -1072,56 +1158,47 @@ private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (De
     var selecting by remember(type) { mutableStateOf(false) }
     var selected by remember(type) { mutableStateOf(setOf<String>()) }
     var showTagDialog by remember(type) { mutableStateOf(false) }
-    var uploading by remember(type) { mutableStateOf(false) }
 
     fun toggleSelect(path: String) {
         selected = if (path in selected) selected - path else selected + path
     }
 
     fun doUpload(collection: String, tags: List<String>) {
-        if (selected.isEmpty() || collection.isEmpty() || uploading) return
+        if (selected.isEmpty() || collection.isEmpty()) return
         val paths = selected.toList()
         val uin = QQCurrentEnv.getCurrentUin()
-        uploading = true
-        scope.launch(Dispatchers.IO) {
-            val result = try {
-                MediaPanelLoader.MediaApi.uploadImages(collection, paths, tags, type, uin)
-            } catch (e: Throwable) {
-                LogUtils.e("MediaPanelContent", "upload $type failed: " + e.message)
-                MediaPanelLoader.UploadResult(0, paths.size)
-            }
-            withContext(Dispatchers.Main) {
-                uploading = false
-                showTagDialog = false
-                if (result.success > 0) {
-                    val msg = if (result.failed > 0) {
-                        "上传成功 ${result.success} 个，失败 ${result.failed} 个"
-                    } else {
-                        "上传成功 ${result.success} 个"
-                    }
-                    Toasts.toast(msg)
-                    selecting = false
-                    selected = emptySet()
-                } else {
-                    Toasts.toast("上传失败，共 ${result.failed} 个")
-                }
-            }
-        }
+        // 先退出选择态（避免重复点击），再交给模块级作用域异步上传：关掉面板也继续，完成时再提示
+        selected = emptySet()
+        selecting = false
+        showTagDialog = false
+        Toasts.toast("${if (type == "voice") "语音" else "视频"}开始上传 ${paths.size} 个，可关闭面板等待完成")
+        MediaPanelLoader.MediaUploader.upload(collection, paths, tags, type, uin)
     }
 
-    LaunchedEffect(type) {
+    // 本地资源根目录（Ptts / Videos）
+    val rootDir = remember(type) { File(MediaPanelLoader.MediaFileCache.dirFor(type)) }
+
+    suspend fun loadLocalEntries() {
+        val (dirs, files) = withContext(Dispatchers.IO) { listDirEntries(currentDir ?: rootDir) }
+        folders = dirs
+        localFiles = files
+    }
+
+    LaunchedEffect(type, currentDir) {
         if (!loaded) {
             loaded = true
+            // 列本地文件前先要宿主的读取权限
+            if (!ensureHostMediaPermission(context, type)) {
+                Toasts.toast("未授予存储权限，无法读取本地文件")
+            }
             collections = withContext(Dispatchers.IO) { MediaPanelLoader.MediaApi.fetchCollections(type, 200) }
-            localFiles = withContext(Dispatchers.IO) { MediaPanelLoader.MediaFileCache.listFiles(type) }
         }
+        loadLocalEntries()
     }
 
-    // 本地文件重命名后重新加载列表
+    // 本地文件重命名/删除后重新加载当前目录
     LaunchedEffect(refreshTrigger) {
-        if (refreshTrigger > 0) {
-            localFiles = withContext(Dispatchers.IO) { MediaPanelLoader.MediaFileCache.listFiles(type) }
-        }
+        if (refreshTrigger > 0) loadLocalEntries()
     }
 
     LaunchedEffect(type, nav, current) {
@@ -1168,11 +1245,37 @@ private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (De
                             .padding(horizontal = 16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        item { SectionTitle(if (type == "voice") "本地语音" else "本地视频") }
-                        if (localFiles.isEmpty()) {
-                            item { EmptyHint("暂无本地资源") }
+                        item {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                if (currentDir != null) {
+                                    Box(
+                                        Modifier
+                                            .clip(RoundedCornerShape(8.dp))
+                                            .background(colors.cardBackground)
+                                            .combinedClickable(
+                                                interactionSource = remember { MutableInteractionSource() },
+                                                indication = null,
+                                                onClick = {
+                                                    currentDir = currentDir?.parentFile
+                                                        ?.takeIf { it.absolutePath != rootDir.absolutePath }
+                                                }
+                                            )
+                                            .padding(horizontal = 10.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("返回", fontSize = 12.sp, color = colors.accentBlue)
+                                    }
+                                    Spacer(Modifier.width(10.dp))
+                                }
+                                SectionTitle(currentDir?.name ?: if (type == "voice") "本地语音" else "本地视频")
+                            }
+                        }
+                        if (folders.isEmpty() && localFiles.isEmpty()) {
+                            item { EmptyHint(if (currentDir == null) "暂无本地资源" else "此文件夹为空") }
                         } else {
-                            items(localFiles) { f ->
+                            items(folders, key = { "dir:" + it.absolutePath }) { dir ->
+                                FolderRow(dir.name) { currentDir = dir }
+                            }
+                            items(localFiles, key = { "file:" + it.absolutePath }) { f ->
                                 AudioRow(
                                     f.name,
                                     onClick = {
@@ -1210,16 +1313,14 @@ private fun AudioPanel(type: String, onSend: (String) -> Unit, onOpenDetail: (De
                                 selected = emptySet()
                             }
                             DetailButton(
-                                if (uploading) "上传中…" else "上传 (${selected.size})",
+                                "上传 (${selected.size})",
                                 colors.accentBlue,
                                 Modifier.weight(1f)
                             ) {
-                                if (!uploading) {
-                                    if (selected.isEmpty()) {
-                                        Toasts.toast("请先选择要上传的文件")
-                                    } else {
-                                        showTagDialog = true
-                                    }
+                                if (selected.isEmpty()) {
+                                    Toasts.toast("请先选择要上传的文件")
+                                } else {
+                                    showTagDialog = true
                                 }
                             }
                         }
@@ -2218,15 +2319,58 @@ private fun rememberDetailSize(target: DetailTarget): String {
     return result
 }
 
-private fun listGalleryFiles(): List<File> {
-    return try {
-        val dir = File(MediaPanelLoader.MediaImageCache.galleryDir())
-        (dir.listFiles() ?: emptyArray())
-            .filter { it.isFile }
-            .sortedByDescending { it.lastModified() }
+/** 列目录内容：子文件夹（按名升序）+ 文件（按修改时间倒序），用于本地资源按文件夹分组显示 */
+private fun listDirEntries(dir: File): Pair<List<File>, List<File>> {
+    val children = try {
+        dir.listFiles() ?: emptyArray()
     } catch (e: Throwable) {
-        emptyList()
+        emptyArray()
     }
+    val folders = children.filter { it.isDirectory }.sortedBy { it.name.lowercase() }
+    val files = children.filter { it.isFile }.sortedByDescending { it.lastModified() }
+    return folders to files
+}
+
+private const val HOST_PERMISSION_REQUEST_CODE = 0x5E01
+
+/** 本地文件按类型要哪个权限：Android 13 起媒体权限细分，之前统一是存储权限 */
+private fun hostMediaPermission(type: String): String =
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        when (type) {
+            "video" -> Manifest.permission.READ_MEDIA_VIDEO
+            "img" -> Manifest.permission.READ_MEDIA_IMAGES
+            else -> Manifest.permission.READ_MEDIA_AUDIO
+        }
+    } else {
+        Manifest.permission.READ_EXTERNAL_STORAGE
+    }
+
+/**
+ * 读本地语音/视频/音频前先申请权限。
+ * 文件是宿主进程在读，必须用宿主的 Activity 申请（模块自己的权限申请没用）；
+ * 宿主 Activity 拿不到 onRequestPermissionsResult 回调，所以这里轮询等用户操作结果。
+ */
+private suspend fun ensureHostMediaPermission(context: Context, type: String): Boolean {
+    val permission = hostMediaPermission(type)
+    if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+        return true
+    }
+    val activity = QQCurrentEnv.getActivity() ?: (context as? Activity)
+    if (activity == null) {
+        LogUtils.e("MediaPanelContent", "申请宿主权限失败：拿不到宿主 Activity")
+        return false
+    }
+    withContext(Dispatchers.Main) {
+        ActivityCompat.requestPermissions(activity, arrayOf(permission), HOST_PERMISSION_REQUEST_CODE)
+    }
+    // 系统弹窗是异步的，最多等 10 秒
+    repeat(100) {
+        delay(100)
+        if (ContextCompat.checkSelfPermission(context, permission) == PackageManager.PERMISSION_GRANTED) {
+            return true
+        }
+    }
+    return false
 }
 
 private fun formatSize(bytes: Long): String {

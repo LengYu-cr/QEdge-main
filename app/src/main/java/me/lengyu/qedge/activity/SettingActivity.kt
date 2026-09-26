@@ -10,8 +10,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -30,7 +28,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.toMutableStateList
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.getValue
@@ -42,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.view.WindowCompat
+import me.lengyu.qedge.hook.HeartbeatManager
 import me.lengyu.qedge.ui.pages.PluginData
 import me.lengyu.qedge.ui.pages.HomeScreen
 import me.lengyu.qedge.ui.pages.FileManagerScreen
@@ -112,6 +111,11 @@ class SettingActivity : ComponentActivity() {
         try {
             if (!me.lengyu.qedge.hook.UserData.hasUpdateInfo()) return
             val version = me.lengyu.qedge.hook.UserData.getUpdateVersion()
+            // 双保险：心跳落盘的数据可能是更新前写的，装上这个版本后同样不该再弹，顺手清掉
+            if (!HeartbeatManager.isNewerVersion(version, HostInfo.moduleVersionName)) {
+                me.lengyu.qedge.hook.UserData.clearUpdateInfo()
+                return
+            }
             me.lengyu.qedge.ui.components.dialogs.UpdateDialog(
                 this,
                 version,
@@ -380,8 +384,10 @@ class SettingActivity : ComponentActivity() {
     @OptIn(ExperimentalAnimationApi::class)
     private fun setupUI() {
         setContent {
-            val list = remember { mutableStateListOf<PluginData>() }
-            list.addAll(getPluginList())
+            // 只在首次组合时取一次插件列表：写在组合体里会被每次重组重复 addAll，
+            // 列表越滚越大，同名 pluginId 重复出现会直接让 LazyColumn 抛
+            // "Key ... was already used" 崩溃
+            val list = remember { getPluginList().toMutableStateList() }
             this@SettingActivity.pluginList = list
 
             val initialPage = intent.getStringExtra("page") ?: getSavedPage()
@@ -402,32 +408,31 @@ class SettingActivity : ComponentActivity() {
                     targetState = currentPage,
                     transitionSpec = {
                         val forward = targetState != "plugin" && initialState == "plugin"
+                        // 只做位移，不做淡入淡出。
+                        // 两页滑动时互相覆盖、且始终不透明，中途不会有半透明重叠；
+                        // 一旦叠上 fadeIn/fadeOut，切换中段两层都是半透明，会透出窗口底色
+                        // （背景图模式下窗口底是纯黑），表现就是"打开页面黑一下"，还多一层合成开销。
+                        val easing = androidx.compose.animation.core.Easing { x ->
+                            x * x * (3f - 2f * x)
+                        }
                         if (forward) {
                             slideInHorizontally(
-                                animationSpec = tween(300, easing = androidx.compose.animation.core.Easing { x ->
-                                    x * x * (3f - 2f * x)
-                                }),
+                                animationSpec = tween(300, easing = easing),
                                 initialOffsetX = { it }
-                            ) + fadeIn(animationSpec = tween(200)) togetherWith
+                            ) togetherWith
                             slideOutHorizontally(
-                                animationSpec = tween(300, easing = androidx.compose.animation.core.Easing { x ->
-                                    x * x * (3f - 2f * x)
-                                }),
+                                animationSpec = tween(300, easing = easing),
                                 targetOffsetX = { -it / 3 }
-                            ) + fadeOut(animationSpec = tween(200))
+                            )
                         } else {
                             slideInHorizontally(
-                                animationSpec = tween(300, easing = androidx.compose.animation.core.Easing { x ->
-                                    x * x * (3f - 2f * x)
-                                }),
+                                animationSpec = tween(300, easing = easing),
                                 initialOffsetX = { -it }
-                            ) + fadeIn(animationSpec = tween(200)) togetherWith
+                            ) togetherWith
                             slideOutHorizontally(
-                                animationSpec = tween(300, easing = androidx.compose.animation.core.Easing { x ->
-                                    x * x * (3f - 2f * x)
-                                }),
+                                animationSpec = tween(300, easing = easing),
                                 targetOffsetX = { it / 3 }
-                            ) + fadeOut(animationSpec = tween(200))
+                            )
                         }
                     },
                     contentAlignment = androidx.compose.ui.Alignment.Center,

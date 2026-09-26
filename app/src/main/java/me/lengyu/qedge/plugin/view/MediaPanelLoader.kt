@@ -6,6 +6,10 @@ import android.view.View
 import com.tencent.qqnt.aio.activity.AIODelegate
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import me.lengyu.qedge.lifecycle.Parasitics
 import me.lengyu.qedge.ui.core.compatibility.QEdgeBottomDialog
 import me.lengyu.qedge.ui.pages.media.MediaPanelContent
@@ -68,6 +72,33 @@ object MediaPanelLoader {
 
     /** 上传结果：成功入库数与失败数（失败 = 上传图床失败 + 服务器拒绝 + 入库异常） */
     data class UploadResult(val success: Int, val failed: Int)
+
+    /**
+     * 上传任务跑在模块级作用域里：面板关掉之后上传继续跑，完成后用 Toast 提示（静默完成）。
+     */
+    object MediaUploader {
+        private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+        fun upload(collection: String, paths: List<String>, tags: List<String>, type: String, uin: String) {
+            if (collection.isEmpty() || paths.isEmpty()) return
+            val unit = if (type == "img") "张" else "个"
+            scope.launch {
+                val result = try {
+                    MediaApi.uploadImages(collection, paths, tags, type, uin)
+                } catch (e: Throwable) {
+                    LogUtils.e("MediaUploader", "upload $type failed: " + e.message)
+                    UploadResult(0, paths.size)
+                }
+                Toasts.toast(
+                    when {
+                        result.success <= 0 -> "上传失败，共 ${result.failed} $unit"
+                        result.failed > 0 -> "上传完成：成功 ${result.success} $unit，失败 ${result.failed} $unit"
+                        else -> "上传完成：成功 ${result.success} $unit"
+                    }
+                )
+            }
+        }
+    }
 
     private var hooked = false
     private var aioDelegate: AIODelegate? = null
@@ -441,17 +472,6 @@ object MediaPanelLoader {
             val d = QQCurrentEnv.getLocalPath() + "Download/QQ/QEdge/" + sub + "/"
             File(d).let { if (!it.exists()) it.mkdirs() }
             return d
-        }
-
-        fun listFiles(type: String): List<File> {
-            return try {
-                val dir = File(dirFor(type))
-                (dir.listFiles() ?: emptyArray())
-                    .filter { it.isFile }
-                    .sortedByDescending { it.lastModified() }
-            } catch (e: Throwable) {
-                emptyList()
-            }
         }
     }
 }

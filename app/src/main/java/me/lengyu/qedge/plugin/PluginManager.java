@@ -54,7 +54,42 @@ public class PluginManager {
             }
         }
 
+        checkDuplicateIds();
         loadAutoLoadConfig();
+    }
+
+    /**
+     * 检查重复插件 id。
+     *
+     * id 取自各插件目录下的 info.prop，不是目录名：重复解压、复制目录都会留下两个
+     * 声明同一个 id 的目录。这种插件在列表里会串台（运行状态、自动加载、删除都是按 id 查找），
+     * 这里日志记录 + 提示用户清理。
+     */
+    private static void checkDuplicateIds() {
+        Map<String, List<String>> dirsById = new HashMap<>();
+        for (PluginInfo info : plugins) {
+            List<String> dirs = dirsById.get(info.getId());
+            if (dirs == null) {
+                dirs = new ArrayList<>();
+                dirsById.put(info.getId(), dirs);
+            }
+            dirs.add(new File(info.getDirPath()).getName());
+        }
+
+        List<String> duplicateIds = new ArrayList<>();
+        for (Map.Entry<String, List<String>> entry : dirsById.entrySet()) {
+            if (entry.getValue().size() >= 2) {
+                duplicateIds.add(entry.getKey());
+            }
+        }
+        if (duplicateIds.isEmpty()) return;
+
+        StringBuilder detail = new StringBuilder();
+        for (String id : duplicateIds) {
+            if (detail.length() > 0) detail.append("; ");
+            detail.append(id).append(" -> ").append(dirsById.get(id));
+        }
+        LogUtils.e("PluginManager", "检测到重复插件ID: " + detail);
     }
 
     private static void loadAutoLoadConfig() {

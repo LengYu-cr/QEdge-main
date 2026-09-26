@@ -158,7 +158,8 @@ public class HeartbeatManager {
                     
                     if (!version.isEmpty() && !apkUrl.isEmpty()) {
                         String ignoredVersion = ModuleConfig.INSTANCE.getString("ignored_version", "");
-                        if (!version.equals(ignoredVersion)) {
+                        // 已经装上这个版本了就不再提示：只按"服务端版本 > 本机安装版本"判定
+                        if (isNewerVersion(version, HostInfo.moduleVersionName) && !version.equals(ignoredVersion)) {
                             // 只落盘更新数据，进入设置页时再弹更新日志
                             UserData.setUpdateInfo(version, updateLog, apkUrl);
                             // 温柔提醒，不打断使用
@@ -170,6 +171,49 @@ public class HeartbeatManager {
         } catch (Exception e) {
             LogUtils.e("HeartbeatManager", "Parse response failed: " + e.getMessage());
         }
+    }
+
+    /**
+     * 服务端版本是否比本机安装的模块版本新。
+     * 只按分段数字比较（1.0.10 > 1.0.9），任一版本号解析不出数字时保守返回 false，
+     * 宁可少提示一次，也不要把"已经装上的版本"再报一遍更新。
+     */
+    public static boolean isNewerVersion(String remoteVersion, String installedVersion) {
+        int[] remote = parseVersion(remoteVersion);
+        int[] installed = parseVersion(installedVersion);
+        if (remote.length == 0 || installed.length == 0) return false;
+
+        int length = Math.max(remote.length, installed.length);
+        for (int i = 0; i < length; i++) {
+            int r = i < remote.length ? remote[i] : 0;
+            int c = i < installed.length ? installed[i] : 0;
+            if (r != c) return r > c;
+        }
+        return false;
+    }
+
+    /** 把 "0.2.8" / "v1.0.10-beta" 解析成 {0,2,8} / {1,0,10}，非数字段记 0。 */
+    private static int[] parseVersion(String version) {
+        if (version == null) return new int[0];
+        String trimmed = version.trim();
+        if (trimmed.isEmpty()) return new int[0];
+
+        String[] parts = trimmed.split("\\.");
+        int[] numbers = new int[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            StringBuilder digits = new StringBuilder();
+            for (int j = 0; j < parts[i].length(); j++) {
+                char ch = parts[i].charAt(j);
+                if (ch >= '0' && ch <= '9') digits.append(ch);
+                else if (digits.length() > 0) break;
+            }
+            try {
+                numbers[i] = digits.length() == 0 ? 0 : Integer.parseInt(digits.toString());
+            } catch (NumberFormatException e) {
+                numbers[i] = 0;
+            }
+        }
+        return numbers;
     }
 
     private void showWelcomeDialog(String initialPassword, String currentUin) {
