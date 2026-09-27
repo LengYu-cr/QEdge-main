@@ -19,10 +19,18 @@
 | 音乐卡片 / 小程序卡片发送 | ✅ | ✅ | ExtraTool.sendMusicCard / sendMiniApp，直接构造 Ark Proto 发送 |
 | 自定义透明头像 | ✅ | ✅ | 无限制，支持 PNG 透明头像|
 | 一键复读 | ✅ | ✅ | 消息气泡旁注入复读入口，点击自动复读该条消息 |
+| 防撤回 | ✅ | ✅ | 协议层拦截撤回推送，被撤回消息依然可见并标注「消息已撤回」 |
+| 长按发送按钮发卡片 | ✅ | ✅ | 长按发送按钮，将输入框内容作为 Ark 卡片 JSON 发送 |
+| 复制卡片消息 | ✅ | ✅ | 卡片消息上方注入「长按复制卡片」按钮，复制卡片 JSON 数据 |
+| 屏蔽链接卡片 | ✅ | ✅ | 移除消息中的链接信息卡片 |
+| 取消拍一拍延迟 | ✅ | ✅ | 取消拍一拍的时间间隔限制 |
 | 语音消息倍速播放 | ✅ | ✅ | 强制固定倍速播放语音（默认 1.5x，可自定义），hook 底层播放器 `setPlaySpeed` |
+| 语音消息强制免提 | ✅ | ✅ | 语音消息强制免提播放，不走听筒 |
 | 篡改发送图片比例 | ✅ | ✅ | 对所有发送的图片元素强制设置 picWidth/picHeight，可自定义宽高 |
 | 图片外显自定义 | ✅ | ✅ | 发送图片时将外显摘要改为随机文案或 HTTP 接口返回内容 |
 | 表情包 AI 标签 | ✅ | ✅ | 发送单图纯表情包时带上「AI表情」标签（picType 1000→2000） |
+| 输入框无字数限制 | ✅ | ✅ | 解除聊天输入框字数限制 |
+| 强制显示全屏按钮 | ✅ | ✅ | 强制显示输入框全屏按钮 |
 
 ### 🛰️ QQ 空间系列
 
@@ -47,6 +55,7 @@
 | **去页面内横幅广告** | 拦截 QQ 主界面顶部横幅（LebaPluginBannerView）等广告数据源 |
 | **禁用 QQ 修复补丁** | 拦截并禁用 QQ 的修复补丁机制 |
 | **禁用 QQ 日志上报** | 在最终 SSO 发送前拦截，禁用 QQ 日志/上报链路 |
+| **拦截安全校验** | 拦截 QQ 安全校验（SecUtil 重打包/签名校验）与网页安全 OCR 检测 |
 
 ### ⚡ 等级加速类（每日 **00:00** 自动执行）
 
@@ -88,6 +97,10 @@
 | **KK 键盘** | `im.weshine.keyboard` | 解锁 SVIP / VIP，皮肤 / 字体 / 表情全部可用；关闭所有广告；DexKit 找退出拦截逻辑加全局兜底防崩溃 |
 | **酷狗音乐（大字版 + 概念版）** | `com.kugou.android.elder`<br>`com.kugou.android.lite` | ① **跳过所有开屏广告**：GdtSplashActivity / AdContainerActivity / 大字版&概念版 gotoAd 直接跳主界面 `MediaActivity`|
 | **傲软抠图** | `com.apowersoft.backgrounderaser` | 解锁 VIP：`VipManager.isVip` / `isVipValid` / `isExpire` / `isVipValidOrBalance` 全部返回 true；`getDeadlineDate` 改写为长有效期；抠图不限次数 |
+| **讯飞输入法** | `com.iflytek.inputmethod` | 解锁会员：Hook `VipAidlUtils` → `IVipCoreService$Wrapper` / `VipCoreServiceBinder` 会员判定链路，覆盖 `vip_resource` / `vip_lianai` / `vip_youbang` 三种会员种类 |
+| **设备信息X** | `com.liuzh.deviceinfo` | 解锁专业版：以 `hu3.b()` 为唯一判定源头强制返回 true；DexKit 通过 `is_pro_user` 字符串定位 Vip 模型，SharedPreferences 兜底 |
+| **无痛单词** | `tech.xiangzi.painless` | 解锁专业版：Hook `UserBean` 的 `isPro()` / `getPro()` / `getProExpire()` / `getProType()`，返回永久专业版（PRO_FOREVER） |
+| **木函** | `com.One.WoodenLetter` | 解锁会员：DexKit 通过 `user_gid` 字符串定位 `util.a.f()` / `k()` 判定方法并强制返回会员态，本地存储兜底返回 3 |
 
 ---
 
@@ -114,9 +127,13 @@
 | NT QQ | 8.9.58 - 9.3.xx | `com.tencent.mobileqq` |
 | NT TIM | 3.9.0 - 4.1.0（已适配卡片跳转绕过） | `com.tencent.tim` |
 | KK 键盘（全版本） | 最新版即可 | `im.weshine.keyboard` |
-| 酷狗音乐（普通 / 大字 / 概念 三版） | 最新版即可 | `com.kugou.android` / `.elder` / `.lite` |
+| 酷狗音乐（大字版 / 概念版） | 最新版即可 | `com.kugou.android.elder` / `com.kugou.android.lite` |
 | 傲软抠图（全版本） | 最新版即可 | `com.apowersoft.backgrounderaser` |
-| Android | 9.0 ~ 16 | — |
+| 讯飞输入法 | 最新版即可 | `com.iflytek.inputmethod` |
+| 设备信息X | 最新版即可 | `com.liuzh.deviceinfo` |
+| 无痛单词 | 最新版即可 | `tech.xiangzi.painless` |
+| 木函 | 最新版即可 | `com.One.WoodenLetter` |
+| Android | 10.0 ~ 16 | — |
 | Xposed 框架 | LSPosed / LSPatch / FPA / 原子 / 无极（Zygisk 模式）等 | — |
 
 ---
@@ -127,17 +144,16 @@
 QEdge/
 ├── app/
 │   └── src/main/java/me/lengyu/qedge/
-│       ├── coldrain/               # 冷雨 QQ 机器人核心（21 功能，ColdRainCore + features/）
+│       ├── coldrain/               # 冷雨 QQ 机器人核心（22 功能，ColdRainCore + features/）
 │       ├── hook/
 │       │   ├── base/               # BaseHookItem / BaseApiHookItem / BaseSwitchHookItem 基类
 │       │   ├── api/                # 通用 Hook 能力（OnMenuBuild / OnSendMsg / OnPush…）
 │       │   ├── entry/              # QQPlusInject / QQSettingInject（设置入口劫持）
-│       │   ├── item/               # QQ/TIM 具体功能项（每功能一个文件，33 项）
+│       │   ├── item/               # QQ/TIM 具体功能项（每功能一个文件，34 项）
 │       │   │   ├── PreventRecall.kt      # 防撤回（协议层拦截）
 │       │   │   ├── KeepAliveHook.kt      # 保活（像素窗/前台/后台通知三策略）
 │       │   │   ├── RepeatMsg.kt          # 复读机
-│       │   │   ├── LevelBoost.kt         # 等级加速（自动加好友）
-│       │   │   ├── QZoneSchedule.kt      # 定时任务调度器（三签到 + 定时说说）
+│       │   │   ├── LevelBoost.kt         # 等级加速（三签到 + 定时说说 + 自动加好友）
 │       │   │   ├── QZoneLikeTool.kt      # 空间 HTTP 接口封装（秒赞/秒评/签到/发说说/日签/大会员）
 │       │   │   ├── LongClickSendCard.kt  # 长按发送按钮发卡片（三级 Hook 策略）
 │       │   │   ├── CopyArkMessage.kt     # 复制卡片消息
@@ -166,10 +182,12 @@ QEdge/
 │       │   │   ├── DisableSecCheck.java  # 拦截 QQ 安全校验（SecUtil 重打包/签名校验）
 │       │   │   ├── DisableWebSecurityCheck.java  # 拦截网页安全 OCR 检测
 │       │   │   ├── ForceModuleToast.java # 强制模块 Toast
+│       │   │   ├── ForceInputNoLimit.java       # 解除输入框字数限制
+│       │   │   ├── ForceFullScreenBtnShow.java  # 强制显示输入框全屏按钮
 │       │   │   ├── ForceSpeaker.java     # 语音消息强制免提，不走听筒
 │       │   │   └── ...                   # 详见 CodeWiki
 │       │   ├── kk/                       # KK 键盘（im.weshine.keyboard）VIP/去广告 Hook
-│       │   ├── kugou/                    # 酷狗音乐（普通/大字/概念 三版）开屏跳过 + 乐固签名绕过
+│       │   ├── kugou/                    # 酷狗音乐（大字版/概念版）开屏跳过 + 乐固签名绕过
 │       │   ├── aoruan/                   # 傲软抠图（com.apowersoft.backgrounderaser）VIP 解锁
 │       │   ├── ifly/                     # com.iflytek.inputmethod
 │       │   ├── deviceInfoX/              # com.liuzh.deviceinfo
@@ -180,10 +198,11 @@ QEdge/
 │       │   ├── PluginManager.java / PluginCompiler.java / PluginCallback.java
 │       │   ├── api/PluginMethod.java     # 暴露给脚本的 180+ 宿主 API
 │       │   ├── bean/                     # MsgData / PluginInfo / GroupInfo / MemberInfo / ...
-│       │   └── view/ChatSettingLoader.kt # 聊天设置入口 BottomSheet
+│       │   └── view/ChatSettingLoader.kt + MediaPanelLoader.kt  # 聊天设置 / 媒体面板入口
 │       ├── ui/
-│       │   ├── pages/                    # HomeScreen（4 Tab）、home/（新首页侧滑栏）、coldrain/、file/
+│       │   ├── pages/                    # HomeScreen（4 Tab）、home/（新首页侧滑栏）、coldrain/、file/、media/
 │       │   ├── services/OnlinePluginService.kt  # 在线脚本 HTTP 服务
+│       │   ├── widget/glass/GlassBackdropHost.java  # 液态玻璃背景宿主
 │       │   ├── components/ + core/       # 原子组件 / 对话框 / 主题
 │       ├── lifecycle/                    # 寄生 Activity（Parasitics / DynamicActivityRegistry）
 │       ├── utils/

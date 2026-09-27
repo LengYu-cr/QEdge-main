@@ -1,6 +1,6 @@
 # QEdge Code Wiki
 
-> 基于 **NT QQ / NT TIM** 的 Xposed 增强模块 + 在线脚本平台。模块化设计，所有功能开关独立可控；Hook 全部 O(1)，无遍历/无循环反射/无深度拷贝；配套 PHP 后台支持脚本上传、下载、反馈、赞助墙、用户中心。
+> 基于 **NT QQ / NT TIM** 的 Xposed 增强模块 + 在线脚本平台。模块化设计，所有功能开关独立可控；Hook 全部 O(1)，无遍历/无循环反射/无深度拷贝；配套 PHP 后台（独立服务端工程，不在本仓库）支持脚本上传、下载、反馈、赞助墙、用户中心。
 
 ---
 
@@ -57,47 +57,51 @@
 ```
 QEdge/
 ├── app/                                     # 主模块（Xposed + UI）
-│   └── src/main/java/me/lengyu/qedge/
-│       ├── coldrain/                        # 冷雨机器人核心（21 功能）
-│       │   ├── ColdRainCore.java / ColdRainFeature.java
-│       │   └── features/                    # 各功能策略（At/群管/签到/天气/解析/...）
-│       ├── hook/                            # Hook 系统
-│       │   ├── XposedEntry.java / MainHook.java / UserData.java / HeartbeatManager.java
-│       │   ├── annotation/  # HookItemAnnotation / HookCategory
-│       │   ├── api/         # 事件分发（OnReceiveMsg/OnSendMsg/OnMenuBuild/...）
-│       │   ├── base/        # 基类 + HookRegistry 注册中心
-│       │   ├── item/        # 功能项（防撤回/闪照破解/保活/复读/...33 项）
-│       │   ├── entry/       # QQPlusInject / QQSettingInject（设置入口劫持）
-│       │   ├── kk/          # KK键盘
-│       │   ├── kugou/       # 酷狗音乐
-│       │   ├── aoruan/      # 傲软抠图
-│       │   ├── ifly/        # com.iflytek.inputmethod
-│       │   ├── deviceInfoX/ # com.liuzh.deviceinfo
-│       │   ├── painlessword/# tech.xiangzi.painless
-│       │   └── woodenletter/# com.One.WoodenLetter
-│       ├── plugin/                        # 在线脚本引擎（Java(BeanShell) + JS(Rhino) 双引擎）
-│       │   ├── PluginManager.java / PluginCompiler.java / PluginCallback.java
-│       │   ├── JsRuntime.kt / JsConsole    # JS(Rhino) 运行时
-│       │   ├── PluginInfo.java / PluginError.java / FixClassLoader.java
-│       │   ├── api/PluginMethod.java       # 暴露给脚本的 180+ 宿主 API
-│       │   ├── bean/                       # MsgData/PluginInfo/GroupInfo/MemberInfo/...
-│       │   └── view/ChatSettingLoader.kt   # 聊天设置入口 BottomSheet
-│       ├── ui/                            # Compose UI
-│       │   ├── pages/home/                # 新首页（MainScreen 侧滑栏 + 卡片）
-│       │   ├── pages/coldrain/            # 冷雨配置页
-│       │   ├── pages/file/                # 文件管理/编辑器/音频/图片
-│       │   ├── services/OnlinePluginService.kt  # 在线脚本 HTTP 服务
-│       │   └── components/ + core/theme/  # 原子组件/对话框/主题
-│       ├── lifecycle/                     # 寄生Activity（Parasitics/DynamicRegistry/CounterfeitFactory）
-│       ├── utils/                         # 工具集（配置/日志/网络/反射/DexKit/proto/json/qq）
-│       ├── activity/                      # SettingActivity / ThemeHelper
-│       ├── common/ModuleScope.kt          # IO 协程调度
-│       └── MainActivity.kt / LauncherActivity.kt
+│   └── src/main/java/
+│       ├── bsh/                             # BeanShell 解释器（Java 插件引擎，含内嵌 org.objectweb.asm）
+│       ├── com/liquidglass/java/miba/       # LiquidGlass 液态玻璃组件源码
+│       └── me/lengyu/qedge/
+│           ├── coldrain/                    # 冷雨机器人核心（22 功能）
+│           │   ├── ColdRainCore.java / ColdRainFeature.java
+│           │   └── features/                # 各功能策略（At/群管/签到/天气/解析/...）
+│           ├── hook/                        # Hook 系统
+│           │   ├── XposedEntry.java / MainHook.java / UserData.java / HeartbeatManager.java
+│           │   ├── annotation/  # HookItemAnnotation / HookCategory
+│           │   ├── api/         # 事件分发（OnReceiveMsg/OnSendMsg/OnMenuBuild/...）
+│           │   ├── base/        # 基类 + HookRegistry 注册中心
+│           │   ├── item/        # 功能项（防撤回/闪照破解/保活/复读/...34 项）
+│           │   ├── entry/       # QQPlusInject / QQSettingInject（设置入口劫持）
+│           │   ├── kk/          # KK键盘
+│           │   ├── kugou/       # 酷狗音乐（大字版 / 概念版）
+│           │   ├── aoruan/      # 傲软抠图
+│           │   ├── ifly/        # com.iflytek.inputmethod
+│           │   ├── deviceInfoX/ # com.liuzh.deviceinfo
+│           │   ├── painlessword/# tech.xiangzi.painless
+│           │   └── woodenletter/# com.One.WoodenLetter
+│           ├── plugin/                      # 在线脚本引擎（Java(BeanShell) + JS(Rhino) 双引擎）
+│           │   ├── PluginManager.java / PluginCompiler.java / PluginCallback.java
+│           │   ├── JsRuntime.kt             # JS(Rhino) 运行时
+│           │   ├── PluginError.java / FixClassLoader.java
+│           │   ├── api/PluginMethod.java    # 暴露给脚本的 180+ 宿主 API
+│           │   ├── bean/                    # MsgData/PluginInfo/GroupInfo/MemberInfo/...
+│           │   └── view/                    # ChatSettingLoader.kt / MediaPanelLoader.kt
+│           ├── ui/                          # Compose UI
+│           │   ├── pages/home/              # 新首页（MainScreen 侧滑栏 + 卡片）
+│           │   ├── pages/coldrain/          # 冷雨配置页
+│           │   ├── pages/file/              # 文件管理/编辑器/音频/图片
+│           │   ├── pages/media/             # 表情/语音/视频综合面板
+│           │   ├── services/OnlinePluginService.kt  # 在线脚本 HTTP 服务
+│           │   ├── widget/glass/            # GlassBackdropHost（液态玻璃背景宿主）
+│           │   └── components/ + core/theme/  # 原子组件/对话框/主题
+│           ├── lifecycle/                   # 寄生Activity（Parasitics/DynamicRegistry/CounterfeitFactory）
+│           ├── utils/                       # 工具集（配置/日志/网络/反射/DexKit/proto/json/qq）
+│           ├── activity/                    # SettingActivity / ThemeHelper
+│           ├── common/ModuleScope.kt        # IO 协程调度
+│           └── MainActivity.kt / LauncherActivity.kt
 │
 ├── qqinterface/                            # QQ接口stub（compileOnly）
 ├── libs/libxposed/                         # Xposed API
-├── QEdge后台/QEdge/                        # PHP后台
-├── bsh/                                    # BeanShell解释器（java 插件）
+├── libsrc/com/liquidglass/java/miba/       # LiquidGlass 库源码（独立 sourceSet）
 ├── build.gradle.kts
 └── gradle/libs.versions.toml
 ```
@@ -149,24 +153,27 @@ QQ/TIM 接口 Stub 层（compileOnly，不打包）：提供 NT 内核接口、�
 ### 4.1 Xposed 注入流程
 
 ```
-XposedEntry.initZygote()           -- 检测 Hook 框架（LSPosed/EdXposed）
+XposedEntry.initZygote()           -- 检测 Hook 框架（LSPosed/EdXposed/Dreamland）
     |
-XposedEntry.handleLoadPackage()    -- 按包名分流
+XposedEntry.handleLoadPackage()    -- 按包名分流（32 位设备直接拒绝并 Toast）
     |
     ├─ QQ/TIM: hook BaseApplicationImpl.onCreate
     |       ├─ HostInfo.init() + Parasitics.initForStubActivity()
     |       ├─ DexKit 缓存有效? 是 -> MainHook.loadHook()
     |       │                  否 -> DexKitFinder.doFind() -> 显示查找弹窗
     |       └─ MainHook.loadHook():
+    |           ├─ ConfigWarmup              异步预热 JsonConfigUtils 类初始化
+    |           ├─ HeartbeatManager.isBanned() 封禁检查
     |           ├─ registerHookItems()        注册所有 BaseHookItem
+    |           ├─ FromServiceMsgDispatcher.loadHook() 服务消息分发
     |           ├─ loadApiHook()              加载 API 类 Hook
     |           ├─ initSwitchHookItem()       初始化开关型 Hook
     |           ├─ hookAccountChange()        监听账号切换
-    |           └─ Thread[Plugin-AutoLoad]:
-    |               2s 延迟 -> loadPluginsIfNeeded() -> ColdRainCore.init()
+    |           ├─ 3s 延迟 -> ChatSettingLoader.loadHook() / MediaPanelLoader.loadHook()
+    |           └─ 5s 延迟 -> loadPluginsIfNeeded() -> ColdRainCore.init()
     |
     ├─ KK 键盘      -> KKHook.loadHook()
-    ├─ 酷狗音乐     -> KuGouHook.loadHook()（大字版 / 概念版分别入口）
+    ├─ 酷狗音乐     -> KuGouHook.loadHook()（大字版 com.kugou.android.elder / 概念版 com.kugou.android.lite 分别入口）
     ├─ 傲软抠图     -> AoRuanHook.loadHook()
     ├─ 讯飞输入法   -> IFlyHook.loadHook()
     ├─ 设备信息X    -> DeviceInfoXHook.loadHook()
@@ -208,8 +215,11 @@ Xposed 模块入口，实现 `IXposedHookLoadPackage` + `IXposedHookZygoteInit`�
 | `handleLoadPackage(LoadPackageParam)` | 按包名分发：QQ/TIM -> 延迟到 Application.onCreate；第三方 APP -> 立即 Hook |
 | `hookBaseApplicationOnCreate(classLoader)` | QQ/TIM 主入口，AtomicBoolean 保证一次性初始化 |
 | `getModulePathFromClassLoader()` | modulePath 为 null 时从 dexElements 反向查找 .apk 路径 |
+| `is32BitDevice()` / `reject32BitDevice(lpparam)` | 32 位设备仅 Toast 提示「QEdge 不支持 32 位系统版本」，不执行 Hook |
 
-支持的宿主：`com.tencent.mobileqq`, `com.tencent.tim`, `im.weshine.keyboard`, `com.iflytek.inputmethod`, `com.kugou.android`, `com.apowersoft.backgrounderaser`, `com.liuzh.deviceinfo`, `tech.xiangzi.painless`, `com.One.WoodenLetter`
+支持的宿主（`isNameSupported` 用 `startsWith` 匹配）：`com.tencent.mobileqq`, `com.tencent.tim`, `im.weshine.keyboard`, `com.iflytek.inputmethod`, `com.kugou.android`, `com.apowersoft.backgrounderaser`, `com.liuzh.deviceinfo`, `tech.xiangzi.painless`, `com.One.WoodenLetter`
+
+实际分发分支：QQ/TIM -> `hookBaseApplicationOnCreate`；`im.weshine.keyboard` -> `hookKK`；`com.iflytek.inputmethod` -> `hookIFly`；`com.kugou.android.elder` -> `hookKuGouElder`；`com.kugou.android.lite` -> `hookKuGouLite`；`com.apowersoft.backgrounderaser` -> `hookAoRuan`；`com.liuzh.deviceinfo` -> `hookDeviceInfoX`；`tech.xiangzi.painless` -> `hookPainless`；`com.One.WoodenLetter` -> `hookWoodenLetter`。普通版 `com.kugou.android` 虽通过 `isNameSupported` 校验，但无对应分支，实际不 Hook。
 
 #### [MainHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/MainHook.java)
 
@@ -217,8 +227,8 @@ Hook 加载调度中心。
 
 | 函数 | 说明 |
 |------|------|
-| `registerHookItems()` | 静态注册 20+ BaseHookItem 到 HookRegistry |
-| `loadHook()` | 主入口：检查封禁 -> 注册 -> 加载 API Hook -> 初始化开关 Hook -> 账号切换 -> 插件+冷雨 |
+| `registerHookItems()` | 静态注册 45 个 BaseHookItem 到 HookRegistry（9 个 API 项 + 36 个其它项） |
+| `loadHook()` | 主入口：ConfigWarmup 预热 -> 检查封禁 -> 注册 -> 服务消息分发 -> 加载 API Hook -> 初始化开关 Hook -> 账号切换 -> 3s 加载 ChatSettingLoader/MediaPanelLoader -> 5s 插件+冷雨 |
 | `loadApiHook()` | 遍历所有 BaseApiHookItem，`isInTargetProcess()` 则 `loadHook()` |
 | `initSwitchHookItem()` | 遍历所有 BaseSwitchHookItem，读取配置启用/禁用 |
 | `hookAccountChange()` | 多策略监听账号切换（优先特定方法 -> 兜底构造函数） |
@@ -241,33 +251,38 @@ public abstract class BaseHookItem {
 ```
 BaseHookItem
 ├── BaseApiHookItem<T extends Listener>     // 观察者模式，事件分发
-│   ├── OnReceiveMsg / OnSendMsg            // 收发消息
-│   ├── OnMenuBuild / OnPaiYiPai            // 菜单构建 / 拍一拍
-│   ├── OnTroopJoin / OnTroopQuit           // 进退群
-│   ├── OnTroopShutUp / OnQZonePush         // 禁言 / QZone 推送
-│   ├── OnGetRKey                           // RKey 获取
-│   └── FromServiceMsgDispatcher            // 服务消息分发
+│   ├── OnGetRKey / OnReceiveMsg / OnSendMsg       // RKey / 收发消息
+│   ├── OnMenuBuild / OnPaiYiPai                   // 菜单构建 / 拍一拍
+│   ├── OnTroopJoin / OnTroopQuit / OnTroopShutUp  // 进退群 / 禁言
+│   ├── OnQZonePush                                // QZone 推送
+│   ├── FromServiceMsgDispatcher                   // 服务消息分发
+│   ├── FlashPicBypass / DownloadEmotion           // 闪照破解 / 资源下载
+│   ├── TransparentAvatar / VideoToBubble          // 透明头像 / 视频转泡泡
+│   ├── AntiPokeDelay / TimArkCardBypass           // 取消拍延迟 / TIM 卡片绕过
+│   ├── LevelBoost / AutoLikeBack                  // 等级加速 / 名片回赞
+│   ├── RemoveLinkInfo / AntiReport / AntiQfixPatch // 屏蔽链接卡片 / 上报·补丁拦截
+│   ├── ForceVip / DisableAIAvatar                 // 解锁本地会员 / 屏蔽 QQ秀·AI头像
+│   ├── DisableSecCheck / DisableWebSecurityCheck  // 安全校验拦截 / 网页安全 OCR 拦截
+│   ├── ForceModuleToast / ForceInputNoLimit       // 强制模块 Toast / 输入无限制
+│   └── ForceFullScreenBtnShow                     // 强制显示全屏按钮
 │
 ├── BaseSwitchHookItem                      // 开关型 Hook（UI 开关控制）
-│   ├── FlashPicBypass / DownloadEmotion    // 闪照破解 / 资源下载
-│   ├── TransparentAvatar / VideoToBubble   // 透明头像 / 视频转泡泡
-│   ├── AntiPokeDelay / TimArkCardBypass    // 取消拍延迟 / TIM 卡片绕过
-│   ├── KeepAliveHook / QZoneSchedule       // 保活 / 定时任务
-│   ├── RepeatMsg / LevelBoost              // 复读 / 等级加速（自动加好友）
-│   ├── PreventRecall / CopyArkMessage      // 防撤回 / 复制卡片
-│   ├── LongClickSendCard / AutoLikeBack    // 长按发卡片 / 名片回赞
-│   ├── RemoveLinkInfo / QZoneLikeTool      // 屏蔽链接卡片 / QZone 打卡·秒赞·日签等
-│   ├── BypassProfileBan / RemoveQrCodeCheck // 绕过资料卡封禁 / 解除扫码限制
-│   ├── SkipScanWaitTime / QLogRedirect     // 跳过扫码确认 / QLog 日志处理
-│   ├── RemoveAds / RemoveRiskWebpageBlock  // 去横幅广告 / 解除风险网页拦截
-│   ├── VoiceSpeed / ImageRatioOverride     // 语音倍速 / 篡改图片比例
-│   ├── ImageSummary / EmotionAiTag         // 图片外显自定义 / 表情包 AI 标签
+│   ├── KeepAliveHook / PreventRecall / RepeatMsg  // 保活 / 防撤回 / 复读
+│   ├── CopyArkMessage / LongClickSendCard         // 复制卡片 / 长按发卡片
+│   ├── BypassProfileBan / RemoveQrCodeCheck       // 绕过资料卡封禁 / 解除扫码限制
+│   ├── SkipScanWaitTime / QLogRedirect            // 跳过扫码确认 / QLog 日志处理
+│   ├── RemoveAds / RemoveRiskWebpageBlock         // 去横幅广告 / 解除风险网页拦截
+│   ├── VoiceSpeed / ImageRatioOverride            // 语音倍速 / 篡改图片比例
+│   ├── ImageSummary / EmotionAiTag                // 图片外显自定义 / 表情包 AI 标签
+│   ├── ForceSpeaker                               // 语音消息强制免提
 │   └── ...
 │
 └── BaseClickableHookItem                   // 可点击菜单项
     ├── QQPlusInject                        // QQ+ 注入
     └── QQSettingInject                     // 设置页注入
 ```
+
+> `QZoneLikeTool` 不是 HookItem，而是 `DexKitTask`——QZone HTTP 接口封装（秒赞/秒评/签到/发说说/日签/大会员），被 `LevelBoost`、`AutoLikeBack` 等调用。
 
 ### 5.3 观察者模式（API Hook）
 
@@ -361,24 +376,26 @@ OnReceiveMsg.INSTANCE.registerListener(msgRecord -> { ... });
 
 **弹窗结构**：`LazyColumn` 列表，展示「脚本管理」列表（每个插件一条，含开关 + 长按菜单）和「冷雨配置」入口。
 
-#### 5.5.5 等级加速 & QZone 定时任务 `QZoneSchedule`
+#### 5.5.5 等级加速 & QZone 定时任务 `LevelBoost`
+
+实现位于 [LevelBoost.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/LevelBoost.kt)（`object LevelBoost : BaseApiHookItem<LevelBoost.Listener>()`），QZone HTTP 接口由 `QZoneLikeTool` 提供。
 
 **三重触发机制**（所有等级加速功能必须实现）：
 
 1. **加载时触发**：`loadHook` 启动时检查
 2. **开关切换触发**：UI 打开开关时立即检查
-3. **00:00 每日触发**：主进程 Timer 定时任务
+3. **00:00 每日触发**：主进程 Timer 定时任务（延迟 5s 启动、周期 60s）
 
-**每日去重**：`isDoneToday(tag)` / `markDoneToday(tag)` 幂等机制，确保同一天只执行一次。
+**每日去重**：`isDoneToday(tag)` / `markDoneToday(tag)` 幂等机制，确保同一天只执行一次；`markDoneToday` 会顺带清理 -7~-4 天的旧 key。
 
 | 功能 | 配置键 | 说明 |
 |------|--------|------|
 | 空间等级签到 | `qzone_daily_checkin_enabled` | QZone 打卡 |
 | QQ 日签打卡 | `qq_daily_sign_enabled` | ti.qq.com 签到 |
 | 大会员签到 | `qq_bigvip_checkin_enabled` | QQ 大会员中心 |
-| 自动加好友 | `level_boost_enabled` | 等级加速加好友 |
+| 自动加好友 | `level_boost_enabled` | 等级加速加好友（16 个 BOT_UINS 中随机取 3 个） |
 | 空间浏览 | `space_browse_enabled` | 提取最多 15 条好友动态链接，带 cookie 以 800ms 间隔访问 |
-| 定时说说 | `qzone_schedule_mood_enabled` | 用户自定义时间（HH:mm）+ 内容 |
+| 定时说说 | `qzone_schedule_mood_enabled` | 用户自定义时间（HH:mm，默认 08:30）+ 内容 |
 
 #### 5.5.6 保活机制 `KeepAliveHook`
 
@@ -469,6 +486,12 @@ OnReceiveMsg.INSTANCE.registerListener(msgRecord -> { ... });
 | 屏蔽 QQ秀/AI头像 | `DisableAIAvatar` | `disable_ai_avatar` | Hook 相关 boolean 判断方法强制返回 false |
 | 禁用 QQ 修复补丁 | `AntiQfixPatch` | `anti_qfix_patch` | 拦截并禁用 QQ 的修复补丁机制 |
 | 禁用 QQ 日志上报 | `AntiReport` | `anti_report` | 在最终 SSO 发送前拦截，禁用 QQ 日志/上报链路 |
+| 语音强制免提 | `ForceSpeaker` | `force_speaker` | 语音消息强制免提播放，不走听筒 |
+| 拦截安全校验 | `DisableSecCheck` | `disable_sec_check` | 拦截 QQ 安全校验（SecUtil 重打包/签名校验） |
+| 拦截网页安全检测 | `DisableWebSecurityCheck` | `disable_web_security_check` | 拦截网页安全 OCR 检测 |
+| 强制模块 Toast | `ForceModuleToast` | `force_module_toast` | 强制模块 Toast 提示 |
+| 输入无限制 | `ForceInputNoLimit` | `force_input_no_limit` | 解除输入框字数限制 |
+| 强制显示全屏按钮 | `ForceFullScreenBtnShow` | `force_fullscreen_btn_show` | 强制显示全屏按钮 |
 
 ---
 
@@ -519,7 +542,7 @@ DexKit 原生库加载管理器：解决 Hook 运行在宿主寄生 ClassLoader 
 
 ### 7.1 架构
 
-[ColdRainCore.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainCore.java) 采用**单例 + 策略模式**，维护 `Map<String, ColdRainFeature>` 功能策略表（20+ 功能），每个功能实现 `shouldHandle(msgData)` + `handle(msgData, core)` 接口。
+[ColdRainCore.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainCore.java) 采用**单例 + 策略模式**，维护 `Map<String, ColdRainFeature>` 功能策略表（22 个功能），每个功能实现 `shouldHandle(msgData)` + `handle(msgData, core)` 接口。
 
 功能包括：状态查询、菜单、问答、签到、群管、禁言检测、视频/音乐/图片解析、天气、整点报时、头衔、点赞、自动上管、头像菜单、进退群欢迎、黑白名单等。
 
@@ -689,17 +712,23 @@ ui/
 ├── core/
 │   ├── theme/          Color.kt (Light/Dark/OLED) / Dimens.kt / Theme.kt
 │   └── compatibility/  XposedComposeDialog.kt (宿主内启动 Compose 弹窗基类)
+├── widget/
+│   └── glass/          GlassBackdropHost.java（液态玻璃背景宿主）
 ├── services/
 │   └── OnlinePluginService.kt              # 在线脚本 HTTP 接口封装
 └── pages/
     ├── HomeScreen.kt                       # 寄生 QQ 的 4 Tab 配置页（模块首页/Java脚本/冷雨Java/文件管理）
+    ├── FileManagerScreen.kt                # 文件管理页
     ├── PluginData.java                     # 插件 UI 数据模型
     ├── home/                               # 新首页（MainScreen 侧滑栏）
     │   ├── MainScreen.kt / HomeSideRail.kt / HomeContentPanel.kt
-    │   ├── HomeDialogs.kt / HomeSupportDialog.kt
+    │   ├── HomeDialogs.kt / HomeSupportDialog.kt / HomeUserCards.kt
+    │   ├── HomePageModels.kt / HomePluginPages.kt
+    │   ├── HomeSettingsItems.kt / HomeSettingsPage.kt
     │   └── HomeBatteryState.kt             # 电池状态指示器
     ├── coldrain/                           # 冷雨配置（ColdRainScreen / ColdRainConfig / ColdRainConfigSection）
-    └── file/                               # 文件管理（FileListPanel / TextEditor / AudioPlayer / ImagePreview）
+    ├── media/                              # 表情/语音/视频综合面板（MediaPanelContent.kt）
+    └── file/                               # 文件管理（FileListPanel / FileManagerUtils / TextEditor / AudioPlayer / ImagePreview）
 ```
 
 ### 9.2 模块首页（`HomeScreen.kt`）
@@ -739,7 +768,7 @@ ui/
 
 ### 10.3 QQ 当前环境
 
-[QQCurrentEnv.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/QQCurrentEnv.java)
+[QQCurrentEnv.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/qq/QQCurrentEnv.java)
 
 | 方法 | 说明 |
 |------|------|
@@ -765,12 +794,14 @@ HttpUtils.java - GET/POST 封装，支持自定义 Headers，用于 Q群管家 A
 | `utils/dexkit/` | DexKit 查找与缓存：`DexKitFinder.kt`（执行查找）、`DexKitTask.kt`（任务接口）、`DexKitCache.kt`（结果缓存）、`DexKitManager.java`（native 库加载回退） |
 | `utils/json/` | JSON 便捷：`JsonExt.java`（路径取值/`u_` UID 深度查找）、`MessageTool.java`（pbandk 消息反射读写）、`ProtoData.java`（JSON/Protobuf 编解码） |
 | `utils/proto/` | 协议发送：`PacketHelper.java`（gzip/WUP/SSOEASY 发包转 JSON）、`packetListener.java` / `protoListener.java` |
-| `utils/reflect/` | 反射工具：`ReflectUtils.java` / `ReflectDSL.kt` / `ReflectExtensions.kt` / `ReflectCache.kt` / `ClassUtils.kt` |
+| `utils/reflect/` | 反射工具：`ReflectDSL.kt` / `ReflectExtensions.kt` / `ReflectCache.kt` / `ClassUtils.kt` |
 | `utils/hook/` | Hook 扩展：`HookExtensions.kt`（Kotlin DSL 包装 XposedBridge）、`HookStatusImpl.java` |
-| `utils/qq/` | QQ 能力封装：`QQCurrentEnv.java` / `MsgTool.java` / `TroopTool.kt` / `FriendTool.java` / `CookieTool.java` / `QQServiceHelper.java` / `ExtraTool.java` |
+| `utils/qq/` | QQ 能力封装：`QQCurrentEnv.java` / `MsgTool.java` / `TroopTool.kt` / `FriendTool.java` / `CookieTool.java` / `QQServiceHelper.java` / `ExtraTool.java` / `SilkPlayerProxy.kt` |
+| `ReflectUtils.java` | 反射工具（位于 `utils/` 根目录） |
 | `ObjectStore.java` | 跨类共享对象/实例的内存存储 |
 | `JarLoader.java` / `HybridClassLoader.java` | 宿主/插件 dex 加载 |
 | `ModulePathHolder.java` | 模块 APK 路径持有 |
+| `ZipUtil.java` | ZIP 解压/读取（脚本包解析） |
 | `Toasts.java` | 统一 Toast 封装 |
 | `HookUtils.java` | Hook 通用辅助 |
 
@@ -828,8 +859,8 @@ HttpUtils.java - GET/POST 封装，支持自定义 Headers，用于 Q群管家 A
 
 | 项目 | 要求 |
 |------|------|
-| 模块版本 | 0.2.7（versionCode 27） |
-| Android | 9.0 ~ 16 (API 28 ~ 37) |
+| 模块版本 | 0.2.9（versionCode 29） |
+| Android | 10.0 ~ 16 (API 29 ~ 37) |
 | Xposed 框架 | LSPosed / LSPatch / FPA / 原子 / 无极（Zygisk 模式） |
 | NT QQ | 8.9.58 ~ 9.3.xx |
 | NT TIM | 3.9.0 ~ 4.1.0 |
@@ -858,9 +889,27 @@ HttpUtils.java - GET/POST 封装，支持自定义 Headers，用于 Q群管家 A
 
 Hook `VipManager` 的 `isVip()`/`isVipValid()`/`isExpire()`/`isVipValidOrBalance()` 全返回 true，`getDeadlineDate()` 改写为长有效期，抠图不限次数。
 
+### 13.4 讯飞输入法 ([IFlyHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/ifly/IFlyHook.java))
+
+破解会员：Hook `VipAidlUtils` 经 `IVipCoreService$Wrapper` / `VipCoreServiceBinder` 的会员判定链路，强制返回会员态，覆盖 `vip_resource` / `vip_lianai` / `vip_youbang` 三种会员种类。
+
+### 13.5 设备信息X ([DeviceInfoXHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/deviceInfoX/DeviceInfoXHook.java))
+
+解锁专业版：以 `hu3.b()` 为唯一判定源头强制返回 true；DexKit 通过 `"is_pro_user"` 字符串定位 Vip 模型与相关方法，并以 SharedPreferences 兜底。
+
+### 13.6 无痛单词 ([PainlessWordHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/painlessword/PainlessWordHook.java))
+
+解锁专业版：Hook `UserBean` 的 `isPro()` / `getPro()` / `getProExpire()` / `getProType()`，返回永久专业版（PRO_FOREVER）。
+
+### 13.7 木函 ([WoodenLetterHook.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/woodenletter/WoodenLetterHook.java))
+
+解锁会员：DexKit 通过 `"user_gid"` 字符串定位 `util.a.f()` / `k()` 判定方法并强制返回会员态，并以本地存储兜底返回 3。
+
 ---
 
 ## 14. PHP 后台架构
+
+> 说明：PHP 后台为**独立服务端工程**，不在本仓库中（本仓库仅含 Android 模块）。以下为服务端能力说明，供对照理解模块侧的接口调用。
 
 ### 14.1 环境与目录
 
