@@ -3,8 +3,6 @@ package me.lengyu.qedge.hook.item;
 import java.lang.reflect.Method;
 
 import de.robv.android.xposed.XposedHelpers;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
 import me.lengyu.qedge.hook.base.BaseApiHookItem;
 import me.lengyu.qedge.hook.base.Listener;

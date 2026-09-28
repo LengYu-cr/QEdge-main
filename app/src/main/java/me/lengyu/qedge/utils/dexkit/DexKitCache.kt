@@ -10,6 +10,13 @@ import java.lang.reflect.Method
 
 object DexKitCache {
 
+    /**
+     * 缓存值：该 key 本次查找已尝试但无法解析。
+     * 用于把「没查过」和「查过但没结果」区分开：否则这类 key 会让 validateAllTasks
+     * 每次都判定缓存不完整，导致每个进程每次启动都触发一次全量重扫。
+     */
+    private const val NOT_FOUND = ""
+
     var cacheMap = mutableMapOf<String, String>()
 
     private val cacheFile by lazy {
@@ -24,9 +31,15 @@ object DexKitCache {
         cacheMap[key] = descriptor
     }
 
+    /** 标记该 key 已查找但无法解析（仅在尚无结果时写入），供 validateAllTasks 判定缓存完整性 */
+    @JvmStatic
+    fun putUnresolved(key: String) {
+        if (!cacheMap.containsKey(key)) cacheMap[key] = NOT_FOUND
+    }
+
     @JvmStatic
     fun getDescriptor(key: String): String? {
-        return cacheMap[key]
+        return cacheMap[key]?.takeIf { it.isNotEmpty() }
     }
 
     @JvmStatic
@@ -41,17 +54,24 @@ object DexKitCache {
 
     @JvmStatic
     fun getClass(key: String): Class<*> {
-        return cacheMap[key]?.let {
+        return getDescriptor(key)?.let {
             DexClass(it).getInstance(me.lengyu.qedge.utils.ReflectUtils.hostClassLoader)
         } ?: throw ClassNotFoundException(key)
     }
 
     @JvmStatic
     fun getMethod(key: String): Method {
-        return cacheMap[key]?.let {
+        return getDescriptor(key)?.let {
             DexMethod(it).getMethodInstance(me.lengyu.qedge.utils.ReflectUtils.hostClassLoader)
         } ?: throw NoSuchMethodException(key)
     }
+
+    /**
+     * 缓存文件是否已存在。仅一次 stat，供冷启动分支判断使用：
+     * 无缓存时必须在主线程赶在 SplashActivity 创建前挂上查找 hook，不能延后到后台线程再判断。
+     */
+    @JvmStatic
+    fun hasCacheFile(): Boolean = cacheFile.exists()
 
     @JvmStatic
     fun initCache(): Boolean {
@@ -109,7 +129,9 @@ object DexKitCache {
         }.getOrDefault(emptyList<Any>())
 
         for (item in hookItems) {
-            if (item is DexKitTask) {
+            // 与 DexKitFinder.startFind 保持一致：不适用的任务（TIM/QQ 专属）本来就不查，
+            // 不能要求它的 key 存在于缓存，否则校验会恒为 false
+            if (item is DexKitTask && item.isApplicable()) {
                 val tagField = runCatching {
                     item.javaClass.getDeclaredField("TAG").apply { isAccessible = true }
                 }.getOrNull() ?: continue

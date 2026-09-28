@@ -73,18 +73,6 @@ public class DisableSecCheck extends BaseApiHookItem {
                 // LogUtils.d(TAG, "hook getPackageVersion success");
             }
 
-            // 5. MD5 计算 → 返回空串（三个重载都拦）
-            for (Method m : cls.getDeclaredMethods()) {
-                if ("getFileMd5".equals(m.getName())) {
-                    m.setAccessible(true);
-                    HookUtils.hookBefore(m, param -> {
-                        if (!isEnabled()) return;
-                        param.setResult("");
-                    });
-                    // LogUtils.d(TAG, "hook getFileMd5(" + m.getParameterCount() + " args) success");
-                }
-            }
-
         } catch (Exception e) {
             LogUtils.e(TAG, "loadHook: " + e.getMessage());
         }

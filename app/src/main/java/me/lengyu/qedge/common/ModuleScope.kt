@@ -58,6 +58,12 @@ object ModuleScope : CoroutineScope {
     }
 
     /**
+     * Java-friendly: 在受限并发调度器上执行 Hook 加载任务（无延迟）。
+     */
+    @JvmStatic
+    fun launchHookJava(tag: String, block: Runnable) = launchHook(tag) { block.run() }
+
+    /**
      * Java-friendly: run blocking code on IO thread without manual Thread creation.
      * All uncaught exceptions are logged via LogUtils, never leaked to framework.
      */

@@ -239,6 +239,7 @@ fun HomeScreen(
     var disableSecCheck by remember { mutableStateOf(ModuleConfig.getBoolean("disable_sec_check", false)) }
     var removeQrCodeCheck by remember { mutableStateOf(ModuleConfig.getBoolean("remove_qrcode_check", false)) }
     var skipScanWaitTime by remember { mutableStateOf(ModuleConfig.getBoolean("skip_scan_wait_time", false)) }
+    var splitScreenScan by remember { mutableStateOf(ModuleConfig.getBoolean("split_screen_scan", false)) }
     var bypassProfileBan by remember { mutableStateOf(ModuleConfig.getBoolean("bypass_profile_ban", false)) }
     var removeAds by remember { mutableStateOf(ModuleConfig.getBoolean("remove_ads", false)) }
     var forceModuleToast by remember { mutableStateOf(ModuleConfig.getBoolean("force_module_toast", false)) }
@@ -588,6 +589,7 @@ fun HomeScreen(
                             disableSecCheck = disableSecCheck,
                             removeQrCodeCheck = removeQrCodeCheck,
                             skipScanWaitTime = skipScanWaitTime,
+                            splitScreenScan = splitScreenScan,
                             bypassProfileBan = bypassProfileBan,
                             removeAds = removeAds,
                             forceModuleToast = forceModuleToast,
@@ -742,6 +744,10 @@ fun HomeScreen(
                             onSkipScanWaitTimeToggle = {
                                 skipScanWaitTime = it
                                 Thread { ModuleConfig.putBoolean("skip_scan_wait_time", it) }.start()
+                            },
+                            onSplitScreenScanToggle = {
+                                splitScreenScan = it
+                                Thread { ModuleConfig.putBoolean("split_screen_scan", it) }.start()
                             },
                             onBypassProfileBanToggle = {
                                 bypassProfileBan = it

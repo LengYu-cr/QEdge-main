@@ -29,7 +29,6 @@ import me.lengyu.qedge.utils.qq.MsgTool
 import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import com.tencent.qqnt.kernel.nativeinterface.MsgElement
 import com.tencent.qqnt.kernel.nativeinterface.MsgRecord
-import de.robv.android.xposed.XposedBridge
 import java.lang.reflect.Method
 import java.lang.reflect.Proxy
 import java.util.ArrayList

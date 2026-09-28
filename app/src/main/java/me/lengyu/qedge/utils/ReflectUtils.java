@@ -1,48 +1,29 @@
 package me.lengyu.qedge.utils;
 
-import android.util.Log;
-
+import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
-import java.lang.reflect.Constructor;
-import java.util.concurrent.ConcurrentHashMap;
-import me.lengyu.qedge.utils.LogUtils;
-import me.lengyu.qedge.utils.HybridClassLoader;
+
+import me.lengyu.qedge.utils.reflect.ClassUtils;
+import me.lengyu.qedge.utils.reflect.ReflectExtensionsKt;
+
 /**
  * @Author 冷雨
  * @Description Java反射工具类
+ * 保留原有静态方法签名，内部统一委托到 utils/reflect（Kotlin）：缓存、父类链回退、参数兼容匹配都由那边提供。
  */
 public class ReflectUtils {
 
     private static final String TAG = "ReflectUtils";
-    public static ClassLoader hostClassLoader;
 
-    // ---- 反射结果缓存：避免消息/图片等热路径每次都遍历方法表、重复抛 NoSuchFieldException ----
-    // key 用 "类名#成员名(#参数个数)"，value 命中缓存的 Method/Field；查不到用 NOT_FOUND 哨兵占位，避免反复失败查找。
-    private static final ConcurrentHashMap<String, Method> METHOD_CACHE = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<String, Field> FIELD_CACHE = new ConcurrentHashMap<>();
-
-    private static final Method NOT_FOUND_METHOD;
-    private static final Field NOT_FOUND_FIELD;
-    static {
-        Method m = null;
-        Field f = null;
-        try {
-            m = ReflectUtils.class.getDeclaredMethod("initClassLoader", ClassLoader.class);
-            f = ReflectUtils.class.getDeclaredField("hostClassLoader");
-        } catch (Throwable ignored) {
-        }
-        NOT_FOUND_METHOD = m;
-        NOT_FOUND_FIELD = f;
-    }
+    // 宿主 ClassLoader 的唯一存储点：主线程初始化后由多个 Hook 线程读取，用 volatile 保证可见性
+    public static volatile ClassLoader hostClassLoader;
 
     public static void initClassLoader(ClassLoader loader) {
         if (loader != null) {
             injectClassLoader(loader);
-               hostClassLoader = loader;
-               return;
+            hostClassLoader = loader;
         }
-        
     }
 
     public static void injectClassLoader(ClassLoader hostClassLoader) {
@@ -56,137 +37,68 @@ public class ReflectUtils {
             Field fParent = ClassLoader.class.getDeclaredField("parent");
             fParent.setAccessible(true);
             fParent.set(self, loader);
-        } catch (Exception ignored) {
-            LogUtils.e("injectClassLoader: failed", ignored.getMessage());
+        } catch (Exception e) {
+            LogUtils.e(TAG, "injectClassLoader error: " + e.getMessage());
         }
     }
 
-    public static Method findMethod(Class<?> clazz, String methodName) {
-        if (clazz == null) return null;
-        String key = clazz.getName() + "#" + methodName;
-        Method cached = METHOD_CACHE.get(key);
-        if (cached != null) {
-            return cached == NOT_FOUND_METHOD ? null : cached;
+    // ---- 类加载 ----
+
+    /** 加载宿主类，失败抛 ClassNotFoundException */
+    public static Class<?> findClass(String className) throws ClassNotFoundException {
+        ClassLoader loader = hostClassLoader;
+        if (loader == null) {
+            throw new ClassNotFoundException("hostClassLoader not initialized: " + className);
         }
-        Method found = null;
+        return loader.loadClass(className);
+    }
+
+    /** 加载宿主类，失败返回 null */
+    public static Class<?> findClassIfExists(String className) {
+        return findClassIfExists(className, hostClassLoader);
+    }
+
+    /** 用指定 ClassLoader 加载，失败返回 null */
+    public static Class<?> findClassIfExists(String className, ClassLoader classLoader) {
+        if (className == null || classLoader == null) {
+            return null;
+        }
         try {
-            for (Method method : clazz.getDeclaredMethods()) {
-                if (method.getName().equals(methodName)) {
-                    method.setAccessible(true);
-                    found = method;
-                    break;
-                }
-            }
-            if (found == null) {
-                for (Method method : clazz.getMethods()) {
-                    if (method.getName().equals(methodName)) {
-                        method.setAccessible(true);
-                        found = method;
-                        break;
-                    }
-                }
-            }
+            return classLoader.loadClass(className);
         } catch (Throwable e) {
-            LogUtils.e(e);
+            return null;
         }
-        METHOD_CACHE.put(key, found != null ? found : NOT_FOUND_METHOD);
-        return found;
+    }
+
+    // ---- 方法查找 ----
+
+    public static Method findMethod(Class<?> clazz, String methodName) {
+        if (clazz == null || methodName == null) return null;
+        return ClassUtils.findMethodOrNull(clazz, methodName);
     }
 
     public static Method findMethod(Class<?> clazz, String methodName, Class<?>... parameterTypes) {
-        try {
-            Method method = clazz.getDeclaredMethod(methodName, parameterTypes);
-            method.setAccessible(true);
-            return method;
-        } catch (NoSuchMethodException e) {
-            try {
-                Method method = clazz.getMethod(methodName, parameterTypes);
-                method.setAccessible(true);
-                return method;
-            } catch (NoSuchMethodException ex) {
-                LogUtils.e(ex);
-            }
-        }
-        return null;
+        if (clazz == null || methodName == null) return null;
+        return ClassUtils.findMethodOrNull(clazz, methodName, parameterTypes);
     }
 
     public static Method findMethod(Class<?> clazz, String methodName, int paramCount) {
-        if (clazz == null) return null;
-        String key = clazz.getName() + "#" + methodName + "#" + paramCount;
-        Method cached = METHOD_CACHE.get(key);
-        if (cached != null) {
-            return cached == NOT_FOUND_METHOD ? null : cached;
-        }
-        Method found = null;
-        try {
-            for (Method method : clazz.getDeclaredMethods()) {
-                if (method.getName().equals(methodName) && method.getParameterCount() == paramCount) {
-                    method.setAccessible(true);
-                    found = method;
-                    break;
-                }
-            }
-            if (found == null) {
-                for (Method method : clazz.getMethods()) {
-                    if (method.getName().equals(methodName) && method.getParameterCount() == paramCount) {
-                        method.setAccessible(true);
-                        found = method;
-                        break;
-                    }
-                }
-            }
-        } catch (Throwable e) {
-            LogUtils.e(e);
-        }
-        METHOD_CACHE.put(key, found != null ? found : NOT_FOUND_METHOD);
-        return found;
+        if (clazz == null || methodName == null) return null;
+        return ClassUtils.findMethodOrNull(clazz, methodName, paramCount);
     }
 
     public static Method findMethod(Class<?> clazz, Class<?> returnType, Class<?>... parameterTypes) {
-        try {
-            for (Method method : clazz.getDeclaredMethods()) {
-                if (isTypeCompatible(method.getReturnType(), returnType)) {
-                    Class<?>[] types = method.getParameterTypes();
-                    if (types.length == parameterTypes.length) {
-                        boolean match = true;
-                        for (int i = 0; i < types.length; i++) {
-                            if (!isTypeCompatible(types[i], parameterTypes[i])) {
-                                match = false;
-                                break;
-                            }
-                        }
-                        if (match) {
-                            method.setAccessible(true);
-                            return method;
-                        }
-                    }
-                }
-            }
-            for (Method method : clazz.getMethods()) {
-                if (isTypeCompatible(method.getReturnType(), returnType)) {
-                    Class<?>[] types = method.getParameterTypes();
-                    if (types.length == parameterTypes.length) {
-                        boolean match = true;
-                        for (int i = 0; i < types.length; i++) {
-                            if (!isTypeCompatible(types[i], parameterTypes[i])) {
-                                match = false;
-                                break;
-                            }
-                        }
-                        if (match) {
-                            method.setAccessible(true);
-                            return method;
-                        }
-                    }
-                }
-            }
-        } catch (Throwable e) {
-            Log.e(TAG, "findMethod by return type error: " + e.getMessage());
-        }
-        return null;
+        if (clazz == null) return null;
+        return ClassUtils.findMethodOrNull(clazz, returnType, parameterTypes);
+    }
+
+    public static Method findMethodOrNull(Class<?> clazz, Class<?> returnType, Class<?>... parameterTypes) {
+        return findMethod(clazz, returnType, parameterTypes);
     }
 
     public static Constructor<?> findConstructor(Class<?> clazz, Class<?>... parameterTypes) {
+        if (clazz == null) return null;
+        // utils/reflect 未提供构造器检索的 DSL，这里保留原实现（含参数兼容匹配）
         try {
             for (Constructor<?> constructor : clazz.getDeclaredConstructors()) {
                 Class<?>[] types = constructor.getParameterTypes();
@@ -221,7 +133,7 @@ public class ReflectUtils {
                 }
             }
         } catch (Throwable e) {
-            LogUtils.e(e);
+            LogUtils.e(TAG, "findConstructor error: " + e.getMessage());
         }
         return null;
     }
@@ -243,72 +155,55 @@ public class ReflectUtils {
         return false;
     }
 
-    public static Method findMethodOrNull(Class<?> clazz, Class<?> returnType, Class<?>... parameterTypes) {
-        return findMethod(clazz, returnType, parameterTypes);
-    }
+    // ---- 字段查找 ----
 
     public static Field findField(Class<?> clazz, String fieldName) {
-        if (clazz == null) return null;
-        String key = clazz.getName() + "#" + fieldName;
-        Field cached = FIELD_CACHE.get(key);
-        if (cached != null) {
-            return cached == NOT_FOUND_FIELD ? null : cached;
-        }
-        Field found = null;
-        try {
-            found = clazz.getDeclaredField(fieldName);
-            found.setAccessible(true);
-        } catch (NoSuchFieldException e) {
-            try {
-                found = clazz.getField(fieldName);
-                found.setAccessible(true);
-            } catch (NoSuchFieldException ex) {
-                LogUtils.e(ex);
-            }
-        }
-        FIELD_CACHE.put(key, found != null ? found : NOT_FOUND_FIELD);
-        return found;
+        if (clazz == null || fieldName == null) return null;
+        return ClassUtils.findFieldOrNull(clazz, fieldName);
     }
 
     public static Object getFieldValue(Object obj, String fieldName) {
+        if (obj == null || fieldName == null) return null;
         try {
             Field field = findField(obj.getClass(), fieldName);
             if (field != null) {
                 return field.get(obj);
             }
         } catch (Throwable e) {
-            Log.e(TAG, "getFieldValue error: " + e.getMessage());
+            LogUtils.e(TAG, "getFieldValue error: " + e.getMessage());
         }
         return null;
     }
 
     public static void setFieldValue(Object obj, String fieldName, Object value) {
+        if (obj == null || fieldName == null) return;
         try {
             Field field = findField(obj.getClass(), fieldName);
             if (field != null) {
                 field.set(obj, value);
             }
         } catch (Throwable e) {
-            Log.e(TAG, "setFieldValue error: " + e.getMessage());
+            LogUtils.e(TAG, "setFieldValue error: " + e.getMessage());
         }
     }
+
+    // ---- 方法调用 ----
 
     public static Object callMethod(Object obj, String methodName, Object... args) {
-        try {
-            Class<?>[] paramTypes = new Class[args.length];
-            for (int i = 0; i < args.length; i++) {
-                paramTypes[i] = args[i].getClass();
-            }
-            Method method = findMethod(obj.getClass(), methodName, paramTypes);
-            if (method != null) {
-                return method.invoke(obj, args);
-            }
-        } catch (Throwable e) {
-            Log.e(TAG, "callMethod error: " + e.getMessage());
+        if (obj == null || methodName == null) return null;
+        Method method = ClassUtils.findMethodOrNull(obj.getClass(), methodName, toArgTypes(args));
+        if (method == null) {
+            return null;
         }
-        return null;
+        try {
+            return invoke(method, obj, args);
+        } catch (Throwable e) {
+            LogUtils.e(TAG, "callMethod " + methodName + " error: " + e.getMessage());
+            return null;
+        }
     }
 
+    /** 历史签名：不带实参，仅能调用无参方法；新代码请用 callMethod(Object, String, Object...) */
     public static Object callMethod(Object obj, Class<?> clazz, String methodName, Class<?>[] paramTypes) {
         try {
             Method method = findMethod(clazz, methodName, paramTypes);
@@ -316,50 +211,74 @@ public class ReflectUtils {
                 return method.invoke(obj, (Object[]) null);
             }
         } catch (Throwable e) {
-            Log.e(TAG, "callMethod error: " + e.getMessage());
+            LogUtils.e(TAG, "callMethod error: " + e.getMessage());
         }
         return null;
     }
 
+    /** 调用被 Hook 前的原始方法 */
     public static Object callOriginal(Object obj, String methodName, Object... args) {
-        return callMethod(obj, methodName, args);
+        if (obj == null || methodName == null) return null;
+        try {
+            Class<?>[] argTypes = new Class[args.length];
+            for (int i = 0; i < args.length; i++) {
+                argTypes[i] = args[i] == null ? null : args[i].getClass();
+            }
+            Method method = ClassUtils.findMethodOrNull(obj.getClass(), methodName, argTypes);
+            if (method == null) {
+                return null;
+            }
+            return ReflectExtensionsKt.callOriginal(method, obj, args);
+        } catch (Throwable e) {
+            LogUtils.e(TAG, "callOriginal error: " + e.getMessage());
+            return null;
+        }
     }
 
     public static Object callStaticMethod(Class<?> clazz, String methodName, Object... args) {
-        try {
-            Class<?>[] paramTypes = new Class[args.length];
-            for (int i = 0; i < args.length; i++) {
-                if (args[i] != null) {
-                    paramTypes[i] = args[i].getClass();
-                } else {
-                    paramTypes[i] = Object.class;
-                }
-            }
-            Method method = findMethod(clazz, methodName, paramTypes);
-            if (method != null) {
-                return method.invoke(null, args);
-            }
-            // 尝试不指定参数类型
-            method = findMethod(clazz, methodName, args.length);
-            if (method != null) {
-                return method.invoke(null, args);
-            }
-        } catch (Throwable e) {
-            Log.e(TAG, "callStaticMethod error: " + e.getMessage());
+        if (clazz == null || methodName == null) return null;
+        Method method = ClassUtils.findMethodOrNull(clazz, methodName, toArgTypes(args));
+        if (method == null) {
+            method = ClassUtils.findMethodOrNull(clazz, methodName, args == null ? 0 : args.length);
         }
-        return null;
+        if (method == null) {
+            return null;
+        }
+        try {
+            return invoke(method, null, args);
+        } catch (Throwable e) {
+            LogUtils.e(TAG, "callStaticMethod " + methodName + " error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /** 实参类型表：null 实参留给 DSL 按“非基本类型”匹配 */
+    private static Class<?>[] toArgTypes(Object[] args) {
+        if (args == null) {
+            return new Class[0];
+        }
+        Class<?>[] types = new Class[args.length];
+        for (int i = 0; i < args.length; i++) {
+            types[i] = args[i] == null ? null : args[i].getClass();
+        }
+        return types;
+    }
+
+    /** 常规 invoke；被 Hook 的目标方法 invoke 失败时回退到未 Hook 的原始实现 */
+    private static Object invoke(Method method, Object obj, Object[] args) throws Throwable {
+        try {
+            return method.invoke(obj, args);
+        } catch (Exception e) {
+            try {
+                return ReflectExtensionsKt.callOriginal(method, obj, args);
+            } catch (Exception ignored) {
+                throw e;
+            }
+        }
     }
 
     public static Object newInstance(Class<?> clazz, Object... args) throws Exception {
-        if (args == null || args.length == 0) {
-            return clazz.newInstance();
-        }
-        Class<?>[] paramTypes = new Class[args.length];
-        for (int i = 0; i < args.length; i++) {
-            paramTypes[i] = args[i].getClass();
-        }
-        java.lang.reflect.Constructor<?> constructor = clazz.getDeclaredConstructor(paramTypes);
-        constructor.setAccessible(true);
-        return constructor.newInstance(args);
+        if (clazz == null) return null;
+        return ReflectExtensionsKt.newInstanceWithArgs(clazz, args);
     }
 }

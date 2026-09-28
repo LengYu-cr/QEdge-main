@@ -191,10 +191,14 @@ object Parasitics {
                     isTargetActivity(component.className)
                 ) {
                     val flags = (args[1] as? Number)?.toLong() ?: 0L
-                    return@newProxyInstance CounterfeitActivityInfoFactory.makeProxyActivityInfo(
+                    val forged = CounterfeitActivityInfoFactory.makeProxyActivityInfo(
                         component.className,
                         flags
                     )
+                    // 伪造失败时回退真实结果，避免 null 或异常穿透 Binder 代理崩宿主
+                    if (forged != null) {
+                        return@newProxyInstance forged
+                    }
                 }
             }
             invokeOriginal(sPackageManager, method, args)

@@ -13,8 +13,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import de.robv.android.xposed.XC_MethodHook;
-import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation;
 import me.lengyu.qedge.hook.base.BaseSwitchHookItem;
@@ -79,25 +77,22 @@ public class ForceSpeaker extends BaseSwitchHookItem {
                     continue;
                 }
                 m.setAccessible(true);
-                XposedBridge.hookMethod(m, new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        try {
-                            AudioManager am = getAudioManager();
-                            if (am != null) {
-                                am.setMode(AudioManager.MODE_NORMAL);
-                                am.setSpeakerphoneOn(true);
-                            } else {
-                                LogUtils.e(TAG, "getAudioManager returned null");
-                            }
-                            // 逆向结论：听筒场景 g$a.b = STREAM_VOICE_CALL(0)，prepare 时
-                            // player.f(g$a.b) 已把 streamType 写死为 VOICE_CALL。这里兜底把
-                            // 播放器 streamType 强制为 MUSIC，音量键才可控（构造器 hook 之外的保险）
-                            forcePlayerStreamMusic(param.thisObject);
-                        } catch (Throwable t) {
-                            LogUtils.e(TAG, "forceSpeaker error: " + t);
+                HookUtils.hookAfter(m, param -> {
+                    if (!isEnabled()) return;
+                    try {
+                        AudioManager am = getAudioManager();
+                        if (am != null) {
+                            am.setMode(AudioManager.MODE_NORMAL);
+                            am.setSpeakerphoneOn(true);
+                        } else {
+                            LogUtils.e(TAG, "getAudioManager returned null");
                         }
+                        // 逆向结论：听筒场景 g$a.b = STREAM_VOICE_CALL(0)，prepare 时
+                        // player.f(g$a.b) 已把 streamType 写死为 VOICE_CALL。这里兜底把
+                        // 播放器 streamType 强制为 MUSIC，音量键才可控（构造器 hook 之外的保险）
+                        forcePlayerStreamMusic(param.thisObject);
+                    } catch (Throwable t) {
+                        LogUtils.e(TAG, "forceSpeaker error: " + t);
                     }
                 });
                 count++;
@@ -152,34 +147,25 @@ public class ForceSpeaker extends BaseSwitchHookItem {
                 if (p.length == 6 && allInt) {
                     // (streamType, sampleRate, channelConfig, audioFormat, bufferSize, mode)
                     c.setAccessible(true);
-                    XposedBridge.hookMethod(c, new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            if (!isEnabled()) return;
-                            param.args[0] = AudioManager.STREAM_MUSIC;
-                        }
+                    HookUtils.hookBefore(c, param -> {
+                        if (!isEnabled()) return;
+                        param.args[0] = AudioManager.STREAM_MUSIC;
                     });
                     any = true;
                 } else if (p.length == 7 && allInt) {
                     // (streamType, sampleRate, channelConfig, audioFormat, bufferSize, mode, sessionId)
                     c.setAccessible(true);
-                    XposedBridge.hookMethod(c, new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            if (!isEnabled()) return;
-                            param.args[0] = AudioManager.STREAM_MUSIC;
-                        }
+                    HookUtils.hookBefore(c, param -> {
+                        if (!isEnabled()) return;
+                        param.args[0] = AudioManager.STREAM_MUSIC;
                     });
                     any = true;
                 } else if (p.length >= 3 && p[0] == AudioAttributes.class) {
                     // (AudioAttributes, AudioFormat, bufferSize, mode[, sessionId])
                     c.setAccessible(true);
-                    XposedBridge.hookMethod(c, new XC_MethodHook() {
-                        @Override
-                        protected void beforeHookedMethod(MethodHookParam param) {
-                            if (!isEnabled()) return;
-                            param.args[0] = MEDIA_ATTRIBUTES;
-                        }
+                    HookUtils.hookBefore(c, param -> {
+                        if (!isEnabled()) return;
+                        param.args[0] = MEDIA_ATTRIBUTES;
                     });
                     any = true;
                 }
@@ -196,25 +182,22 @@ public class ForceSpeaker extends BaseSwitchHookItem {
         try {
             Method play = AudioTrack.class.getDeclaredMethod("play");
             play.setAccessible(true);
-            XposedBridge.hookMethod(play, new XC_MethodHook() {
-                @Override
-                protected void beforeHookedMethod(MethodHookParam param) {
-                    if (!isEnabled()) return;
-                    int st = -1;
+            HookUtils.hookBefore(play, param -> {
+                if (!isEnabled()) return;
+                int st = -1;
+                try {
+                    Method getStream = AudioTrack.class.getMethod("getStreamType");
+                    st = (Integer) getStream.invoke(param.thisObject);
+                } catch (Throwable t) {
+                    LogUtils.e(TAG, "getStreamType unavailable: " + t.getMessage());
+                }
+                if (st != -1 && st != AudioManager.STREAM_MUSIC) {
+                    LogUtils.i(TAG, "AudioTrack.play() streamType=" + st + ", forcing MUSIC");
                     try {
-                        Method getStream = AudioTrack.class.getMethod("getStreamType");
-                        st = (Integer) getStream.invoke(param.thisObject);
+                        AudioTrack.class.getMethod("setStreamType", int.class)
+                            .invoke(param.thisObject, AudioManager.STREAM_MUSIC);
                     } catch (Throwable t) {
-                        LogUtils.e(TAG, "getStreamType unavailable: " + t.getMessage());
-                    }
-                    if (st != -1 && st != AudioManager.STREAM_MUSIC) {
-                        LogUtils.i(TAG, "AudioTrack.play() streamType=" + st + ", forcing MUSIC");
-                        try {
-                            AudioTrack.class.getMethod("setStreamType", int.class)
-                                .invoke(param.thisObject, AudioManager.STREAM_MUSIC);
-                        } catch (Throwable t) {
-                            LogUtils.e(TAG, "setStreamType on play unavailable: " + t.getMessage());
-                        }
+                        LogUtils.e(TAG, "setStreamType on play unavailable: " + t.getMessage());
                     }
                 }
             });
@@ -280,22 +263,18 @@ public class ForceSpeaker extends BaseSwitchHookItem {
     // 改用 hookAllMethods 遍历全部重载（float / float,float）
     private void hookVolume() {
         try {
-            XposedBridge.hookAllMethods(AudioTrack.class, "setVolume",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        for (int i = 0; i < param.args.length; i++) {
-                            if (param.args[i] instanceof Float) {
-                                float v = (Float) param.args[i];
-                                if (v > 1.0f) {
-                                    LogUtils.i(TAG, "setVolume clamped arg" + i + "=" + v + " -> 1.0");
-                                    param.args[i] = 1.0f;
-                                }
-                            }
+            HookUtils.hookAllMethods(AudioTrack.class, "setVolume", param -> {
+                if (!isEnabled()) return;
+                for (int i = 0; i < param.args.length; i++) {
+                    if (param.args[i] instanceof Float) {
+                        float v = (Float) param.args[i];
+                        if (v > 1.0f) {
+                            LogUtils.i(TAG, "setVolume clamped arg" + i + "=" + v + " -> 1.0");
+                            param.args[i] = 1.0f;
                         }
                     }
-                });
+                }
+            }, null);
         } catch (Throwable t) {
             LogUtils.e(TAG, "hookVolume failed: " + t);
         }
@@ -305,22 +284,18 @@ public class ForceSpeaker extends BaseSwitchHookItem {
     // 默认 1.0，但游戏中心等场景可能被调大导致声音异常放大且绕过媒体音量
     private void hookStereoVolume() {
         try {
-            XposedBridge.hookAllMethods(AudioTrack.class, "setStereoVolume",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        for (int i = 0; i < param.args.length; i++) {
-                            if (param.args[i] instanceof Float) {
-                                float v = (Float) param.args[i];
-                                if (v > 1.0f) {
-                                    LogUtils.i(TAG, "setStereoVolume clamped arg" + i + "=" + v + " -> 1.0");
-                                    param.args[i] = 1.0f;
-                                }
-                            }
+            HookUtils.hookAllMethods(AudioTrack.class, "setStereoVolume", param -> {
+                if (!isEnabled()) return;
+                for (int i = 0; i < param.args.length; i++) {
+                    if (param.args[i] instanceof Float) {
+                        float v = (Float) param.args[i];
+                        if (v > 1.0f) {
+                            LogUtils.i(TAG, "setStereoVolume clamped arg" + i + "=" + v + " -> 1.0");
+                            param.args[i] = 1.0f;
                         }
                     }
-                });
+                }
+            }, null);
         } catch (Throwable t) {
             LogUtils.e(TAG, "hookStereoVolume failed: " + t);
         }
@@ -331,39 +306,32 @@ public class ForceSpeaker extends BaseSwitchHookItem {
     // 直接强制媒体流，音量键（QBaseActivity 已绑 MUSIC）即可控制
     private void hookMediaPlayer() {
         try {
-            XposedBridge.hookMethod(
+            HookUtils.hookBefore(
                 MediaPlayer.class.getMethod("setAudioStreamType", int.class),
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        int st = (Integer) param.args[0];
-                        if (st != AudioManager.STREAM_MUSIC) {
-                            LogUtils.i(TAG, "MediaPlayer.setAudioStreamType(" + st + ") -> MUSIC");
-                            param.args[0] = AudioManager.STREAM_MUSIC;
-                        }
+                param -> {
+                    if (!isEnabled()) return;
+                    int st = (Integer) param.args[0];
+                    if (st != AudioManager.STREAM_MUSIC) {
+                        LogUtils.i(TAG, "MediaPlayer.setAudioStreamType(" + st + ") -> MUSIC");
+                        param.args[0] = AudioManager.STREAM_MUSIC;
                     }
                 });
         } catch (Throwable t) {
             LogUtils.e(TAG, "hookMediaPlayer setAudioStreamType failed: " + t);
         }
         try {
-            XposedBridge.hookAllMethods(MediaPlayer.class, "setVolume",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        for (int i = 0; i < param.args.length; i++) {
-                            if (param.args[i] instanceof Float) {
-                                float v = (Float) param.args[i];
-                                if (v > 1.0f) {
-                                    LogUtils.i(TAG, "MediaPlayer.setVolume clamped arg" + i + "=" + v + " -> 1.0");
-                                    param.args[i] = 1.0f;
-                                }
-                            }
+            HookUtils.hookAllMethods(MediaPlayer.class, "setVolume", param -> {
+                if (!isEnabled()) return;
+                for (int i = 0; i < param.args.length; i++) {
+                    if (param.args[i] instanceof Float) {
+                        float v = (Float) param.args[i];
+                        if (v > 1.0f) {
+                            LogUtils.i(TAG, "MediaPlayer.setVolume clamped arg" + i + "=" + v + " -> 1.0");
+                            param.args[i] = 1.0f;
                         }
                     }
-                });
+                }
+            }, null);
         } catch (Throwable t) {
             LogUtils.e(TAG, "hookMediaPlayer setVolume failed: " + t);
         }
@@ -372,34 +340,28 @@ public class ForceSpeaker extends BaseSwitchHookItem {
     // QQ 在通话逻辑下可能操作 VOICE_CALL 音量，NORMAL 模式下无效；重定向到 MUSIC 使音量键生效
     private void hookStreamVolume() {
         try {
-            XposedBridge.hookMethod(
+            HookUtils.hookBefore(
                 AudioManager.class.getMethod("setStreamVolume", int.class, int.class, int.class),
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        int st = (Integer) param.args[0];
-                        if (st == AudioManager.STREAM_VOICE_CALL) {
-                            LogUtils.i(TAG, "setStreamVolume(VOICE_CALL=" + param.args[1] + ") -> MUSIC");
-                            param.args[0] = AudioManager.STREAM_MUSIC;
-                        }
+                param -> {
+                    if (!isEnabled()) return;
+                    int st = (Integer) param.args[0];
+                    if (st == AudioManager.STREAM_VOICE_CALL) {
+                        LogUtils.i(TAG, "setStreamVolume(VOICE_CALL=" + param.args[1] + ") -> MUSIC");
+                        param.args[0] = AudioManager.STREAM_MUSIC;
                     }
                 });
         } catch (Throwable t) {
             LogUtils.e(TAG, "hook setStreamVolume failed: " + t);
         }
         try {
-            XposedBridge.hookMethod(
+            HookUtils.hookBefore(
                 AudioManager.class.getMethod("adjustStreamVolume", int.class, int.class, int.class),
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        int st = (Integer) param.args[0];
-                        if (st == AudioManager.STREAM_VOICE_CALL) {
-                            LogUtils.i(TAG, "adjustStreamVolume(VOICE_CALL, dir=" + param.args[1] + ") -> MUSIC");
-                            param.args[0] = AudioManager.STREAM_MUSIC;
-                        }
+                param -> {
+                    if (!isEnabled()) return;
+                    int st = (Integer) param.args[0];
+                    if (st == AudioManager.STREAM_VOICE_CALL) {
+                        LogUtils.i(TAG, "adjustStreamVolume(VOICE_CALL, dir=" + param.args[1] + ") -> MUSIC");
+                        param.args[0] = AudioManager.STREAM_MUSIC;
                     }
                 });
         } catch (Throwable t) {
@@ -408,19 +370,15 @@ public class ForceSpeaker extends BaseSwitchHookItem {
         // 音量键真实入口：adjustSuggestedStreamVolume，按当前 Activity 的
         // setVolumeControlStream 决定调整哪个流。若被绑到 VOICE_CALL 则强制 MUSIC
         try {
-            XposedBridge.hookAllMethods(AudioManager.class, "adjustSuggestedStreamVolume",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        if (param.args.length < 2 || !(param.args[1] instanceof Integer)) return;
-                        int st = (Integer) param.args[1];
-                        if (st == AudioManager.STREAM_VOICE_CALL) {
-                            LogUtils.i(TAG, "adjustSuggestedStreamVolume(VOICE_CALL) -> MUSIC");
-                            param.args[1] = AudioManager.STREAM_MUSIC;
-                        }
-                    }
-                });
+            HookUtils.hookAllMethods(AudioManager.class, "adjustSuggestedStreamVolume", param -> {
+                if (!isEnabled()) return;
+                if (param.args.length < 2 || !(param.args[1] instanceof Integer)) return;
+                int st = (Integer) param.args[1];
+                if (st == AudioManager.STREAM_VOICE_CALL) {
+                    LogUtils.i(TAG, "adjustSuggestedStreamVolume(VOICE_CALL) -> MUSIC");
+                    param.args[1] = AudioManager.STREAM_MUSIC;
+                }
+            }, null);
         } catch (Throwable t) {
             LogUtils.e(TAG, "hook adjustSuggestedStreamVolume failed: " + t);
         }
@@ -428,18 +386,14 @@ public class ForceSpeaker extends BaseSwitchHookItem {
         // QQ 语音界面常 setVolumeControlStream(VOICE_CALL) 把音量键绑定到通话音量，
         // 在 NORMAL 模式下无效导致"音量键无法控制"，重定向到 MUSIC
         try {
-            XposedBridge.hookAllMethods(Activity.class, "setVolumeControlStream",
-                new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        int st = (Integer) param.args[0];
-                        if (st == AudioManager.STREAM_VOICE_CALL) {
-                            LogUtils.i(TAG, "setVolumeControlStream(VOICE_CALL) -> MUSIC");
-                            param.args[0] = AudioManager.STREAM_MUSIC;
-                        }
-                    }
-                });
+            HookUtils.hookAllMethods(Activity.class, "setVolumeControlStream", param -> {
+                if (!isEnabled()) return;
+                int st = (Integer) param.args[0];
+                if (st == AudioManager.STREAM_VOICE_CALL) {
+                    LogUtils.i(TAG, "setVolumeControlStream(VOICE_CALL) -> MUSIC");
+                    param.args[0] = AudioManager.STREAM_MUSIC;
+                }
+            }, null);
         } catch (Throwable t) {
             LogUtils.e(TAG, "hook setVolumeControlStream failed: " + t);
         }
@@ -489,12 +443,9 @@ public class ForceSpeaker extends BaseSwitchHookItem {
                 if (p.length != 1 || m.getReturnType() != void.class) continue;
                 if (!"com.tencent.mvi.base.mvi.MviUIState".equals(p[0].getName())) continue;
                 m.setAccessible(true);
-                XposedBridge.hookMethod(m, new XC_MethodHook() {
-                    @Override
-                    protected void beforeHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        param.setResult(null);
-                    }
+                HookUtils.hookBefore(m, param -> {
+                    if (!isEnabled()) return;
+                    param.setResult(null);
                 });
                 any = true;
             }
@@ -518,26 +469,23 @@ public class ForceSpeaker extends BaseSwitchHookItem {
                 "com.tencent.mobileqq.aio.reserve1.audio.AIOAudioBtnVB", ReflectUtils.hostClassLoader);
             for (Constructor<?> c : cls.getDeclaredConstructors()) {
                 c.setAccessible(true);
-                XposedBridge.hookMethod(c, new XC_MethodHook() {
-                    @Override
-                    protected void afterHookedMethod(MethodHookParam param) {
-                        if (!isEnabled()) return;
-                        try {
-                            for (Field fld : cls.getDeclaredFields()) {
-                                if (Modifier.isStatic(fld.getModifiers())) continue;
-                                if (!"kotlin.Lazy".equals(fld.getType().getName())) continue;
-                                fld.setAccessible(true);
-                                Object lazy = fld.get(param.thisObject);
-                                if (lazy == null) continue;
-                                // kotlin.Lazy.getValue() 为接口方法，名字稳定
-                                Object v = XposedHelpers.callMethod(lazy, "getValue");
-                                if (v instanceof LinearLayout) {
-                                    ((LinearLayout) v).setVisibility(View.GONE);
-                                    return;
-                                }
+                HookUtils.hookAfter(c, param -> {
+                    if (!isEnabled()) return;
+                    try {
+                        for (Field fld : cls.getDeclaredFields()) {
+                            if (Modifier.isStatic(fld.getModifiers())) continue;
+                            if (!"kotlin.Lazy".equals(fld.getType().getName())) continue;
+                            fld.setAccessible(true);
+                            Object lazy = fld.get(param.thisObject);
+                            if (lazy == null) continue;
+                            // kotlin.Lazy.getValue() 为接口方法，名字稳定
+                            Object v = XposedHelpers.callMethod(lazy, "getValue");
+                            if (v instanceof LinearLayout) {
+                                ((LinearLayout) v).setVisibility(View.GONE);
+                                return;
                             }
-                        } catch (Throwable ignored) { }
-                    }
+                        }
+                    } catch (Throwable ignored) { }
                 });
             }
         } catch (Throwable t) {

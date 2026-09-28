@@ -59,6 +59,7 @@ import me.lengyu.qedge.hook.item.RemoveQrCodeCheck;
 import me.lengyu.qedge.hook.item.ForceSpeaker;
 import me.lengyu.qedge.hook.item.BypassProfileBan;
 import me.lengyu.qedge.hook.item.SkipScanWaitTime;
+import me.lengyu.qedge.hook.item.SplitScreenScan;
 import me.lengyu.qedge.hook.item.DisableWebSecurityCheck;
 import me.lengyu.qedge.hook.item.DisableSecCheck;
 import me.lengyu.qedge.hook.item.ForceModuleToast;
@@ -109,6 +110,7 @@ public class MainHook {
         HookRegistry.register(QLogRedirect.INSTANCE);
         HookRegistry.register(RemoveQrCodeCheck.INSTANCE);
         HookRegistry.register(SkipScanWaitTime.INSTANCE);
+        HookRegistry.register(SplitScreenScan.INSTANCE);
         HookRegistry.register(AntiQfixPatch.INSTANCE);
         HookRegistry.register(AntiReport.INSTANCE);
         HookRegistry.register(ForceVip.INSTANCE);

@@ -93,16 +93,36 @@ public class HookUtils {
     }
 
     public static void hookAllMethods(Class<?> clazz, String methodName, HookCallback afterCallback) {
-        XposedHelpers.findAndHookMethod(clazz, methodName, new XC_MethodHook() {
+        hookAllMethods(clazz, methodName, null, afterCallback);
+    }
+
+    /**
+     * hook 指定类中同名方法的全部重载（对应 XposedBridge.hookAllMethods）。
+     * 注意：不是 XposedHelpers.findAndHookMethod，那个只按参数类型匹配单个方法。
+     */
+    public static void hookAllMethods(Class<?> clazz, String methodName, HookCallback beforeCallback, HookCallback afterCallback) {
+        XposedBridge.hookAllMethods(clazz, methodName, new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
+                if (beforeCallback != null) {
+                    beforeCallback.onHook(param);
+                }
+            }
+
             @Override
             protected void afterHookedMethod(MethodHookParam param) throws Throwable {
-                afterCallback.onHook(param);
+                if (afterCallback != null) {
+                    afterCallback.onHook(param);
+                }
             }
         });
     }
 
-    public static void hookAllMethods(Class<?> clazz, String methodName, HookCallback beforeCallback, HookCallback afterCallback) {
-        XposedHelpers.findAndHookMethod(clazz, methodName, new XC_MethodHook() {
+    /**
+     * hook 指定类的全部构造方法（对应 XposedBridge.hookAllConstructors）
+     */
+    public static void hookAllConstructors(Class<?> clazz, HookCallback beforeCallback, HookCallback afterCallback) {
+        XposedBridge.hookAllConstructors(clazz, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) throws Throwable {
                 if (beforeCallback != null) {

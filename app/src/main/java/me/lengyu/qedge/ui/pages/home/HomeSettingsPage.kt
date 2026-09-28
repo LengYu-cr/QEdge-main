@@ -595,7 +595,7 @@ internal fun HomePage(
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = "基础配置",
-                    subtitle = "禁用QQ修复补丁等系统级功能",
+                    subtitle = "禁用QQ修复补丁、日志上报等系统级功能",
                     expanded = expanded,
                     onClick = { toggleCard("card_system") }
                 )
@@ -607,7 +607,7 @@ internal fun HomePage(
 
                     SettingSwitchItem(
                         title = "禁用QQ修复补丁",
-                        subtitle = "拦截并禁用QQ的修复补丁机制",
+                        subtitle = "拦截并禁用QQ的修复补丁机制，从而更稳定地使用QEdge",
                         checked = state.antiQfixPatch,
                         onCheckedChange = callbacks.onAntiQfixPatchToggle
                     )
@@ -616,7 +616,7 @@ internal fun HomePage(
 
                     SettingSwitchItem(
                         title = "禁用QQ日志上报",
-                        subtitle = "拦截SSO上报并禁用QQ日志",
+                        subtitle = "拦截SSO上报并禁用QQ日志上传，可防止模块报错数据一并上传被服务器检测",
                         checked = state.antiReport,
                         onCheckedChange = callbacks.onAntiReportToggle
                     )
@@ -660,8 +660,8 @@ internal fun HomePage(
                     Spacer(modifier = Modifier.height(4.dp))
 
                     SettingSwitchItem(
-                        title = "拦截安全校验",
-                        subtitle = "屏蔽重打包检测、签名校验与APK版本读取",
+                        title = "拦截安全校验(谨慎开启)",
+                        subtitle = "屏蔽重打包检测、签名校验与APK版本读取（可能导致其他功能异常）",
                         checked = state.disableSecCheck,
                         onCheckedChange = callbacks.onDisableSecCheckToggle
                     )
@@ -682,6 +682,15 @@ internal fun HomePage(
                         subtitle = "忽略倒计时，扫码确认按钮可直接点击确认登录",
                         checked = state.skipScanWaitTime,
                         onCheckedChange = callbacks.onSkipScanWaitTimeToggle
+                    )
+
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    SettingSwitchItem(
+                        title = "分屏允许扫码",
+                        subtitle = "分屏/小窗下也允许打开扫一扫，绕过QQ的多窗口限制",
+                        checked = state.splitScreenScan,
+                        onCheckedChange = callbacks.onSplitScreenScanToggle
                     )
 
                     Spacer(modifier = Modifier.height(4.dp))

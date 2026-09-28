@@ -10,12 +10,12 @@ import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import java.util.concurrent.atomic.AtomicBoolean;
 import me.lengyu.qedge.activity.SettingActivity;
+import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.lifecycle.DynamicActivityRegistry;
 import me.lengyu.qedge.lifecycle.Parasitics;
 import me.lengyu.qedge.utils.HostInfo;
 import me.lengyu.qedge.utils.Toasts;
 import me.lengyu.qedge.utils.ReflectUtils;
-import me.lengyu.qedge.utils.reflect.ClassUtils;
 import me.lengyu.qedge.utils.dexkit.DexKitCache;
 import me.lengyu.qedge.utils.dexkit.DexKitFinder;
 import me.lengyu.qedge.utils.hook.HookStatusImpl;
@@ -100,7 +100,6 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
 
             HostInfo.packageName = lpparam.packageName;
             HostInfo.processName = lpparam.processName;
-            ClassUtils.INSTANCE.setHostClassLoader(lpparam.classLoader);
             ReflectUtils.initClassLoader(lpparam.classLoader);
             Parasitics.INSTANCE.setModulePath(modulePath);
 
@@ -213,23 +212,47 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
                             Parasitics.initForStubActivity(hostContext);
-
-                            boolean cacheValid = DexKitCache.initCache();
-                            if (cacheValid && DexKitCache.validateAllTasks()) {
-                                MainHook.loadHook();
-                            } else {
-                                DexKitFinder.doFind();
-                            }
                         } catch (Throwable e) {
                             XposedBridge.log("[QEdge] 延迟初始化失败: " + e.getMessage());
                             XposedBridge.log(e);
                         }
+                        loadHooksOffMainThread();
                     }
                 }
             }});
         } catch (Throwable e) {
             XposedBridge.log("[QEdge] Hook BaseApplicationImpl.onCreate 失败: " + e.getMessage());
         }
+    }
+
+    /**
+     * 缓存读盘、反射校验、Hook 注册与 DexKit 查找都不是首帧必需，整体移到后台调度器执行，
+     * 主线程只保留 initialized 抢占与 HostInfo/Parasitics 这类必须尽早生效的初始化。
+     * 例外：首次安装/升级后没有缓存时，必须先在主线程同步挂上 SplashActivity 的查找 hook
+     * （DexKitFinder.doFind），否则查找流程永远不会被触发，Hook 也就永远不会加载。
+     */
+    private void loadHooksOffMainThread() {
+        if (!DexKitCache.hasCacheFile()) {
+            DexKitFinder.doFind();
+            return;
+        }
+        ModuleScope.launchHookJava("HookInit", () -> {
+            try {
+                // 必须先注册：validateAllTasks() 靠 HookRegistry 收集 DexKitTask 列表，
+                // 未注册时列表为空、校验恒为 true，缓存缺条目也不会被发现，会直接 hook 失败。
+                // loadHook() 内部会再注册一次，HookRegistry 按类去重，无副作用。
+                MainHook.registerHookItems();
+                if (DexKitCache.initCache() && DexKitCache.validateAllTasks()) {
+                    MainHook.loadHook();
+                } else {
+                    // 缓存损坏或缺条目：退回重新查找
+                    ModuleScope.postToMain(DexKitFinder::doFind);
+                }
+            } catch (Throwable e) {
+                XposedBridge.log("[QEdge] Hook 初始化失败: " + e.getMessage());
+                XposedBridge.log(e);
+            }
+        });
     }
 
     private void hookKuGouElder(final ClassLoader classLoader) {
@@ -240,7 +263,8 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                         Context hostContext = (Context) param.thisObject;
                         HostInfo hostInfo = HostInfo.INSTANCE;
                         HostInfo.init(hostContext);
-                        KuGouHook.loadHook("com.kugou.android.elder");
+                        // Hook 注册与 DexKit 扫描较重，交给后台调度器，不占用宿主主线程
+                        ModuleScope.launchHookJava("KuGouHook", () -> KuGouHook.loadHook("com.kugou.android.elder"));
                         Toasts.toast("QEdge 注入成功");
                     } catch (Throwable e) {
                         XposedBridge.log("[QEdge] 酷狗大字版 Hook 失败: " + e.getMessage());
@@ -261,7 +285,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                         Context hostContext = (Context) param.thisObject;
                         HostInfo hostInfo = HostInfo.INSTANCE;
                         HostInfo.init(hostContext);
-                        KuGouHook.loadHook("com.kugou.android.lite");
+                        ModuleScope.launchHookJava("KuGouHook", () -> KuGouHook.loadHook("com.kugou.android.lite"));
                         Toasts.toast("QEdge 注入成功");
                     } catch (Throwable e) {
                         XposedBridge.log("[QEdge] 酷狗概念版 Hook 失败: " + e.getMessage());
@@ -284,7 +308,8 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
                             Parasitics.initForStubActivity(hostContext);
-                            KKHook.loadHook();
+                            // Hook 注册与 DexKit 扫描较重，交给后台调度器，不占用宿主主线程
+                            ModuleScope.launchHookJava("KKHook", () -> KKHook.loadHook());
                             Toasts.toast("QEdge 注入成功");
                         } catch (Throwable e) {
                             XposedBridge.log("[QEdge] 延迟初始化失败: " + e.getMessage());
@@ -307,7 +332,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             Context hostContext = (Context) param.thisObject;
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
-                            IFlyHook.loadHook();
+                            ModuleScope.launchHookJava("IFlyHook", () -> IFlyHook.loadHook());
                             Toasts.toast("QEdge 注入成功");
                         } catch (Throwable e) {
                             XposedBridge.log("[QEdge] 讯飞输入法延迟初始化失败: " + e.getMessage());
@@ -331,7 +356,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
                             Parasitics.initForStubActivity(hostContext);
-                            AoRuanHook.loadHook();
+                            ModuleScope.launchHookJava("AoRuanHook", () -> AoRuanHook.loadHook());
                             Toasts.toast("QEdge 注入成功");
                         } catch (Throwable e) {
                             XposedBridge.log("[QEdge] 延迟初始化失败: " + e.getMessage());
@@ -355,7 +380,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
                             Parasitics.initForStubActivity(hostContext);
-                            DeviceInfoXHook.loadHook();
+                            ModuleScope.launchHookJava("DeviceInfoXHook", () -> DeviceInfoXHook.loadHook());
                             Toasts.toast("QEdge 注入成功");
                         } catch (Throwable e) {
                             XposedBridge.log("[QEdge] 设备信息X延迟初始化失败: " + e.getMessage());
@@ -379,7 +404,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
                             Toasts.toast("QEdge 注入成功");
-                            PainlessWordHook.loadHook();
+                            ModuleScope.launchHookJava("PainlessWordHook", () -> PainlessWordHook.loadHook());
                         } catch (Throwable e) {
                             XposedBridge.log("[QEdge] 无痛单词延迟初始化失败: " + e.getMessage());
                             XposedBridge.log(e);
@@ -402,7 +427,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             HostInfo hostInfo = HostInfo.INSTANCE;
                             HostInfo.init(hostContext);
                             Toasts.toast("QEdge 注入成功");
-                            WoodenLetterHook.loadHook();
+                            ModuleScope.launchHookJava("WoodenLetterHook", () -> WoodenLetterHook.loadHook());
                         } catch (Throwable e) {
                             XposedBridge.log("[QEdge] 木函延迟初始化失败: " + e.getMessage());
                             XposedBridge.log(e);

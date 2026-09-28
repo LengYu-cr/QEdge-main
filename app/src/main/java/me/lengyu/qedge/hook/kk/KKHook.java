@@ -174,12 +174,24 @@ public class KKHook {
 
     private static void hookUncaughtException() {
         try {
-            final Thread.UncaughtExceptionHandler defaultHandler =
+            final Thread.UncaughtExceptionHandler originalHandler =
                 Thread.getDefaultUncaughtExceptionHandler();
             Thread.setDefaultUncaughtExceptionHandler((thread, throwable) -> {
                 LogUtils.e("hookExit", "Uncaught exception in " + thread.getName() +
                     ": " + throwable.getMessage());
                 LogUtils.e(throwable);
+
+                // 记录后交还系统原本的崩溃语义（上报 AMS / 记录 tombstone），
+                // 不静默吞掉异常导致进程停留在不一致状态。
+                // "不闪退"由本类后续的 killProcess / System.exit / halt hook 保证。
+                if (originalHandler == null) {
+                    return;
+                }
+                try {
+                    originalHandler.uncaughtException(thread, throwable);
+                } catch (Throwable e) {
+                    LogUtils.e("hookExit", "delegate uncaught exception error: " + e.getMessage());
+                }
             });
         } catch (Throwable e) {
             LogUtils.e("hookExit", "hookUncaughtException error: " + e.getMessage());

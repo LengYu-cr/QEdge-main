@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,7 +14,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.sp
 import com.tencent.mobileqq.activity.SplashActivity
 import me.lengyu.qedge.common.ModuleScope
@@ -60,21 +58,11 @@ object DexKitFinder {
                 val context = it.thisObject as Context
 
                 dialogRef = object : XposedComposeDialog(context) {
-                    override fun configureWindow() {
-                        super.configureWindow()
-                        window?.apply {
-                            clearFlags(android.view.WindowManager.LayoutParams.FLAG_DIM_BEHIND)
-                            setDimAmount(0f)
-                        }
-                    }
-
                     @Composable
                     override fun DialogContent() {
                         QEdgeTheme {
                             Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color(0x80000000)),
+                                modifier = Modifier.fillMaxSize(),
                                 contentAlignment = Alignment.Center
                             ) {
                                 CenterDialogContainerNoButton(
@@ -145,6 +133,8 @@ object DexKitFinder {
                                             DexKitCache.cacheMap[tip] = first.descriptor
                                         } else {
                                             LogUtils.e(TAG, "No class found for: ${task.TAG}->$name")
+                                            // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
+                                            DexKitCache.putUnresolved("${task.TAG}->$name")
                                         }
                                     }
                                 }
@@ -163,19 +153,26 @@ object DexKitFinder {
                                             DexKitCache.cacheMap[tip] = first.descriptor
                                         } else {
                                             LogUtils.e(TAG, "No method found for: ${task.TAG}->$name")
+                                            // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
+                                            DexKitCache.putUnresolved("${task.TAG}->$name")
                                         }
                                     }
                                 }
                             }
                         }
-                    }.onFailure { LogUtils.e(task.TAG, it) }
+                    }.onFailure {
+                        LogUtils.e(task.TAG, it)
+                        // 查询抛异常同样要留痕，否则校验会一直判定缓存不完整而重复全量扫描
+                        task.getQueryMap().keys.forEach { DexKitCache.putUnresolved("${task.TAG}->$it") }
+                    }
                 }
             }
             progressText = "查找完成，正在初始化..."
             DexKitCache.saveCache()
             isFindComplete = true
-            Handler(Looper.getMainLooper()).post {
-                dialogRef?.dismiss()
+            Handler(Looper.getMainLooper()).post { dialogRef?.dismiss() }
+            // 缓存已就绪，Hook 注册与安装交给后台调度器，不占用主线程
+            ModuleScope.launchHookJava("HookInit") {
                 MainHook.loadHook()
             }
         }
