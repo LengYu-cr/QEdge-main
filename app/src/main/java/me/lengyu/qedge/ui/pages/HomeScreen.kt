@@ -114,8 +114,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.net.URL
 
+import me.lengyu.qedge.ui.pages.home.CollapsibleContent
 import me.lengyu.qedge.ui.pages.home.HomePage
 import me.lengyu.qedge.ui.pages.home.HomePageCallbacks
+import me.lengyu.qedge.ui.pages.home.HomeSearchBar
+import me.lengyu.qedge.ui.pages.home.LocalHomeSearchQuery
 
 
 import me.lengyu.qedge.ui.pages.home.HomePageState
@@ -198,6 +201,9 @@ fun HomeScreen(
     var isLoading by remember { mutableStateOf(false) }
     var searchQuery by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf("") }
+    // 模块首页功能搜索：按钮展开搜索框，输入后按行过滤首页功能卡片
+    var homeSearchActive by remember { mutableStateOf(false) }
+    var homeSearchQuery by remember { mutableStateOf("") }
 
     var qzoneAutoLike by remember { mutableStateOf(ModuleConfig.getBoolean("qzone_auto_like", false)) }
     var qzoneAutoComment by remember { mutableStateOf(ModuleConfig.getBoolean("qzone_auto_comment", false)) }
@@ -438,6 +444,11 @@ fun HomeScreen(
 
     LaunchedEffect(selectedTab) {
         GlassBackdropHost.get()?.setSelected(selectedTab, true)
+        // 切到其它标签页时收起首页搜索，避免回到首页仍是过滤状态
+        if (selectedTab != 0) {
+            homeSearchActive = false
+            homeSearchQuery = ""
+        }
     }
 
     // 有背景图时不分亮暗：整页固定走暗色玻璃风格；无背景图则跟随当前主题
@@ -497,8 +508,22 @@ fun HomeScreen(
                 onAvatarClick = { expandedPanel = if (expandedPanel == 1) 0 else 1 },
                 showSponsorButton = true,
                 onSponsorClick = { expandedPanel = if (expandedPanel == 3) 0 else 3 },
+                showSearchButton = selectedTab == 0,
+                searchActive = homeSearchActive,
+                onSearchClick = {
+                    homeSearchActive = !homeSearchActive
+                    if (!homeSearchActive) homeSearchQuery = ""
+                },
                 actions = {}
             )
+
+            // 首页搜索框：点击标题旁搜索按钮后由标题下方推出
+            CollapsibleContent(expanded = homeSearchActive && selectedTab == 0) {
+                HomeSearchBar(
+                    query = homeSearchQuery,
+                    onQueryChange = { homeSearchQuery = it }
+                )
+            }
 
             AnimatedVisibility(visible = expandedPanel == 1 && selectedTab == 0) {
                 UserInfoCard(
@@ -548,7 +573,8 @@ fun HomeScreen(
                     .windowInsetsPadding(WindowInsets.navigationBars)
             ) { tab ->
                 when (tab) {
-                    0 -> HomePage(
+                    0 -> CompositionLocalProvider(LocalHomeSearchQuery provides homeSearchQuery) {
+                    HomePage(
                         state = HomePageState(
                             qzoneAutoLike = qzoneAutoLike,
                             qzoneAutoComment = qzoneAutoComment,
@@ -871,6 +897,7 @@ fun HomeScreen(
                             onMediaPanelEntryClick = { showMediaEntryDialog = true }
                         )
                     )
+                    }
                     1 -> JavaPluginsPage(
                         plugins = plugins,
                         onlinePlugins = onlinePlugins,

@@ -43,6 +43,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -57,16 +58,13 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.common.ModuleScope
 import me.lengyu.qedge.ui.components.atoms.ActionButton
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
-import me.lengyu.qedge.ui.components.atoms.QEdgeSwitch
 import me.lengyu.qedge.ui.components.molecules.AnimatedListItem
 import me.lengyu.qedge.ui.components.molecules.EmptyStateView
 import me.lengyu.qedge.ui.components.molecules.QEdgeTopBar
@@ -111,6 +109,9 @@ internal fun HomePage(
     callbacks: HomePageCallbacks
 ) {
     val colors = QEdgeTheme.colors
+    // 搜索态：非空即按关键词过滤卡片与功能行，卡片强制展开
+    val searchQuery = LocalHomeSearchQuery.current
+    val searching = searchQuery.isNotBlank()
     // 手风琴：当前展开的卡片 key，null 表示全部收起
     var expandedCard by remember { mutableStateOf<String?>(null) }
     val toggleCard: (String) -> Unit = { key ->
@@ -126,17 +127,30 @@ internal fun HomePage(
         contentPadding = PaddingValues(bottom = GlassBackdropHost.CONTENT_BOTTOM_DP.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        if (searching && !anyCardVisibleForSearch(searchQuery)) {
+            item(key = "empty_search") {
+                Box(
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 48.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("没有找到相关功能", fontSize = 15.sp, color = colors.textSecondary)
+                }
+            }
+        }
+
         item(key = "hangup") {
+            if (!isCardVisibleForSearch(searchQuery, "hangup")) return@item
             HangupEntryCard()
         }
 
         item(key = "card_qzone") {
-        val expanded = expandedCard == "card_qzone"
+        if (!isCardVisibleForSearch(searchQuery, "card_qzone")) return@item
+        val expanded = searching || expandedCard == "card_qzone"
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_qzone")) {
         QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
-                    title = "QQ空间",
-                    subtitle = "自动点赞、自动评论",
+                    title = HomeRowText.CARD_QZONE,
                     expanded = expanded,
                     onClick = { toggleCard("card_qzone") }
                 )
@@ -147,26 +161,25 @@ internal fun HomePage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     SettingSwitchItem(
-                        title = "空间秒赞",
-                        subtitle = "收到好友动态自动点赞(确保在前台运行)",
+                        title = HomeRowText.QZONE_AUTO_LIKE,
                         checked = state.qzoneAutoLike,
                         onCheckedChange = callbacks.onLikeToggle
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "空间秒评",
+                        title = HomeRowText.QZONE_AUTO_COMMENT,
                         subtitle = state.commentText,
                         checked = state.qzoneAutoComment,
                         onCheckedChange = callbacks.onCommentToggle,
                         onClick = callbacks.onCommentTextClick
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "定时发说说 +0.5天",
+                        title = HomeRowText.MOOD_SCHEDULE,
                         subtitle = run {
                             val preview = if (state.moodText.length > 18) state.moodText.take(18) + "…" else state.moodText
                             "${state.moodTime} · $preview"
@@ -179,14 +192,16 @@ internal fun HomePage(
             }
         }
         }
+        }
 
         item(key = "card_chat") {
-        val expanded = expandedCard == "card_chat"
+        if (!isCardVisibleForSearch(searchQuery, "card_chat")) return@item
+        val expanded = searching || expandedCard == "card_chat"
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_chat")) {
         QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
-                    title = "聊天功能",
-                    subtitle = "闪照破解、视频转泡泡等",
+                    title = HomeRowText.CARD_CHAT,
                     expanded = expanded,
                     onClick = { toggleCard("card_chat") }
                 )
@@ -197,13 +212,12 @@ internal fun HomePage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     SettingSwitchItem(
-                        title = "闪照破解",
-                        subtitle = "闪照直接查看，无需长按",
+                        title = HomeRowText.FLASH_PIC_BYPASS,
                         checked = state.flashPicBypass,
                         onCheckedChange = callbacks.onFlashPicToggle
                     )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 // 存储路径固定不变，缓存避免每次重组都走一次 getExternalStorageDirectory
                 val emotionSavePath = remember {
@@ -212,7 +226,7 @@ internal fun HomePage(
                 val copyCtx = androidx.compose.ui.platform.LocalContext.current
 
                 SettingSwitchItem(
-                    title = "表情/泡泡/视频/语音下载",
+                    title = HomeRowText.EMOTION_DOWNLOAD,
                     subtitle = "保存至 " + emotionSavePath + "，点击复制",
                     checked = state.downloadEmotion,
                     onCheckedChange = callbacks.onDownloadEmotionToggle,
@@ -229,63 +243,57 @@ internal fun HomePage(
                 )
 
                 SettingSwitchItem(
-                    title = "屏蔽链接信息卡片",
-                    subtitle = "收到链接时，自动屏蔽",
+                    title = HomeRowText.REMOVE_LINK_INFO,
                     checked = state.removeLinkInfo,
                     onCheckedChange = callbacks.onRemoveLinkInfoToggle
                 )
 
                 if (HostInfo.isQQ) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "视频转泡泡消息",
-                        subtitle = "发送视频时，自动替换为泡泡",
+                        title = HomeRowText.VIDEO_TO_BUBBLE,
                         checked = state.videoToBubble,
                         onCheckedChange = callbacks.onVideoToBubbleToggle
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "取消拍一拍时间限制",
-                    subtitle = "解除拍一拍时间限制",
+                    title = HomeRowText.ANTI_POKE_DELAY,
                     checked = state.antiPokeDelay,
                     onCheckedChange = callbacks.onAntiPokeDelayToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "防撤回",
-                    subtitle = "拦截QQ消息撤回，已撤回的消息依然可见",
+                    title = HomeRowText.PREVENT_RECALL,
                     checked = state.preventRecall,
                     onCheckedChange = callbacks.onPreventRecallToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "复制卡片消息",
-                    subtitle = "在卡片上方显示长按复制按钮，长按复制JSON",
+                    title = HomeRowText.COPY_ARK_MESSAGE,
                     checked = state.copyArkMessage,
                     onCheckedChange = callbacks.onCopyArkMessageToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "长按发送发卡片",
-                    subtitle = "长按发送按钮将输入框内JSON作为卡片消息发送",
+                    title = HomeRowText.LONG_CLICK_SEND_CARD,
                     checked = state.longClickSendCard,
                     onCheckedChange = callbacks.onLongClickSendCardToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "消息复读",
+                    title = HomeRowText.REPEAT_MSG,
                     subtitle = if (state.repeatMsgIcon.isNotEmpty())
                         "已自定义按钮图标，点击更换（打开后不选图则恢复默认）"
                     else
@@ -295,19 +303,18 @@ internal fun HomePage(
                     onClick = callbacks.onRepeatMsgIconClick
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "AI表情标签",
-                    subtitle = "发送纯表情包时自动带上AI表情标签",
+                    title = HomeRowText.EMOTION_AI_TAG,
                     checked = state.emotionAiTag,
                     onCheckedChange = callbacks.onEmotionAiTagToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "篡改发送图片比例",
+                    title = HomeRowText.IMAGE_RATIO,
                     subtitle = run {
                         val w = state.imageRatioWidth.toIntOrNull() ?: 0
                         val h = state.imageRatioHeight.toIntOrNull() ?: 0
@@ -318,10 +325,10 @@ internal fun HomePage(
                     onClick = callbacks.onImageRatioConfigClick
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "语音消息倍速播放",
+                    title = HomeRowText.VOICE_SPEED,
                     subtitle = run {
                         val v = state.voiceSpeedValue.toFloatOrNull() ?: 1.5f
                         "播放倍速 $v x，点击修改"
@@ -331,19 +338,18 @@ internal fun HomePage(
                     onClick = callbacks.onVoiceSpeedConfigClick
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "语音强制免提",
-                    subtitle = "语音消息强制扬声器播放，不走听筒",
+                    title = HomeRowText.FORCE_SPEAKER,
                     checked = state.forceSpeakerEnabled,
                     onCheckedChange = callbacks.onForceSpeakerToggle
                 )
 
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
 
                 SettingSwitchItem(
-                    title = "图片外显自定义",
+                    title = HomeRowText.IMAGE_SUMMARY,
                     subtitle = run {
                         val modeDesc = if (state.imageSummaryMode == "http") {
                             if (state.imageSummaryFormat == "json") "接口返回(JSON)" else "接口返回(文本)"
@@ -361,42 +367,40 @@ internal fun HomePage(
                 )
 
                 if (HostInfo.isTIM) {
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
                     SettingSwitchItem(
-                        title = "TIM卡片阻断绕过",
-                        subtitle = "解除低版本TIM对Ark卡片跳转的限制",
+                        title = HomeRowText.TIM_ARK_CARD_BYPASS,
                         checked = state.timArkCardBypass,
                         onCheckedChange = callbacks.onTimArkCardBypassToggle
                     )
                 }
 
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
+                SettingGroupDivider()
+                SettingGap(12)
 
                 val scriptEntryLabel = ChatSettingLoader.ENTRY_OPTIONS[state.chatSettingEntry] ?: state.chatSettingEntry
                 SettingClickItem(
-                    title = "聊天页脚本菜单入口",
+                    title = HomeRowText.CHAT_SCRIPT_ENTRY,
                     subtitle = "当前「$scriptEntryLabel」· 长按聊天页对应按钮打开脚本菜单（重启QQ生效），点击更改",
                     onClick = callbacks.onChatSettingEntryClick
                 )
 
-                Spacer(modifier = Modifier.height(20.dp))
-                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
-                Spacer(modifier = Modifier.height(16.dp))
+                SettingGap(20)
+                SettingGroupDivider()
+                SettingGap(16)
                 SettingSwitchItem(
-                    title = "综合面板（表情/语音/视频）",
-                    subtitle = "打开后长按聊天页对应按钮打开综合面板",
+                    title = HomeRowText.MEDIA_PANEL,
                     checked = state.mediaPanelEnabled,
                     onCheckedChange = callbacks.onMediaPanelToggle
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                SettingGap(12)
                 // 入口选择行：开关关闭时禁用（点击弹纵向单选弹窗，两入口重合时红字警告）
                 val mediaEnabled = state.mediaPanelEnabled
                 val mediaEntryLabel = MediaPanelLoader.ENTRY_OPTIONS[state.mediaPanelEntry] ?: state.mediaPanelEntry
                 val entryConflict = state.chatSettingEntry == state.mediaPanelEntry
                 SettingClickItem(
-                    title = "综合面板入口",
+                    title = HomeRowText.MEDIA_PANEL_ENTRY,
                     subtitle = if (entryConflict)
                         "脚本菜单与综合面板入口均为「$mediaEntryLabel」，长按会冲突，请错开 · 点击更改"
                     else
@@ -408,20 +412,18 @@ internal fun HomePage(
                     onClick = callbacks.onMediaPanelEntryClick
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                SettingGap(4)
 
                 SettingSwitchItem(
-                    title = "解除输入框字数上限",
-                    subtitle = "解除聊天输入框字数限制，可输入超长文本（重启QQ生效）",
+                    title = HomeRowText.FORCE_INPUT_NO_LIMIT,
                     checked = state.forceInputNoLimit,
                     onCheckedChange = callbacks.onForceInputNoLimitToggle
                 )
 
-                Spacer(modifier = Modifier.height(4.dp))
+                SettingGap(4)
 
                 SettingSwitchItem(
-                    title = "强制显示输入框全屏按钮",
-                    subtitle = "强制全屏输入按钮始终显示，不随行数隐藏",
+                    title = HomeRowText.FORCE_FULLSCREEN_BTN,
                     checked = state.forceFullScreenBtnShow,
                     onCheckedChange = callbacks.onForceFullScreenBtnShowToggle
                 )
@@ -429,14 +431,16 @@ internal fun HomePage(
             }
         }
         }
+        }
 
         item(key = "card_profile") {
-        val expanded = expandedCard == "card_profile"
+        if (!isCardVisibleForSearch(searchQuery, "card_profile")) return@item
+        val expanded = searching || expandedCard == "card_profile"
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_profile")) {
         QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
-                    title = "资料卡",
-                    subtitle = "上传透明头像等，名片回赞",
+                    title = HomeRowText.CARD_PROFILE,
                     expanded = expanded,
                     onClick = { toggleCard("card_profile") }
                 )
@@ -447,17 +451,15 @@ internal fun HomePage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     SettingSwitchItem(
-                        title = "半透明头像上传",
-                        subtitle = "可上传(群)头像、名片等，不用则关",
+                        title = HomeRowText.TRANSPARENT_AVATAR,
                         checked = state.transparentAvatar,
                         onCheckedChange = callbacks.onTransparentAvatarToggle
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "名片自动回赞",
-                        subtitle = "收到名片点赞自动回赞",
+                        title = HomeRowText.PROFILE_AUTO_LIKE_BACK,
                         checked = state.profileAutoLikeBack,
                         onCheckedChange = callbacks.onProfileAutoLikeBackToggle
                     )
@@ -465,14 +467,16 @@ internal fun HomePage(
             }
         }
         }
+        }
 
         item(key = "card_level") {
-        val expanded = expandedCard == "card_level"
+        if (!isCardVisibleForSearch(searchQuery, "card_level")) return@item
+        val expanded = searching || expandedCard == "card_level"
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_level")) {
         QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
-                    title = "等级加速",
-                    subtitle = "00:00时自动空间打卡，qq日签打卡，大会员签到，自动加好友",
+                    title = HomeRowText.CARD_LEVEL,
                     expanded = expanded,
                     onClick = { toggleCard("card_level") }
                 )
@@ -483,44 +487,39 @@ internal fun HomePage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     SettingSwitchItem(
-                        title = "空间等级签到",
-                        subtitle = "自动执行空间打卡 +0.5天",
+                        title = HomeRowText.QZONE_CHECKIN,
                         checked = state.qzoneCheckinEnabled,
                         onCheckedChange = callbacks.onCheckinToggle
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "QQ 日签打卡",
-                        subtitle = "自动执行日签打卡 +0.5天",
+                        title = HomeRowText.DAILY_SIGN,
                         checked = state.dailySignEnabled,
                         onCheckedChange = callbacks.onDailySignToggle
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "大会员签到",
-                        subtitle = "自动执行（无需开通大会员） +0.5天",
+                        title = HomeRowText.BIG_VIP_CHECKIN,
                         checked = state.bigVipCheckinEnabled,
                         onCheckedChange = callbacks.onBigVipCheckinToggle
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "自动加好友",
-                        subtitle = "自动添加3个好友 +1.5天",
+                        title = HomeRowText.AUTO_ADD_FRIEND,
                         checked = state.levelBoostEnabled,
                         onCheckedChange = callbacks.onLevelBoostToggle
                     )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
                     SettingSwitchItem(
-                        title = "空间浏览",
-                        subtitle = "浏览好友说说10条 +0.5天",
+                        title = HomeRowText.SPACE_BROWSE,
                         checked = state.spaceBrowseEnabled,
                         onCheckedChange = callbacks.onSpaceBrowseToggle
                     )
@@ -528,14 +527,16 @@ internal fun HomePage(
             }
         }
         }
+        }
 
         item(key = "card_keepalive") {
-        val expanded = expandedCard == "card_keepalive"
+        if (!isCardVisibleForSearch(searchQuery, "card_keepalive")) return@item
+        val expanded = searching || expandedCard == "card_keepalive"
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_keepalive")) {
         QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
-                    title = "应用保活",
-                    subtitle = "应用保活，保持进程可见，可能会高耗电",
+                    title = HomeRowText.CARD_KEEPALIVE,
                     expanded = expanded,
                     onClick = { toggleCard("card_keepalive") }
                 )
@@ -545,57 +546,41 @@ internal fun HomePage(
                     HorizontalDivider(color = colors.textSecondary.copy(0.08f))
                     Spacer(modifier = Modifier.height(16.dp))
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("透明悬浮窗", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("1x1透明悬浮窗，保持进程可见", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        }
-                        QEdgeSwitch(checked = state.keepAlivePixel, onCheckedChange = callbacks.onKeepAlivePixelToggle)
-                    }
+                    SettingSwitchItem(
+                        title = HomeRowText.KEEP_ALIVE_PIXEL,
+                        checked = state.keepAlivePixel,
+                        onCheckedChange = callbacks.onKeepAlivePixelToggle
+                    )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("前台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("高优先级常驻通知，最高保活优先级", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        }
-                        QEdgeSwitch(checked = state.keepAliveForeground, onCheckedChange = callbacks.onKeepAliveForegroundToggle)
-                    }
+                    SettingSwitchItem(
+                        title = HomeRowText.KEEP_ALIVE_FOREGROUND,
+                        checked = state.keepAliveForeground,
+                        onCheckedChange = callbacks.onKeepAliveForegroundToggle
+                    )
 
-                    Spacer(modifier = Modifier.height(12.dp))
+                    SettingGap(12)
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("后台通知", fontSize = 16.sp, fontWeight = FontWeight.Medium, color = colors.textPrimary)
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text("低优先级通知，轻量保活", fontSize = 12.sp, color = colors.textSecondary, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
-                        }
-                        QEdgeSwitch(checked = state.keepAliveBackground, onCheckedChange = callbacks.onKeepAliveBackgroundToggle)
-                    }
+                    SettingSwitchItem(
+                        title = HomeRowText.KEEP_ALIVE_BACKGROUND,
+                        checked = state.keepAliveBackground,
+                        onCheckedChange = callbacks.onKeepAliveBackgroundToggle
+                    )
                 }
             }
         }
         }
+        }
 
         item(key = "card_system") {
-        val expanded = expandedCard == "card_system"
+        if (!isCardVisibleForSearch(searchQuery, "card_system")) return@item
+        val expanded = searching || expandedCard == "card_system"
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_system")) {
         QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
-                    title = "基础配置",
-                    subtitle = "禁用QQ修复补丁、日志上报等系统级功能",
+                    title = HomeRowText.CARD_SYSTEM,
                     expanded = expanded,
                     onClick = { toggleCard("card_system") }
                 )
@@ -606,115 +591,103 @@ internal fun HomePage(
                     Spacer(modifier = Modifier.height(16.dp))
 
                     SettingSwitchItem(
-                        title = "禁用QQ修复补丁",
-                        subtitle = "拦截并禁用QQ的修复补丁机制，从而更稳定地使用QEdge",
+                        title = HomeRowText.ANTI_QFIX_PATCH,
                         checked = state.antiQfixPatch,
                         onCheckedChange = callbacks.onAntiQfixPatchToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "禁用QQ日志上报",
-                        subtitle = "拦截SSO上报并禁用QQ日志上传，可防止模块报错数据一并上传被服务器检测",
+                        title = HomeRowText.ANTI_REPORT,
                         checked = state.antiReport,
                         onCheckedChange = callbacks.onAntiReportToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "解锁本地会员",
-                        subtitle = "强制本地QQ超级会员/VIP/SVIP，目前可用于开启QQ自带的自动语音转文字、解除表情包收藏500的限制、解除语音发送时长限制、解除每日文件上传限制，其他的自己去测试。会员不会在主页显示。",
+                        title = HomeRowText.FORCE_VIP,
                         checked = state.forceVip,
                         onCheckedChange = callbacks.onForceVipToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "屏蔽QQ秀/AI头像",
-                        subtitle = "屏蔽QQ秀与AI头像相关显示",
+                        title = HomeRowText.DISABLE_AI_AVATAR,
                         checked = state.disableAIAvatar,
                         onCheckedChange = callbacks.onDisableAIAvatarToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "解除风险网页拦截",
-                        subtitle = "点击消息中链接时不再拦截风险网页",
+                        title = HomeRowText.REMOVE_RISK_WEBPAGE,
                         checked = state.removeRiskWebpage,
                         onCheckedChange = callbacks.onRemoveRiskWebpageToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "拦截网页安全检测",
-                        subtitle = "阻止WebView截图上传识别，跳过网页安全OCR检测",
+                        title = HomeRowText.DISABLE_WEB_SECURITY_CHECK,
                         checked = state.disableWebSecurityCheck,
                         onCheckedChange = callbacks.onDisableWebSecurityCheckToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "拦截安全校验(谨慎开启)",
-                        subtitle = "屏蔽重打包检测、签名校验与APK版本读取（可能导致其他功能异常）",
+                        title = HomeRowText.DISABLE_SEC_CHECK,
                         checked = state.disableSecCheck,
                         onCheckedChange = callbacks.onDisableSecCheckToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "解除扫码限制",
-                        subtitle = "解除长按识别或从相册中扫描二维码时的风险检查",
+                        title = HomeRowText.REMOVE_QRCODE_CHECK,
                         checked = state.removeQrCodeCheck,
                         onCheckedChange = callbacks.onRemoveQrCodeCheckToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "跳过扫码确认等待时间",
-                        subtitle = "忽略倒计时，扫码确认按钮可直接点击确认登录",
+                        title = HomeRowText.SKIP_SCAN_WAIT,
                         checked = state.skipScanWaitTime,
                         onCheckedChange = callbacks.onSkipScanWaitTimeToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "分屏允许扫码",
-                        subtitle = "分屏/小窗下也允许打开扫一扫，绕过QQ的多窗口限制",
+                        title = HomeRowText.SPLIT_SCREEN_SCAN,
                         checked = state.splitScreenScan,
                         onCheckedChange = callbacks.onSplitScreenScanToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "绕过资料卡封禁",
-                        subtitle = "强制显示被封禁用户的 QQ 资料卡主页，绕过封禁拦截弹窗",
+                        title = HomeRowText.BYPASS_PROFILE_BAN,
                         checked = state.bypassProfileBan,
                         onCheckedChange = callbacks.onBypassProfileBanToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "去页面内横幅广告",
-                        subtitle = "清理QQ主界面顶部横幅广告等广告数据源",
+                        title = HomeRowText.REMOVE_ADS,
                         checked = state.removeAds,
                         onCheckedChange = callbacks.onRemoveAdsToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "QLog日志重定向/拦截",
+                        title = HomeRowText.QLOG_REDIRECT,
                         subtitle = when (state.qlogRedirectMode) {
                             QLogRedirect.MODE_MUTE -> "纯拦截模式：QQ日志被直接丢弃，不写入本地文件，点击选择模式"
                             QLogRedirect.MODE_REDIRECT -> "重定向模式：QQ日志写入 QEdge/log/QLog/，点击选择模式"
@@ -725,19 +698,18 @@ internal fun HomePage(
                         onClick = callbacks.onQLogRedirectModeClick
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "强制模块Toast",
-                        subtitle = "接管QQ原生Toast，改用模块样式弹出提示",
+                        title = HomeRowText.FORCE_MODULE_TOAST,
                         checked = state.forceModuleToast,
                         onCheckedChange = callbacks.onForceModuleToastToggle
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
 
                     SettingSwitchItem(
-                        title = "自定义背景图",
+                        title = HomeRowText.BG_IMAGE,
                         subtitle = when {
                             state.bgImageEnabled && state.bgImageUri.isNotEmpty() ->
                                 "已选图片作为首页背景，点击重新选择"
@@ -751,9 +723,10 @@ internal fun HomePage(
                         onClick = callbacks.onBgImagePickClick
                     )
 
-                    Spacer(modifier = Modifier.height(4.dp))
+                    SettingGap(4)
                 }
             }
+        }
         }
         }
     }

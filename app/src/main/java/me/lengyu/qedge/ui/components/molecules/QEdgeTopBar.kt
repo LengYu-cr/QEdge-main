@@ -47,6 +47,10 @@ fun QEdgeTopBar(
     onAvatarClick: () -> Unit = {},
     showSponsorButton: Boolean = false,
     onSponsorClick: () -> Unit = {},
+    /** 标题右侧的搜索按钮：点击切换搜索框展开/收起 */
+    showSearchButton: Boolean = false,
+    searchActive: Boolean = false,
+    onSearchClick: () -> Unit = {},
     actions: @Composable () -> Unit = {}
 ) {
     val colors = QEdgeTheme.colors
@@ -92,6 +96,29 @@ fun QEdgeTopBar(
         actions()
 
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (showSearchButton) {
+                QEdgeCard(
+                    modifier = Modifier.size(40.dp),
+                    glass = true,
+                    animateContentSize = false,
+                    onClick = onSearchClick
+                ) {
+                    Box(modifier = Modifier.size(40.dp), contentAlignment = Alignment.Center) {
+                        if (searchActive) {
+                            Text("✕", fontSize = 18.sp, color = colors.textPrimary)
+                        } else {
+                            Icon(
+                                painterResource(R.drawable.ic_search),
+                                "搜索功能",
+                                Modifier.size(24.dp),
+                                colors.textPrimary
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.width(10.dp))
+            }
+
             if (showCreateButton) {
                 QEdgeCard(
                     modifier = Modifier.size(40.dp),
