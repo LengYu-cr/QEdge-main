@@ -86,6 +86,7 @@ import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
+import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.plugin.view.MediaPanelLoader
 import me.lengyu.qedge.hook.item.LevelBoost
@@ -219,10 +220,8 @@ internal fun HomePage(
 
                 SettingGap(12)
 
-                // 存储路径固定不变，缓存避免每次重组都走一次 getExternalStorageDirectory
-                val emotionSavePath = remember {
-                    android.os.Environment.getExternalStorageDirectory().absolutePath + "/Download/QQ/QEdge/"
-                }
+                // 与 DownloadEmotion / 媒体面板保持同源，避免硬编码路径漂移
+                val emotionSavePath = remember { QQCurrentEnv.getMediaPath() + "QEdge/" }
                 val copyCtx = androidx.compose.ui.platform.LocalContext.current
 
                 SettingSwitchItem(

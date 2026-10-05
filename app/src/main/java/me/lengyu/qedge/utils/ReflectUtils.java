@@ -26,6 +26,23 @@ public class ReflectUtils {
         }
     }
 
+    /**
+     * 只切换宿主类查找入口，不改写模块自身 ClassLoader 的 parent。
+     *
+     * <p>QQ 9.3.70 起用 Tinker 热更补丁运行，真正在跑的宿主类挂在补丁 ClassLoader 上，
+     * 必须用它去查找宿主类，否则会挂到基础包里的旧版同名类上（表现为 hook 安装成功但永不触发）。
+     * 但补丁 loader 是 DelegateLastClassLoader，启动期正并发加载同一批类，
+     * 一旦把它设成模块 loader 的 parent 就会互相等待死锁（QQ 卡启动页），
+     * 因此补丁 loader 只能走这里，绝不能走 {@link #injectClassLoader}。
+     */
+    public static void setHostClassLoader(ClassLoader loader) {
+        if (loader == null) {
+            return;
+        }
+        HybridClassLoader.setHostClassLoader(loader);
+        hostClassLoader = loader;
+    }
+
     public static void injectClassLoader(ClassLoader hostClassLoader) {
         HybridClassLoader.setHostClassLoader(hostClassLoader);
         HybridClassLoader loader = HybridClassLoader.INSTANCE;

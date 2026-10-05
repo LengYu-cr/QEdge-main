@@ -491,7 +491,7 @@ private fun EmojiPanel(
                             // 左侧灰色小字提醒：如何保存/导入图片
                             Text(
                                 "保存：长按图片选「保存」/合集详情「下载图片」\n导入：图片放入 " +
-                                    QQCurrentEnv.getLocalPath() + "Download/QQ/QEdge/Pictures/ 即自动显示",
+                                    QQCurrentEnv.getMediaPath() + "QEdge/Pictures/ 即自动显示",
                                 fontSize = 10.sp,
                                 lineHeight = 14.sp,
                                 color = colors.textSecondary.copy(alpha = 0.8f),

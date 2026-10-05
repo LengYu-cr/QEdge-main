@@ -340,4 +340,14 @@ public class QQCurrentEnv {
         }
         return getLocalPath() + "Android/data/" + context.getPackageName() + "/";
     }
+    
+
+    public static String getMediaPath() {
+        Context context = HostInfo.getContext();
+        if (context == null) {
+            return getLocalPath() + "Android/media/com.tencent.mobileqq/";
+        }
+        return getLocalPath() + "Android/media/" + context.getPackageName() + "/";
+    }
+    
 }

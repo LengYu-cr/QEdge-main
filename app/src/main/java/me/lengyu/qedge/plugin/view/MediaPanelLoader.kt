@@ -371,8 +371,8 @@ object MediaPanelLoader {
         }
 
         fun galleryDir(): String {
-            // 与 DownloadEmotion 图片保存目录保持一致：/storage/emulated/0/Download/QQ/QEdge/Pictures/
-            val d = QQCurrentEnv.getLocalPath() + "Download/QQ/QEdge/Pictures/"
+            // 与 DownloadEmotion 图片保存目录保持一致：/storage/emulated/0/Android/media/com.tencent.mobileqq/QEdge/Pictures/
+            val d = QQCurrentEnv.getMediaPath() + "QEdge/Pictures/"
             File(d).let { if (!it.exists()) it.mkdirs() }
             return d
         }
@@ -469,7 +469,7 @@ object MediaPanelLoader {
         fun dirFor(type: String): String {
             // 与 DownloadEmotion 保存目录保持一致：语音 Ptts、视频 Videos
             val sub = if (type == "voice") "Ptts" else "Videos"
-            val d = QQCurrentEnv.getLocalPath() + "Download/QQ/QEdge/" + sub + "/"
+            val d = QQCurrentEnv.getMediaPath() + "QEdge/" + sub + "/"
             File(d).let { if (!it.exists()) it.mkdirs() }
             return d
         }

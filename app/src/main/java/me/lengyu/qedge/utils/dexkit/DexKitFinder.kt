@@ -15,7 +15,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
-import com.tencent.mobileqq.activity.SplashActivity
+import de.robv.android.xposed.XC_MethodHook
+import de.robv.android.xposed.XC_MethodHook.MethodHookParam
+import de.robv.android.xposed.XposedHelpers
 import me.lengyu.qedge.common.ModuleScope
 import me.lengyu.qedge.hook.MainHook
 import me.lengyu.qedge.hook.base.HookRegistry
@@ -24,6 +26,7 @@ import me.lengyu.qedge.ui.core.compatibility.XposedComposeDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
+import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.reflect.*
 import me.lengyu.qedge.utils.hook.hookAfter
 import me.lengyu.qedge.utils.qq.TroopTool
@@ -35,8 +38,11 @@ import org.luckypray.dexkit.query.base.BaseFinder
 
 object DexKitFinder {
 
+    private const val SPLASH_ACTIVITY = "com.tencent.mobileqq.activity.SplashActivity"
+
     private var progressText by mutableStateOf("QEdge准备开始查找...")
     private var isFindComplete by mutableStateOf(false)
+    private var splashHookFired = false
     private var dialogRef: XposedComposeDialog? = null
 
     @JvmStatic
@@ -52,12 +58,38 @@ object DexKitFinder {
 
     @Suppress("DEPRECATION")
     private fun showFindDialog() {
-        SplashActivity::class.java
-            .getDeclaredMethod("doOnCreate", Bundle::class.java)
-            .hookAfter {
-                val context = it.thisObject as Context
+        // QQ 的 Activity 基类走 doOnCreate 模板方法；9.3.70 起可能不再经过它，
+        // 因此额外兜底 Activity 生命周期 onCreate，两者取先触发者。
+        hookSplashMethod("doOnCreate")
+        hookSplashMethod("onCreate")
+    }
 
-                dialogRef = object : XposedComposeDialog(context) {
+    private fun hookSplashMethod(name: String) {
+        try {
+            // 必须用宿主查找 loader（补丁 loader）解析，不能用 SplashActivity::class.java：
+            // 后者走模块 loader 的 parent 链，解析到的是基础包里那个根本没在跑的旧版类，
+            // 结果就是 hook 安装成功但永不触发（QQ 9.3.70 的启动页在 Tinker 补丁里）。
+            val clazz = ReflectUtils.findClassIfExists(SPLASH_ACTIVITY)
+                ?: throw ClassNotFoundException(SPLASH_ACTIVITY)
+            XposedHelpers.findAndHookMethod(
+                clazz, name, Bundle::class.java,
+                object : XC_MethodHook() {
+                    override fun afterHookedMethod(param: MethodHookParam) {
+                        if (splashHookFired) {
+                            return
+                        }
+                        splashHookFired = true
+                        showFindDialogInternal(param.thisObject as Context)
+                    }
+                }
+            )
+        } catch (e: Throwable) {
+            LogUtils.e("SplashActivity.$name hook 失败: " + e)
+        }
+    }
+
+    private fun showFindDialogInternal(context: Context) {
+        dialogRef = object : XposedComposeDialog(context) {
                     @Composable
                     override fun DialogContent() {
                         QEdgeTheme {
@@ -86,8 +118,7 @@ object DexKitFinder {
                     show()
                 }
 
-                startFind()
-            }
+        startFind()
     }
 
     private fun startFind() {

@@ -56,8 +56,8 @@ object DownloadEmotion : BaseApiHookItem<DownloadEmotion.DownloadEmotionListener
 
         thread {
             try {
-                // 统一存 /storage/emulated/0/Download/QEdge/{Pictures,Videos,PTT}/ (QQ 对 Tencent 目录有完整权限, 绕过 Scoped Storage)
-                val rootDir = File(QQCurrentEnv.getLocalPath() + "Download/QQ/QEdge")
+                // 统一存 /storage/emulated/0/Android/media/com.tencent.mobileqq/QEdge/{Pictures,Videos,Ptsts}/ (QQ 对 Tencent 目录有完整权限, 绕过 Scoped Storage)
+                val rootDir = File(QQCurrentEnv.getMediaPath() + "QEdge")
                 val picSaveDir = File(rootDir, "Pictures").apply { if (!exists()) mkdirs() }
                 val videoSaveDir = File(rootDir, "Videos").apply { if (!exists()) mkdirs() }
                 val pttSaveDir = File(rootDir, "Ptts").apply { if (!exists()) mkdirs() }
@@ -116,7 +116,7 @@ object DownloadEmotion : BaseApiHookItem<DownloadEmotion.DownloadEmotionListener
                         val paths = downloadedFiles.map { it.absolutePath }.toTypedArray()
                         MediaScannerConnection.scanFile(activity, paths, null) { _, _ -> }
                     }
-                    val sb = StringBuilder("已保存到/Tencent/QEdge/")
+                    val sb = StringBuilder("已保存到${QQCurrentEnv.getMediaPath()}QEdge/")
                     val types = mutableListOf<String>()
                     if (pttList.isNotEmpty()) types.add("Ptts(语音)")
                     if (videoList.isNotEmpty()) types.add("Videos(视频)")

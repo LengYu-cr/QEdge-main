@@ -2,13 +2,19 @@ package me.lengyu.qedge.hook;
 
 import android.content.Context;
 import android.os.Build;
+import dalvik.system.BaseDexClassLoader;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
 import de.robv.android.xposed.XC_MethodHook;
 import de.robv.android.xposed.XposedBridge;
 import de.robv.android.xposed.XposedHelpers;
 import de.robv.android.xposed.callbacks.XC_LoadPackage;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.Method;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
+import me.lengyu.qedge.BuildConfig;
 import me.lengyu.qedge.activity.SettingActivity;
 import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.lifecycle.DynamicActivityRegistry;
@@ -33,6 +39,7 @@ import me.lengyu.qedge.hook.woodenletter.WoodenLetterHook;
  */
 public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteInit {
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
+    private static final AtomicBoolean hasCapturedTinker = new AtomicBoolean(false);
     private static String modulePath = null;
     private static final String[] supportedPackages = {"com.tencent.mobileqq", "com.tencent.tim", "im.weshine.keyboard", "com.iflytek.inputmethod", "com.kugou.android", "com.apowersoft.backgrounderaser", "com.liuzh.deviceinfo", "tech.xiangzi.painless", "com.One.WoodenLetter"};
 
@@ -204,27 +211,133 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
 
     private void hookBaseApplicationOnCreate(final ClassLoader classLoader) {
         try {
-            XposedHelpers.findAndHookMethod("com.tencent.common.app.BaseApplicationImpl", classLoader, "onCreate", new Object[]{new XC_MethodHook() {
-                protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) {
-                    if (XposedEntry.initialized.compareAndSet(false, true)) {
-                        try {
-                            Context hostContext = (Context) param.thisObject;
-                            HostInfo hostInfo = HostInfo.INSTANCE;
-                            HostInfo.init(hostContext);
-                            Parasitics.initForStubActivity(hostContext);
-                        } catch (Throwable e) {
-                            XposedBridge.log("[QEdge] 延迟初始化失败: " + e.getMessage());
-                            XposedBridge.log(e);
-                        }
-                        loadHooksOffMainThread();
-                    }
-                }
-            }});
+            Method attach = classLoader
+                    .loadClass("com.tencent.common.app.QFixApplicationImplProxy")
+                    .getDeclaredMethod("attachBaseContext", Context.class);
+            attach.setAccessible(true);
+            hookQFixAttach(attach);
         } catch (Throwable e) {
-            XposedBridge.log("[QEdge] Hook BaseApplicationImpl.onCreate 失败: " + e.getMessage());
+            XposedBridge.log("[QEdge] 未找到 QFixApplicationImplProxy.attachBaseContext，直接启动: " + e.getMessage());
+            doRealStartup(classLoader);
         }
     }
 
+    /**
+     * QQ 启用了热更补丁（QFix/Tinker），真正的宿主类挂在补丁自己的 ClassLoader 上，
+     * 而不是 lpparam.classLoader。若直接拿 lpparam.classLoader 去 hook，会挂到宿主里的同名类上，
+     * 表现就是"hook 安装成功但永远不触发"。这里在 attachBaseContext 执行期间拦截所有
+     * BaseDexClassLoader 构造，捕获补丁 loader，附件结束后立即卸载临时 hook。
+     */
+    private void hookQFixAttach(final Method attach) {
+        final List<XC_MethodHook.Unhook> constructorUnhooks = new ArrayList<>();
+
+        XposedBridge.hookMethod(attach, new XC_MethodHook() {
+            @Override
+            protected void beforeHookedMethod(MethodHookParam param) {
+                for (Constructor<?> constructor : BaseDexClassLoader.class.getDeclaredConstructors()) {
+                    try {
+                        XC_MethodHook.Unhook unhook = XposedBridge.hookMethod(constructor, new XC_MethodHook() {
+                            @Override
+                            protected void afterHookedMethod(MethodHookParam param) {
+                                ClassLoader loader = (ClassLoader) param.thisObject;
+                                String loaderStr = loader.toString();
+                                if (loaderStr.contains(BuildConfig.APPLICATION_ID)) {
+                                    return;
+                                }
+                                if ((loaderStr.contains("com.tencent.")
+                                        || loaderStr.contains("TinkerClassLoader")
+                                        || loaderStr.contains("DelegateLastClassLoader"))
+                                        && hasCapturedTinker.compareAndSet(false, true)) {
+                                    doRealStartup(loader);
+                                }
+                            }
+                        });
+                        if (unhook != null) {
+                            constructorUnhooks.add(unhook);
+                        }
+                    } catch (Throwable ignored) {
+                    }
+                }
+            }
+
+            @Override
+            protected void afterHookedMethod(MethodHookParam param) {
+                for (XC_MethodHook.Unhook unhook : constructorUnhooks) {
+                    unhook.unhook();
+                }
+                constructorUnhooks.clear();
+
+                if (!hasCapturedTinker.get()) {
+                    Context context = (Context) param.args[0];
+                    XposedBridge.log("[QEdge] 未捕获热更 ClassLoader，回退 context.classLoader");
+                    doRealStartup(context.getClassLoader());
+                }
+            }
+        });
+    }
+
+    /** 拿到真实宿主 ClassLoader 后只执行一次：挂 Application.onCreate */
+    private synchronized void doRealStartup(final ClassLoader realClassLoader) {
+        if (!initialized.compareAndSet(false, true)) {
+            return;
+        }
+        // 两个需求必须分开满足：
+        //  - 宿主类查找要用补丁 loader，否则会挂到基础包里的旧版同名类上（hook 装了不触发）；
+        //  - 但绝不能改写模块自身 ClassLoader 的 parent（initClassLoader 会做这件事），
+        //    补丁 loader 是 DelegateLastClassLoader，启动期正并发加载同一批类，会死锁（QQ 卡启动页）。
+        // 所以这里只切换查找入口，不动 parent 链。
+        ReflectUtils.setHostClassLoader(realClassLoader);
+        hookApplicationOnCreate();
+    }
+
+    /**
+     * QQ 9.3.70 起 Application 改由 QFix 代理创建，会先后实例化
+     * QFixApplicationImplProxy / QFixApplicationImpl / BaseApplicationImpl，
+     * 且都不重写 onCreate，只能从 android.app.Application 兜底拦截后沿继承链确认身份。
+     */
+    private void hookApplicationOnCreate() {
+        try {
+            XposedHelpers.findAndHookMethod(
+                    "android.app.Application",
+                    ReflectUtils.hostClassLoader,
+                    "onCreate",
+                    new XC_MethodHook() {
+                        @Override
+                        protected void afterHookedMethod(MethodHookParam param) {
+                            Object app = param.thisObject;
+                            if (!(app instanceof Context)) {
+                                return;
+                            }
+                            if (!isBaseApplicationImpl(app)) {
+                                return;
+                            }
+                            XposedBridge.log("[QEdge] 命中 QQ Application: " + app.getClass().getName());
+                            try {
+                                Context hostContext = (Context) app;
+                                HostInfo hostInfo = HostInfo.INSTANCE;
+                                HostInfo.init(hostContext);
+                                Parasitics.initForStubActivity(hostContext);
+                            } catch (Throwable e) {
+                                XposedBridge.log("[QEdge] 初始化失败: " + e.getMessage());
+                                XposedBridge.log(e);
+                            }
+                            loadHooksOffMainThread();
+                        }
+                    });
+        } catch (Throwable e) {
+            XposedBridge.log("[QEdge] Hook Application.onCreate 失败: " + e.getMessage());
+        }
+    }
+
+    /** 沿继承链判断是否 QQ 的 BaseApplicationImpl（不能在编译期引用该类） */
+    private static boolean isBaseApplicationImpl(Object app) {
+        for (Class<?> c = app.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
+            if ("com.tencent.common.app.BaseApplicationImpl".equals(c.getName())) {
+                return true;
+            }
+        }
+        return false;
+    }
     /**
      * 缓存读盘、反射校验、Hook 注册与 DexKit 查找都不是首帧必需，整体移到后台调度器执行，
      * 主线程只保留 initialized 抢占与 HostInfo/Parasitics 这类必须尽早生效的初始化。
@@ -244,9 +357,11 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                 MainHook.registerHookItems();
                 if (DexKitCache.initCache() && DexKitCache.validateAllTasks()) {
                     MainHook.loadHook();
+                    XposedBridge.log("[QEdge] Hook 初始化成功");
                 } else {
                     // 缓存损坏或缺条目：退回重新查找
                     ModuleScope.postToMain(DexKitFinder::doFind);
+                    XposedBridge.log("[QEdge] Hook 初始化失败，退回重新查找");
                 }
             } catch (Throwable e) {
                 XposedBridge.log("[QEdge] Hook 初始化失败: " + e.getMessage());
