@@ -65,6 +65,7 @@ import me.lengyu.qedge.hook.item.DisableSecCheck;
 import me.lengyu.qedge.hook.item.ForceModuleToast;
 import me.lengyu.qedge.hook.item.ForceInputNoLimit;
 import me.lengyu.qedge.hook.item.ForceFullScreenBtnShow;
+import me.lengyu.qedge.hook.item.WebJsBridgeAllowlist;
 
 import java.util.List;
 /**
@@ -122,6 +123,7 @@ public class MainHook {
         HookRegistry.register(ForceModuleToast.INSTANCE);
         HookRegistry.register(ForceInputNoLimit.INSTANCE);
         HookRegistry.register(ForceFullScreenBtnShow.INSTANCE);
+        HookRegistry.register(WebJsBridgeAllowlist.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;

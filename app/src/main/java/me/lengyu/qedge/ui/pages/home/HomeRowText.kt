@@ -177,6 +177,9 @@ internal object HomeRowText {
     @field:RowText(title = "拦截网页安全检测", subtitle = "阻止WebView截图上传识别，跳过网页安全OCR检测", card = "card_system")
     val DISABLE_WEB_SECURITY_CHECK = "拦截网页安全检测"
 
+    @field:RowText(title = "浏览器JS接口放行", subtitle = "允许自定义域名使用JS调用QQ的mqq和内部接口，点击配置", card = "card_system")
+    val WEB_JS_ALLOWLIST = "浏览器JS接口放行"
+
     @field:RowText(title = "拦截安全校验(谨慎开启)", subtitle = "屏蔽重打包检测、签名校验与APK版本读取（可能导致其他功能异常）", card = "card_system")
     val DISABLE_SEC_CHECK = "拦截安全校验(谨慎开启)"
 

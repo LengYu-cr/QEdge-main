@@ -160,7 +160,8 @@ private val hookItemClassNames: List<String> = listOf(
     "me.lengyu.qedge.hook.item.TimArkCardBypass",
     "me.lengyu.qedge.hook.item.TransparentAvatar",
     "me.lengyu.qedge.hook.item.VideoToBubble",
-    "me.lengyu.qedge.hook.item.VoiceSpeed"
+    "me.lengyu.qedge.hook.item.VoiceSpeed",
+    "me.lengyu.qedge.hook.item.WebJsBridgeAllowlist"
 )
 
 /** 注解检索文本 */

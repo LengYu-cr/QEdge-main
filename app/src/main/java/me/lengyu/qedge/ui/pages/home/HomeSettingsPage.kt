@@ -638,6 +638,19 @@ internal fun HomePage(
                     SettingGap(4)
 
                     SettingSwitchItem(
+                        title = HomeRowText.WEB_JS_ALLOWLIST,
+                        subtitle = run {
+                            val count = state.webJsAllowlistRules.split(',').count { it.isNotBlank() }
+                            if (count > 0) "已放行 $count 个域名，点击修改" else "放行后可让该域名获得*.qq.com的JSBridge权限,可以调用QQ内部接口。未配置域名，点击添加"
+                        },
+                        checked = state.webJsAllowlistEnabled,
+                        onCheckedChange = callbacks.onWebJsAllowlistToggle,
+                        onClick = callbacks.onWebJsAllowlistConfigClick
+                    )
+
+                    SettingGap(4)
+
+                    SettingSwitchItem(
                         title = HomeRowText.DISABLE_SEC_CHECK,
                         checked = state.disableSecCheck,
                         onCheckedChange = callbacks.onDisableSecCheckToggle

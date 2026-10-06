@@ -87,6 +87,7 @@ import me.lengyu.qedge.ui.pages.home.HomeEntrySelectDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageSummaryDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageRatioDialog
 import me.lengyu.qedge.ui.pages.home.HomeVoiceSpeedDialog
+import me.lengyu.qedge.ui.pages.home.HomeWebJsAllowlistDialog
 import me.lengyu.qedge.ui.pages.home.HomeQLogRedirectDialog
 import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
 import me.lengyu.qedge.utils.HostInfo
@@ -242,6 +243,9 @@ fun HomeScreen(
     var disableAIAvatar by remember { mutableStateOf(ModuleConfig.getBoolean("disable_ai_avatar", false)) }
     var removeRiskWebpage by remember { mutableStateOf(ModuleConfig.getBoolean("remove_risk_webpage", false)) }
     var disableWebSecurityCheck by remember { mutableStateOf(ModuleConfig.getBoolean("disable_web_security_check", false)) }
+    var webJsAllowlistEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("web_js_allowlist_enable", false)) }
+    var webJsAllowlistRules by remember { mutableStateOf(ModuleConfig.getString("web_js_allowlist_rules", "")) }
+    var showWebJsAllowlistDialog by remember { mutableStateOf(false) }
     var disableSecCheck by remember { mutableStateOf(ModuleConfig.getBoolean("disable_sec_check", false)) }
     var removeQrCodeCheck by remember { mutableStateOf(ModuleConfig.getBoolean("remove_qrcode_check", false)) }
     var skipScanWaitTime by remember { mutableStateOf(ModuleConfig.getBoolean("skip_scan_wait_time", false)) }
@@ -612,6 +616,8 @@ fun HomeScreen(
                             disableAIAvatar = disableAIAvatar,
                             removeRiskWebpage = removeRiskWebpage,
                             disableWebSecurityCheck = disableWebSecurityCheck,
+                            webJsAllowlistEnabled = webJsAllowlistEnabled,
+                            webJsAllowlistRules = webJsAllowlistRules,
                             disableSecCheck = disableSecCheck,
                             removeQrCodeCheck = removeQrCodeCheck,
                             skipScanWaitTime = skipScanWaitTime,
@@ -759,6 +765,11 @@ fun HomeScreen(
                                 disableWebSecurityCheck = it
                                 Thread { ModuleConfig.putBoolean("disable_web_security_check", it) }.start()
                             },
+                            onWebJsAllowlistToggle = {
+                                webJsAllowlistEnabled = it
+                                Thread { ModuleConfig.putBoolean("web_js_allowlist_enable", it) }.start()
+                            },
+                            onWebJsAllowlistConfigClick = { showWebJsAllowlistDialog = true },
                             onDisableSecCheckToggle = {
                                 disableSecCheck = it
                                 Thread { ModuleConfig.putBoolean("disable_sec_check", it) }.start()
@@ -994,6 +1005,17 @@ fun HomeScreen(
                 voiceSpeedValue = v
                 showVoiceSpeedDialog = false
                 Thread { ModuleConfig.putString("voice_speed_value", v) }.start()
+            }
+        )
+
+        HomeWebJsAllowlistDialog(
+            show = showWebJsAllowlistDialog,
+            current = webJsAllowlistRules,
+            onDismiss = { showWebJsAllowlistDialog = false },
+            onConfirm = { rules ->
+                webJsAllowlistRules = rules
+                showWebJsAllowlistDialog = false
+                Thread { ModuleConfig.putString("web_js_allowlist_rules", rules) }.start()
             }
         )
 
