@@ -11,13 +11,12 @@
 
 | 功能 | QQ | TIM | 说明 |
 |------|:--:|:---:|------|
-| 消息图片/视频/语音一键下载 | ✅ | ✅ | 长按菜单项，统一保存到 `/storage/emulated/0/Tencent/QEdge/{Pictures,Videos,PTT}/` |
+| 消息图片/视频/语音一键下载 | ✅ | ✅ | 长按菜单项，统一保存到 `/storage/emulated/0/Android/media/<宿主包名>/QEdge/{Pictures,Videos,Ptts}/`（绕过 Scoped Storage） |
 | 闪照无限制查看 | ✅ | ✅ | 绕过"查看5秒后销毁"限制，仍可正常保存原图 |
-| 半透明头像上传 | ✅ | ✅ | 上传 PNG 透明头像，支持 200×200 自动裁圆 |
+| 半透明头像上传 | ✅ | ✅ | 上传（群）头像 / 名片时绕过头像裁剪检查，把头像场景的 JPEG 压缩改写为 PNG 以保留透明通道（重启 QQ 生效） |
 | 自己发送的视频 → 泡泡消息 | ✅ | ❌（TIM 不支持泡泡查看） | 开关打开后，相册或拍摄的视频消息自动转成泡泡消息 Element 发送 |
 | TIM Ark 卡片跳转白名单绕过 | ❌ | ✅ | 通过 DexKit 扫描 ark 组件包下所有 boolean 方法，HookAfter 强制返回 true，跳过 TIM 对非白名单卡片的阻断 |
 | 音乐卡片 / 小程序卡片发送 | ✅ | ✅ | ExtraTool.sendMusicCard / sendMiniApp，直接构造 Ark Proto 发送 |
-| 自定义透明头像 | ✅ | ✅ | 无限制，支持 PNG 透明头像|
 | 一键复读 | ✅ | ✅ | 消息气泡旁注入复读入口，点击自动复读该条消息 |
 | 防撤回 | ✅ | ✅ | 协议层拦截撤回推送，被撤回消息依然可见并标注「消息已撤回」 |
 | 长按发送按钮发卡片 | ✅ | ✅ | 长按发送按钮，将输入框内容作为 Ark 卡片 JSON 发送 |
@@ -29,8 +28,10 @@
 | 篡改发送图片比例 | ✅ | ✅ | 对所有发送的图片元素强制设置 picWidth/picHeight，可自定义宽高 |
 | 图片外显自定义 | ✅ | ✅ | 发送图片时将外显摘要改为随机文案或 HTTP 接口返回内容 |
 | 表情包 AI 标签 | ✅ | ✅ | 发送单图纯表情包时带上「AI表情」标签（picType 1000→2000） |
-| 输入框无字数限制 | ✅ | ✅ | 解除聊天输入框字数限制 |
+| 输入框无字数限制 | ✅ | ✅ | 解除聊天输入框字数限制（重启 QQ 生效） |
 | 强制显示全屏按钮 | ✅ | ✅ | 强制显示输入框全屏按钮 |
+| 聊天页脚本菜单入口 | ✅ | ✅ | 长按聊天页指定按钮（默认「更多功能」）打开脚本菜单，入口可在首页切换（重启 QQ 生效） |
+| 综合面板（表情/语音/视频） | ✅ | ✅ [待确认] | 长按聊天页指定按钮（默认「相册」）打开表情 / 语音 / 视频综合面板，入口可配置且需与脚本菜单入口错开 |
 
 ### 🛰️ QQ 空间系列
 
@@ -56,6 +57,19 @@
 | **禁用 QQ 修复补丁** | 拦截并禁用 QQ 的修复补丁机制 |
 | **禁用 QQ 日志上报** | 在最终 SSO 发送前拦截，禁用 QQ 日志/上报链路 |
 | **拦截安全校验** | 拦截 QQ 安全校验（SecUtil 重打包/签名校验）与网页安全 OCR 检测 |
+| **浏览器 JS 接口放行** | 自定义域名白名单，命中后放行 QQ 内置浏览器 `AuthorizeConfig` 的域名闸口，允许这些域名用 JS 调用 QQ 的 mqq 及内部接口（点击弹窗配置规则） |
+| **分屏允许扫码** | 强制分屏判定返回 true，在分屏 / 小窗下也能打开扫一扫 |
+| **强制模块 Toast** | 接管 QQ 原生 `QQToast`，改用模块样式弹出提示 |
+
+### 🔋 应用保活（QQ + TIM）
+
+三种保活策略可单独开关，开启后可能增加耗电：
+
+| 功能 | 说明 |
+|------|------|
+| **透明悬浮窗** | 1×1 透明悬浮窗驻留，保持进程可见 |
+| **前台通知** | 高优先级常驻通知，最高保活优先级 |
+| **后台通知** | 低优先级通知，轻量保活（定时重发避免被回收） |
 
 ### ⚡ 等级加速类（每日 **00:00** 自动执行）
 
@@ -85,10 +99,13 @@
 
 ### 🎨 模块 UI
 
-- Material 3 动态色（Light/Dark 双主题 + OLED 纯黑）
-- 首页卡片分组：聊天增强 → QQ 空间 → 资料卡 → 等级加速
+- Material 3 配色（Light/Dark 双主题，暗色为 OLED 纯黑，首启跟随系统）
+- 首页卡片分组：电脑代挂 → QQ空间 → 聊天功能 → 资料卡 → 等级加速 → 应用保活 → 基础配置 → 模块配置
 - 所有设置项点击即时写入，无需退出页面
-- 侧滑抽屉：首页 / 在线脚本 / 关于 / 开发者设置
+- 模块内页底部液态玻璃导航条：模块首页 / 拓展脚本 / 冷雨Java / 文件管理；顶栏含用户信息、更新日志、赞助墙与首页功能搜索
+- 模块配置卡片：展示 DexKit 缓存就绪/缺失情况（缺失项标红），支持「重建 DexKit 缓存」（清缓存后重新扫描，完成后重启 QQ 生效）
+- 自定义背景图：从相册选图作为首页背景（拷贝到模块数据目录），未选图时回落默认明暗主题
+- 桌面图标 / 模块设置入口的独立首页：侧滑抽屉（QQ 交流群 / Telegram / 用户后台 / 更新日志 / 适配列表），右上角显示版本号并检测更新
 
 ### 🎧 第三方 APP 增强（非 QQ / TIM 作用域同样生效）
 
@@ -144,12 +161,15 @@
 QEdge/
 ├── app/
 │   └── src/main/java/me/lengyu/qedge/
+│       ├── MainActivity.kt / LauncherActivity.kt  # 独立首页（桌面图标 / 模块设置入口）/ 启动页
+│       ├── activity/               # SettingActivity（模块内页）+ ThemeHelper
+│       ├── common/                 # ModuleScope（协程/线程调度）
 │       ├── coldrain/               # 冷雨 QQ 机器人核心（22 功能，ColdRainCore + features/）
 │       ├── hook/
-│       │   ├── base/               # BaseHookItem / BaseApiHookItem / BaseSwitchHookItem 基类
-│       │   ├── api/                # 通用 Hook 能力（OnMenuBuild / OnSendMsg / OnPush…）
+│       │   ├── base/               # BaseHookItem / BaseApiHookItem / BaseSwitchHookItem / BaseClickableHookItem / HookRegistry
+│       │   ├── api/                # 通用 Hook 能力（OnMenuBuild / OnSendMsg / OnQZonePush…）
 │       │   ├── entry/              # QQPlusInject / QQSettingInject（设置入口劫持）
-│       │   ├── item/               # QQ/TIM 具体功能项（每功能一个文件，34 项）
+│       │   ├── item/               # QQ/TIM 具体功能项（每功能一个文件，37 项）
 │       │   │   ├── PreventRecall.kt      # 防撤回（协议层拦截）
 │       │   │   ├── KeepAliveHook.kt      # 保活（像素窗/前台/后台通知三策略）
 │       │   │   ├── RepeatMsg.kt          # 复读机
@@ -168,6 +188,7 @@ QEdge/
 │       │   │   ├── BypassProfileBan.kt   # 绕过资料卡封禁（含昵称兜底）
 │       │   │   ├── RemoveQrCodeCheck.kt  # 解除扫码风险限制
 │       │   │   ├── SkipScanWaitTime.java # 跳过扫码确认等待
+│       │   │   ├── SplitScreenScan.kt    # 分屏/小窗允许扫码
 │       │   │   ├── QLogRedirect.kt       # QLog 日志拦截/重定向
 │       │   │   ├── RemoveAds.kt          # 去页面内横幅广告
 │       │   │   ├── RemoveRiskWebpageBlock.kt  # 解除风险网页拦截
@@ -181,6 +202,7 @@ QEdge/
 │       │   │   ├── AntiReport.java       # 禁用 QQ 日志上报
 │       │   │   ├── DisableSecCheck.java  # 拦截 QQ 安全校验（SecUtil 重打包/签名校验）
 │       │   │   ├── DisableWebSecurityCheck.java  # 拦截网页安全 OCR 检测
+│       │   │   ├── WebJsBridgeAllowlist.kt     # 浏览器 JS 接口放行（自定义域名白名单）
 │       │   │   ├── ForceModuleToast.java # 强制模块 Toast
 │       │   │   ├── ForceInputNoLimit.java       # 解除输入框字数限制
 │       │   │   ├── ForceFullScreenBtnShow.java  # 强制显示输入框全屏按钮
@@ -200,11 +222,11 @@ QEdge/
 │       │   ├── bean/                     # MsgData / PluginInfo / GroupInfo / MemberInfo / ...
 │       │   └── view/ChatSettingLoader.kt + MediaPanelLoader.kt  # 聊天设置 / 媒体面板入口
 │       ├── ui/
-│       │   ├── pages/                    # HomeScreen（4 Tab）、home/（新首页侧滑栏）、coldrain/、file/、media/
+│       │   ├── pages/                    # HomeScreen（4 Tab）、home/（首页卡片/设置行/侧滑栏/配置弹窗）、coldrain/、file/、media/
 │       │   ├── services/OnlinePluginService.kt  # 在线脚本 HTTP 服务
 │       │   ├── widget/glass/GlassBackdropHost.java  # 液态玻璃背景宿主
 │       │   ├── components/ + core/       # 原子组件 / 对话框 / 主题
-│       ├── lifecycle/                    # 寄生 Activity（Parasitics / DynamicActivityRegistry）
+│       ├── lifecycle/                    # 寄生 Activity（Parasitics / DynamicActivityRegistry / CounterfeitActivityInfoFactory）
 │       ├── utils/
 │       │   ├── ModuleConfig.kt           # 集中式 JSON 配置（禁 SharedPreferences）
 │       │   ├── HostInfo.kt               # 进程名/包名

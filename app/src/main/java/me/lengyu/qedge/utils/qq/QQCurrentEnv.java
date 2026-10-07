@@ -55,7 +55,11 @@ public class QQCurrentEnv {
             LogUtils.e("QEdge", "getQQAppInterface: " + e.getMessage());
         }
         try {
-            Object app = BaseApplicationImpl.getApplication().peekAppRuntime();
+            BaseApplicationImpl application = BaseApplicationImpl.getApplication();
+            if (application == null) {
+                return null;
+            }
+            Object app = application.peekAppRuntime();
             if (app != null) {
                 if (app instanceof QQAppInterface) {
                     qqAppInterface = (QQAppInterface) app;
@@ -84,7 +88,11 @@ public class QQCurrentEnv {
             LogUtils.e("QEdge", "getAppRuntime: " + e.getMessage());
         }
         try {
-            return BaseApplicationImpl.getApplication().peekAppRuntime();
+            BaseApplicationImpl application = BaseApplicationImpl.getApplication();
+            if (application == null) {
+                return null;
+            }
+            return application.peekAppRuntime();
         } catch (Throwable e) {
             LogUtils.e("QEdge", "getAppRuntime via BaseApplicationImpl: " + e.getMessage());
         }

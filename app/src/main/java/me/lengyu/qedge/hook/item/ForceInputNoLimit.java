@@ -9,7 +9,7 @@ import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.ReflectUtils;
 
-@HookItemAnnotation(value = "解除输入框字数上限", category = "item")
+@HookItemAnnotation(value = "解除输入框字数上限", category = "item", process = "Main")
 public class ForceInputNoLimit extends BaseApiHookItem {
 
     public static final ForceInputNoLimit INSTANCE = new ForceInputNoLimit();
@@ -73,7 +73,8 @@ public class ForceInputNoLimit extends BaseApiHookItem {
 
             target.setInt(null, MAX_LENGTH);
         } catch (Throwable t) {
-            LogUtils.e(TAG, "hookUniqueIntField: " + t);
+            // setInt 会触发目标类 <clinit>，失败时把 cause 一并带出来便于定位
+            LogUtils.e(TAG, "hookUniqueIntField: " + t + (t.getCause() != null ? ", cause: " + t.getCause() : ""));
         }
     }
 }

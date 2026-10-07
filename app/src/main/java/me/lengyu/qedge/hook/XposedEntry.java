@@ -39,7 +39,11 @@ import me.lengyu.qedge.hook.woodenletter.WoodenLetterHook;
  */
 public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteInit {
     private static final AtomicBoolean initialized = new AtomicBoolean(false);
+    /** 只保证"挂 Application.onCreate 这个动作"执行一次；不能占用 initialized，那是 onCreate 回调里抢初始化的闸门 */
+    private static final AtomicBoolean startupHooked = new AtomicBoolean(false);
     private static final AtomicBoolean hasCapturedTinker = new AtomicBoolean(false);
+    /** 尚未确定走哪条路时挂上的 hook，先命中的那条把另一个卸掉 */
+    private static final List<XC_MethodHook.Unhook> temporaryUnhooks = new ArrayList<>();
     private static String modulePath = null;
     private static final String[] supportedPackages = {"com.tencent.mobileqq", "com.tencent.tim", "im.weshine.keyboard", "com.iflytek.inputmethod", "com.kugou.android", "com.apowersoft.backgrounderaser", "com.liuzh.deviceinfo", "tech.xiangzi.painless", "com.One.WoodenLetter"};
 
@@ -209,17 +213,41 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
         }
     }
 
+    /**
+     * 两条路同时挂上，谁先命中谁负责启动，命中后立即把另一条卸掉：
+     *  1) QFix 代理 attachBaseContext —— 跑补丁包时真正的宿主类在补丁 loader 上，靠它抢到补丁 loader；
+     *  2) BaseApplicationImpl.onCreate —— 直接用 lpparam.classLoader，兼容没有 QFix 的老版本（如 9.1.67）。
+     */
     private void hookBaseApplicationOnCreate(final ClassLoader classLoader) {
+        // XposedBridge.log("[QEdge] asdfghj");
         try {
             Method attach = classLoader
                     .loadClass("com.tencent.common.app.QFixApplicationImplProxy")
                     .getDeclaredMethod("attachBaseContext", Context.class);
             attach.setAccessible(true);
-            hookQFixAttach(attach);
+            addTemporaryHook(hookQFixAttach(attach, classLoader));
+            XposedBridge.log("[QEdge] QFix 代理 hook 安装成功");
         } catch (Throwable e) {
-            XposedBridge.log("[QEdge] 未找到 QFixApplicationImplProxy.attachBaseContext，直接启动: " + e.getMessage());
-            doRealStartup(classLoader);
+            XposedBridge.log("[QEdge] QFix 代理不可用，仅走 BaseApplicationImpl: " + e.getMessage());
         }
+        addTemporaryHook(hookApplicationOnCreate(classLoader));
+    }
+
+    /** 临时 hook 统一登记：哪条路先命中，就由 unhookTemporaryHooks 把另一条卸掉 */
+    private static synchronized void addTemporaryHook(XC_MethodHook.Unhook unhook) {
+        if (unhook != null) {
+            temporaryUnhooks.add(unhook);
+        }
+    }
+
+    private static synchronized void unhookTemporaryHooks() {
+        for (XC_MethodHook.Unhook unhook : temporaryUnhooks) {
+            try {
+                unhook.unhook();
+            } catch (Throwable ignored) {
+            }
+        }
+        temporaryUnhooks.clear();
     }
 
     /**
@@ -228,10 +256,10 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
      * 表现就是"hook 安装成功但永远不触发"。这里在 attachBaseContext 执行期间拦截所有
      * BaseDexClassLoader 构造，捕获补丁 loader，附件结束后立即卸载临时 hook。
      */
-    private void hookQFixAttach(final Method attach) {
+    private XC_MethodHook.Unhook hookQFixAttach(final Method attach, final ClassLoader classLoader) {
         final List<XC_MethodHook.Unhook> constructorUnhooks = new ArrayList<>();
 
-        XposedBridge.hookMethod(attach, new XC_MethodHook() {
+        return XposedBridge.hookMethod(attach, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
                 for (Constructor<?> constructor : BaseDexClassLoader.class.getDeclaredConstructors()) {
@@ -248,6 +276,14 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                                         || loaderStr.contains("TinkerClassLoader")
                                         || loaderStr.contains("DelegateLastClassLoader"))
                                         && hasCapturedTinker.compareAndSet(false, true)) {
+                                    // 抢到补丁 loader 了，构造函数上的临时 hook 立刻摘掉
+                                    for (XC_MethodHook.Unhook constructorUnhook : constructorUnhooks) {
+                                        try {
+                                            constructorUnhook.unhook();
+                                        } catch (Throwable ignored) {
+                                        }
+                                    }
+                                    constructorUnhooks.clear();
                                     doRealStartup(loader);
                                 }
                             }
@@ -267,10 +303,10 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                 }
                 constructorUnhooks.clear();
 
+                // 补丁 loader 没抢到：QFix 这条路走不通，回退 BaseApplicationImpl + lpparam.classLoader
                 if (!hasCapturedTinker.get()) {
-                    Context context = (Context) param.args[0];
-                    XposedBridge.log("[QEdge] 未捕获热更 ClassLoader，回退 context.classLoader");
-                    doRealStartup(context.getClassLoader());
+                    XposedBridge.log("[QEdge] 未捕获热更 ClassLoader，回退 BaseApplicationImpl");
+                    doRealStartup(classLoader);
                 }
             }
         });
@@ -278,66 +314,59 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
 
     /** 拿到真实宿主 ClassLoader 后只执行一次：挂 Application.onCreate */
     private synchronized void doRealStartup(final ClassLoader realClassLoader) {
-        if (!initialized.compareAndSet(false, true)) {
+        // 这里绝不能用 initialized：真正的初始化在 hookApplicationOnCreate 的 onCreate 回调里做，
+        // 若此处先把 initialized 抢掉，回调里的 CAS 恒为 false，整段初始化会被静默跳过（表现为打完日志后再无任何输出）。
+        if (!startupHooked.compareAndSet(false, true)) {
             return;
         }
+        // 已经有路先命中了，把另一条（含自己）临时 hook 全部卸掉，只留下面这次真正要挂的 onCreate
+        unhookTemporaryHooks();
         // 两个需求必须分开满足：
         //  - 宿主类查找要用补丁 loader，否则会挂到基础包里的旧版同名类上（hook 装了不触发）；
         //  - 但绝不能改写模块自身 ClassLoader 的 parent（initClassLoader 会做这件事），
         //    补丁 loader 是 DelegateLastClassLoader，启动期正并发加载同一批类，会死锁（QQ 卡启动页）。
         // 所以这里只切换查找入口，不动 parent 链。
         ReflectUtils.setHostClassLoader(realClassLoader);
-        hookApplicationOnCreate();
+        hookApplicationOnCreate(realClassLoader);
     }
 
     /**
-     * QQ 9.3.70 起 Application 改由 QFix 代理创建，会先后实例化
-     * QFixApplicationImplProxy / QFixApplicationImpl / BaseApplicationImpl，
-     * 且都不重写 onCreate，只能从 android.app.Application 兜底拦截后沿继承链确认身份。
+     * 宿主启动入口：挂 BaseApplicationImpl.onCreate；没走 QFix 那条路时 ClassLoader 就是 lpparam.classLoader
      */
-    private void hookApplicationOnCreate() {
+    private XC_MethodHook.Unhook hookApplicationOnCreate(final ClassLoader classLoader) {
         try {
-            XposedHelpers.findAndHookMethod(
-                    "android.app.Application",
-                    ReflectUtils.hostClassLoader,
-                    "onCreate",
-                    new XC_MethodHook() {
-                        @Override
-                        protected void afterHookedMethod(MethodHookParam param) {
-                            Object app = param.thisObject;
-                            if (!(app instanceof Context)) {
-                                return;
+            XC_MethodHook.Unhook unhook = XposedHelpers.findAndHookMethod("com.tencent.common.app.BaseApplicationImpl", classLoader, "onCreate", new Object[]{new XC_MethodHook() {
+                protected void afterHookedMethod(XC_MethodHook.MethodHookParam param) {
+                    if (XposedEntry.initialized.compareAndSet(false, true)) {
+                        // 这条路先拿到初始化权，另一条路（QFix attachBaseContext）直接取消 hook
+                        unhookTemporaryHooks();
+                        try {
+                            Context hostContext = (Context) param.thisObject;
+                            HostInfo hostInfo = HostInfo.INSTANCE;
+                            HostInfo.init(hostContext);
+                            Parasitics.initForStubActivity(hostContext);
+                            
+                            boolean cacheValid = DexKitCache.initCache();
+                            if (cacheValid && DexKitCache.validateAllTasks()) {
+                                MainHook.loadHook();
+                            } else {
+                                DexKitFinder.doFind();
                             }
-                            if (!isBaseApplicationImpl(app)) {
-                                return;
-                            }
-                            XposedBridge.log("[QEdge] 命中 QQ Application: " + app.getClass().getName());
-                            try {
-                                Context hostContext = (Context) app;
-                                HostInfo hostInfo = HostInfo.INSTANCE;
-                                HostInfo.init(hostContext);
-                                Parasitics.initForStubActivity(hostContext);
-                            } catch (Throwable e) {
-                                XposedBridge.log("[QEdge] 初始化失败: " + e.getMessage());
-                                XposedBridge.log(e);
-                            }
-                            loadHooksOffMainThread();
+                        } catch (Throwable e) {
+                            XposedBridge.log("[QEdge] 延迟初始化失败: " + e.getMessage());
+                            XposedBridge.log(e);
                         }
-                    });
+                    }
+                }
+            }});
+            XposedBridge.log("[QEdge] BaseApplicationImpl.onCreate hook 安装成功");
+            return unhook;
         } catch (Throwable e) {
-            XposedBridge.log("[QEdge] Hook Application.onCreate 失败: " + e.getMessage());
+            XposedBridge.log("[QEdge] Hook BaseApplicationImpl.onCreate 失败: " + e.getMessage());
+            return null;
         }
     }
 
-    /** 沿继承链判断是否 QQ 的 BaseApplicationImpl（不能在编译期引用该类） */
-    private static boolean isBaseApplicationImpl(Object app) {
-        for (Class<?> c = app.getClass(); c != null && c != Object.class; c = c.getSuperclass()) {
-            if ("com.tencent.common.app.BaseApplicationImpl".equals(c.getName())) {
-                return true;
-            }
-        }
-        return false;
-    }
     /**
      * 缓存读盘、反射校验、Hook 注册与 DexKit 查找都不是首帧必需，整体移到后台调度器执行，
      * 主线程只保留 initialized 抢占与 HostInfo/Parasitics 这类必须尽早生效的初始化。

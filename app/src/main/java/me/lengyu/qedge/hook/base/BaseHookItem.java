@@ -20,6 +20,11 @@ public abstract class BaseHookItem {
         String target = annotation.process();
         if (target == null || target.isEmpty() || "All".equals(target)) return true;
         String currentProcess = HostInfo.processName;
+        if (currentProcess == null) return false;
+        // "Main" 表示宿主主进程（进程名就是包名）；其余取值按 "包名 + target" 拼接，如 ":MSF"
+        if ("Main".equals(target)) {
+            return currentProcess.equals(HostInfo.packageName);
+        }
         return currentProcess.equals(HostInfo.packageName + target);
     }
 

@@ -206,6 +206,14 @@ internal object HomeRowText {
 
     @field:RowText(title = "自定义背景图", subtitle = "开启后跳转相册选图作为背景，未选图时使用默认明暗主题", card = "card_system")
     val BG_IMAGE = "自定义背景图"
+
+    // ==================== 模块配置 ====================
+
+    @field:RowText(title = "模块配置", subtitle = "DexKit 缓存状态检查与重建", card = "card_module_config", cardHeader = true)
+    val CARD_MODULE_CONFIG = "模块配置"
+
+    @field:RowText(title = "重建 DexKit 缓存", subtitle = "清除当前缓存并重新扫描宿主方法，缺失项会列在上方", card = "card_module_config")
+    val REBUILD_DEXKIT_CACHE = "重建 DexKit 缓存"
 }
 
 /** 全部注解：key -> 注解，lazy 扫描 [HomeRowText] 的字段构建一次 */

@@ -86,6 +86,9 @@ import me.lengyu.qedge.ui.pages.home.HomeMoodScheduleDialog
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
+import me.lengyu.qedge.utils.Toasts
+import me.lengyu.qedge.utils.dexkit.DexKitCache
+import me.lengyu.qedge.utils.dexkit.DexKitFinder
 import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.plugin.view.MediaPanelLoader
@@ -740,6 +743,120 @@ internal fun HomePage(
             }
         }
         }
+        }
+
+        item(key = "card_module_config") {
+        if (!isCardVisibleForSearch(searchQuery, "card_module_config")) return@item
+        val expanded = searching || expandedCard == "card_module_config"
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_module_config")) {
+            ModuleConfigCard(
+                expanded = expanded,
+                onToggle = { toggleCard("card_module_config") }
+            )
+        }
+        }
+    }
+}
+
+/**
+ * 模块配置卡片：展示 DexKit 缓存缺失情况（缺的标红），并提供「重建缓存」按钮。
+ * 样式全部走 QEdgeTheme.colors，自动适配明暗主题与自定义背景图模式。
+ */
+@Composable
+private fun ModuleConfigCard(expanded: Boolean, onToggle: () -> Unit) {
+    val colors = QEdgeTheme.colors
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    var expectedCount by remember { mutableIntStateOf(-1) }
+    var missingKeys by remember { mutableStateOf<List<String>>(emptyList()) }
+    var rebuilding by remember { mutableStateOf(false) }
+    var refreshTick by remember { mutableIntStateOf(0) }
+
+    // 仅在展开时扫描缓存状态：expectedKeys 要读 HookRegistry 并构建查询，放 IO 线程
+    LaunchedEffect(expanded, refreshTick) {
+        if (!expanded) return@LaunchedEffect
+        val status = withContext(Dispatchers.IO) {
+            val keys = DexKitCache.expectedKeys()
+            keys.size to keys.filter { DexKitCache.getDescriptor(it) == null }
+        }
+        expectedCount = status.first
+        missingKeys = status.second
+    }
+
+    val summary = if (expectedCount < 0) "读取中…" else "${expectedCount - missingKeys.size} / $expectedCount 已就绪"
+    val summaryColor = when {
+        expectedCount < 0 -> colors.textSecondary
+        missingKeys.isEmpty() -> colors.accentGreen
+        else -> colors.accentRed
+    }
+
+    QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            CardHeader(
+                title = HomeRowText.CARD_MODULE_CONFIG,
+                expanded = expanded,
+                onClick = onToggle
+            )
+
+            CollapsibleContent(expanded) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("DexKit 缓存", fontSize = 16.sp, color = colors.textPrimary)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        summary,
+                        fontSize = 12.sp,
+                        color = summaryColor,
+                        textAlign = TextAlign.End,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                SettingGap(6)
+
+                if (expectedCount < 0) {
+                    // 状态读取中，标题右侧已提示，这里不再重复
+                } else if (missingKeys.isEmpty()) {
+                    Text(
+                        "缓存完整，未发现缺失方法",
+                        fontSize = 12.sp,
+                        color = colors.textSecondary
+                    )
+                } else {
+                    // 缺失项逐条列出并标红，key 形如「任务名->查询名」
+                    missingKeys.forEach { key ->
+                        Text(
+                            "缺失 · $key",
+                            fontSize = 12.sp,
+                            color = colors.accentRed,
+                            modifier = Modifier.padding(vertical = 2.dp)
+                        )
+                    }
+                }
+
+                SettingGap(12)
+
+                SettingClickItem(
+                    title = HomeRowText.REBUILD_DEXKIT_CACHE,
+                    subtitle = if (rebuilding) "正在重新查找，请稍候…"
+                    else "清除缓存并重新扫描，完成后重启 QQ 生效",
+                    enabled = !rebuilding,
+                    onClick = {
+                        val started = DexKitFinder.refind(context) {
+                            rebuilding = false
+                            refreshTick++
+                            Toasts.toast("DexKit 缓存已重建，重启QQ后生效")
+                        }
+                        if (started) rebuilding = true
+                    }
+                )
+            }
         }
     }
 }

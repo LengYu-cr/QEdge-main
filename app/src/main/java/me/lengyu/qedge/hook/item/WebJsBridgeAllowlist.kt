@@ -43,16 +43,16 @@ object WebJsBridgeAllowlist : BaseSwitchHookItem() {
             val commandGate = clazz.declaredMethods.filter { m ->
                 m.returnType == java.lang.Boolean.TYPE &&
                     m.parameterTypes.size == 3 &&
-                    m.parameterTypes[0] == java.lang.String::class.java &&
-                    m.parameterTypes[1] == java.lang.String::class.java &&
+                    m.parameterTypes[0] == String::class.java &&
+                    m.parameterTypes[1] == String::class.java &&
                     m.parameterTypes[2] == java.lang.Boolean.TYPE
             }
             val schemeGate = clazz.declaredMethods.filter { m ->
                 m.returnType == java.lang.Boolean.TYPE &&
                     !Modifier.isStatic(m.modifiers) &&
                     m.parameterTypes.size == 2 &&
-                    m.parameterTypes[0] == java.lang.String::class.java &&
-                    m.parameterTypes[1] == java.lang.String::class.java
+                    m.parameterTypes[0] == String::class.java &&
+                    m.parameterTypes[1] == String::class.java
             }
             val targets = (commandGate + schemeGate).distinct()
             if (targets.isEmpty()) {

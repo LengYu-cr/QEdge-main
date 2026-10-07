@@ -157,7 +157,9 @@ internal fun UserInfoCard(uin: String, avatarBitmap: android.graphics.Bitmap?) {
                         modifier = Modifier
                             .size(60.dp)
                             .clip(RoundedCornerShape(30.dp))
-                            .background(colors.cardBackground)
+                            /* 头像可能是带透明通道的 PNG（透明头像）。铺不透明底色会把透明区变成
+                               一块死色底（暗色下就是近黑），只有还没加载出头像、显示占位图标时才需要底色 */
+                            .background(if (avatarBitmap == null) colors.cardBackground else Color.Transparent)
                             .clickable(
                                 interactionSource = remember { MutableInteractionSource() },
                                 indication = null

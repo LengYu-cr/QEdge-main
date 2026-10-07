@@ -27,6 +27,7 @@ import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ReflectUtils
+import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.utils.reflect.*
 import me.lengyu.qedge.utils.hook.hookAfter
 import me.lengyu.qedge.utils.qq.TroopTool
@@ -44,6 +45,28 @@ object DexKitFinder {
     private var isFindComplete by mutableStateOf(false)
     private var splashHookFired = false
     private var dialogRef: XposedComposeDialog? = null
+
+    /** 重新查找完成后的回调（首页「模块配置」用它刷新缓存状态），仅 refind 期间有值 */
+    private var onFindFinished: (() -> Unit)? = null
+
+    /**
+     * 清除当前 DexKit 缓存并立即重新查找方法（首页「模块配置」按钮）。
+     * 查找期间复用启动时的进度对话框，完成后在主线程回调 [onFinished]。
+     * 已有查找在进行时返回 false（此时不会回调），避免调用方一直等待。
+     */
+    @JvmStatic
+    fun refind(context: Context, onFinished: () -> Unit): Boolean {
+        if (dialogRef?.isShowing == true) {
+            Toasts.toast("正在查找方法，请稍候")
+            return false
+        }
+        onFindFinished = onFinished
+        isFindComplete = false
+        progressText = "QEdge准备开始查找..."
+        DexKitCache.clearAll()
+        showFindDialogInternal(context)
+        return true
+    }
 
     @JvmStatic
     fun doFind() {
@@ -128,7 +151,7 @@ object DexKitFinder {
             if (!DexKitManager.ensureLibrary()) {
                 LogUtils.e(TAG, "dexkit lib unavailable, abort find")
                 progressText = "libdexkit.so 加载失败"
-                Handler(Looper.getMainLooper()).post { dialogRef?.dismiss() }
+                abortFind()
                 return@launchIO
             }
 
@@ -140,6 +163,8 @@ object DexKitFinder {
             val sourceDir = HostInfo.getHostContext()?.applicationInfo?.sourceDir
             if (sourceDir == null) {
                 LogUtils.e(TAG, "sourceDir is null")
+                progressText = "宿主 sourceDir 为空，查找失败"
+                abortFind()
                 return@launchIO
             }
 
@@ -201,11 +226,26 @@ object DexKitFinder {
             progressText = "查找完成，正在初始化..."
             DexKitCache.saveCache()
             isFindComplete = true
-            Handler(Looper.getMainLooper()).post { dialogRef?.dismiss() }
+            val finished = onFindFinished
+            onFindFinished = null
+            Handler(Looper.getMainLooper()).post {
+                dialogRef?.dismiss()
+                finished?.invoke()
+            }
             // 缓存已就绪，Hook 注册与安装交给后台调度器，不占用主线程
             ModuleScope.launchHookJava("HookInit") {
                 MainHook.loadHook()
             }
+        }
+    }
+
+    /** 查找异常结束：关掉进度弹窗并在主线程回调，避免「重新查找」按钮永远转圈 */
+    private fun abortFind() {
+        val finished = onFindFinished
+        onFindFinished = null
+        Handler(Looper.getMainLooper()).post {
+            dialogRef?.dismiss()
+            finished?.invoke()
         }
     }
 }

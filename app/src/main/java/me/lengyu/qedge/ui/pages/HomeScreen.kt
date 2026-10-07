@@ -348,11 +348,15 @@ fun HomeScreen(
         if (currentUin.isNotEmpty()) {
             withContext(Dispatchers.IO) {
                 try {
-                    val url = URL("https://q.qlogo.cn/g?b=qq&nk=$currentUin&s=100")
+                    // 透明头像必须尽量取 PNG：默认端点回的是 JPEG，JPEG 没有 alpha 通道，
+                    // 透明区会被服务端压平成黑底，解码后无法恢复
+                    val url = URL("https://q.qlogo.cn/headimg_dl?dst_uin=$currentUin&spec=100&img_type=png")
                     val connection = url.openConnection()
                     connection.connectTimeout = 10000
                     connection.readTimeout = 10000
-                    avatarBitmap = BitmapFactory.decodeStream(connection.getInputStream())
+                    val stream = connection.getInputStream()
+                    val options = BitmapFactory.Options().apply { inPreferredConfig = android.graphics.Bitmap.Config.ARGB_8888 }
+                    avatarBitmap = BitmapFactory.decodeStream(stream, null, options)
                 } catch (_: Throwable) {
                 }
             }

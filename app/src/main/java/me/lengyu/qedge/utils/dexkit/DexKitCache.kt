@@ -1,7 +1,10 @@
 package me.lengyu.qedge.utils.dexkit
 
+import me.lengyu.qedge.hook.item.QZoneLikeTool
 import me.lengyu.qedge.utils.HostInfo
 import me.lengyu.qedge.utils.LogUtils
+import me.lengyu.qedge.utils.qq.TroopTool
+import me.lengyu.qedge.utils.reflect.TAG
 import org.json.JSONObject
 import org.luckypray.dexkit.wrap.DexClass
 import org.luckypray.dexkit.wrap.DexMethod
@@ -120,30 +123,40 @@ object DexKitCache {
         }.getOrDefault(false)
     }
 
+    /**
+     * 本宿主需要查找的全部缓存 key，与 DexKitFinder.startFind 的任务集合完全一致：
+     * HookRegistry 里的 DexKitTask + TroopTool + QZoneLikeTool，均按 isApplicable() 过滤。
+     * key 的拼接方式也必须与 startFind 一致（tag 取类简单名）。
+     */
     @JvmStatic
-    fun validateAllTasks(): Boolean {
-        val hookItems = runCatching {
+    fun expectedKeys(): List<String> {
+        val tasks = mutableListOf<DexKitTask>()
+        runCatching {
             Class.forName("me.lengyu.qedge.hook.base.HookRegistry")
                 .getMethod("getHookItems")
                 .invoke(null) as List<*>
-        }.getOrDefault(emptyList<Any>())
+        }.onFailure {
+            LogUtils.e("DexKitCache", "read HookRegistry failed: ${it.message}")
+        }.getOrNull()?.let { tasks += it.filterIsInstance<DexKitTask>() }
 
-        for (item in hookItems) {
-            // 与 DexKitFinder.startFind 保持一致：不适用的任务（TIM/QQ 专属）本来就不查，
-            // 不能要求它的 key 存在于缓存，否则校验会恒为 false
-            if (item is DexKitTask && item.isApplicable()) {
-                val tagField = runCatching {
-                    item.javaClass.getDeclaredField("TAG").apply { isAccessible = true }
-                }.getOrNull() ?: continue
-                val tag = tagField.get(item) as? String ?: continue
-                for (key in item.getQueryMap().keys) {
-                    val cacheKey = "$tag->$key"
-                    if (!cacheMap.containsKey(cacheKey)) {
-                        return false
-                    }
-                }
-            }
-        }
-        return true
+        tasks += TroopTool
+        tasks += QZoneLikeTool
+
+        return tasks.filter { it.isApplicable() }
+            .flatMap { task -> task.getQueryMap().keys.map { "${task.TAG}->$it" } }
     }
+
+    /**
+     * 清空内存与磁盘缓存（下次查找会全量重扫）。
+     * 缓存里没有的 key 与查过但标记为 NOT_FOUND（空串）的 key，都算缺失。
+     */
+    @JvmStatic
+    fun clearAll() {
+        cacheMap.clear()
+        runCatching { cacheFile.delete() }
+            .onFailure { LogUtils.e("DexKitCache", "clearAll failed: ${it.message}") }
+    }
+
+    @JvmStatic
+    fun validateAllTasks(): Boolean = expectedKeys().all { cacheMap.containsKey(it) }
 }

@@ -176,7 +176,7 @@ private val hookAnnotationIndex: List<HookAnnotationText> by lazy {
     hookItemClassNames.mapNotNull { name ->
         try {
             val ann = Class.forName(name, false, loader)
-                ?.getAnnotation(HookItemAnnotation::class.java) ?: return@mapNotNull null
+                .getAnnotation(HookItemAnnotation::class.java) ?: return@mapNotNull null
             HookAnnotationText(ann.value, ann.tag, ann.desc)
         } catch (t: Throwable) {
             null

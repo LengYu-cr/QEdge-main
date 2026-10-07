@@ -44,7 +44,7 @@ internal fun HomeSupportDialog(onDismiss: () -> Unit) {
 
             SupportItem(
                 name = "QQ",
-                version = "9.1.78-9.3.65",
+                version = "9.1.67-9.3.70",
                 features = listOf("Java脚本", "文件管理器", "冷雨Java嵌入版", "好玩的模块功能")
             )
             SupportDivider()

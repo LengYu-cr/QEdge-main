@@ -157,20 +157,31 @@ XposedEntry.initZygote()           -- 检测 Hook 框架（LSPosed/EdXposed/Drea
     |
 XposedEntry.handleLoadPackage()    -- 按包名分流（32 位设备直接拒绝并 Toast）
     |
-    ├─ QQ/TIM: hook BaseApplicationImpl.onCreate
-    |       ├─ HostInfo.init() + Parasitics.initForStubActivity()
-    |       ├─ DexKit 缓存有效? 是 -> MainHook.loadHook()
-    |       │                  否 -> DexKitFinder.doFind() -> 显示查找弹窗
-    |       └─ MainHook.loadHook():
-    |           ├─ ConfigWarmup              异步预热 JsonConfigUtils 类初始化
-    |           ├─ HeartbeatManager.isBanned() 封禁检查
-    |           ├─ registerHookItems()        注册所有 BaseHookItem
-    |           ├─ FromServiceMsgDispatcher.loadHook() 服务消息分发
-    |           ├─ loadApiHook()              加载 API 类 Hook
-    |           ├─ initSwitchHookItem()       初始化开关型 Hook
-    |           ├─ hookAccountChange()        监听账号切换
-    |           ├─ 3s 延迟 -> ChatSettingLoader.loadHook() / MediaPanelLoader.loadHook()
-    |           └─ 5s 延迟 -> loadPluginsIfNeeded() -> ColdRainCore.init()
+    ├─ QQ/TIM: hookBaseApplicationOnCreate(classLoader)
+    |       ├─ 同时挂两条临时 hook（谁先命中谁启动，doRealStartup 后 unhook 另一条）：
+    |       │  ① QFixApplicationImplProxy.attachBaseContext
+    |       │       before: 拦截所有 BaseDexClassLoader 构造，捕获热更 loader
+    |       │               （toString 含 com.tencent. 且非模块 / TinkerClassLoader / DelegateLastClassLoader）
+    |       │               -> 摘掉构造函数上的临时 hook -> doRealStartup(热更 loader)
+    |       │       after : 未捕获热更 loader -> doRealStartup(lpparam.classLoader) 回退
+    |       │  ② BaseApplicationImpl.onCreate（直接用 lpparam.classLoader）
+    |       ├─ doRealStartup(realClassLoader)（startupHooked CAS 保证仅一次）:
+    |       │       unhookTemporaryHooks() -> ReflectUtils.setHostClassLoader(realClassLoader)
+    |       │       -> hookApplicationOnCreate(realClassLoader)
+    |       └─ BaseApplicationImpl.onCreate 回调（initialized CAS 保证仅一次）:
+    |               HostInfo.init() + Parasitics.initForStubActivity()
+    |               ├─ 缓存有效(DexKitCache.initCache() && validateAllTasks())? 是 -> MainHook.loadHook()
+    |               │                                               否 -> DexKitFinder.doFind() -> 显示查找弹窗
+    |               └─ MainHook.loadHook():
+    |                   ├─ ConfigWarmup              异步预热 JsonConfigUtils 类初始化
+    |                   ├─ HeartbeatManager.isBanned() 封禁检查
+    |                   ├─ registerHookItems()        注册所有 BaseHookItem
+    |                   ├─ FromServiceMsgDispatcher.loadHook() 服务消息分发
+    |                   ├─ loadApiHook()              加载 API 类 Hook
+    |                   ├─ initSwitchHookItem()       初始化开关型 Hook
+    |                   ├─ hookAccountChange()        监听账号切换
+    |                   ├─ 3s 延迟 -> ChatSettingLoader.loadHook() / MediaPanelLoader.loadHook()
+    |                   └─ 5s 延迟 -> loadPluginsIfNeeded() -> ColdRainCore.init()
     |
     ├─ KK 键盘      -> KKHook.loadHook()
     ├─ 酷狗音乐     -> KuGouHook.loadHook()（大字版 com.kugou.android.elder / 概念版 com.kugou.android.lite 分别入口）
@@ -183,12 +194,12 @@ XposedEntry.handleLoadPackage()    -- 按包名分流（32 位设备直接拒绝
 
 ### 4.2 DexKit 首次查找流程
 
-1. Hook `SplashActivity.doOnCreate` 显示 Compose 查找进度弹窗
-2. 收集所有 `DexKitTask`，过滤 `.filter { it.isApplicable() }`
+1. `registerHookItems()` 注册 Hook 项；Hook `SplashActivity.doOnCreate` 与 `onCreate`（取先触发者）显示 Compose 查找进度弹窗
+2. 收集所有 `DexKitTask`，过滤 `.filter { it.isApplicable() }`（另含 `TroopTool` / `QZoneLikeTool`）
 3. `DexKitBridge.create(sourceDir)` 加载宿主 APK
-4. 逐个执行 `getQueryMap()` -> FindClass / FindMethod
+4. 逐个执行 `getQueryMap()` -> FindClass / FindMethod（无结果时 `putUnresolved` 留痕）
 5. 结果存入 `DexKitCache.cacheMap`（key = `TaskTAG->QueryName`）
-6. 保存缓存到文件 -> 提示完成 -> 杀进程重启
+6. 保存缓存到文件 -> 提示完成 -> 加载 Hook（`MainHook.loadHook()`）
 
 ### 4.3 账号切换流程
 
@@ -212,10 +223,16 @@ Xposed 模块入口，实现 `IXposedHookLoadPackage` + `IXposedHookZygoteInit`�
 | 函数 | 说明 |
 |------|------|
 | `initZygote(StartupParam)` | 检测 Hook 框架类型，保存 modulePath |
-| `handleLoadPackage(LoadPackageParam)` | 按包名分发：QQ/TIM -> 延迟到 Application.onCreate；第三方 APP -> 立即 Hook |
-| `hookBaseApplicationOnCreate(classLoader)` | QQ/TIM 主入口，AtomicBoolean 保证一次性初始化 |
+| `handleLoadPackage(LoadPackageParam)` | 按包名分发：QQ/TIM -> `hookBaseApplicationOnCreate`；第三方 APP -> 立即对应 hook |
+| `hookBaseApplicationOnCreate(classLoader)` | QQ/TIM 主入口，同时挂 QFix 代理 `attachBaseContext` 与 `BaseApplicationImpl.onCreate` 两条临时 hook |
+| `hookQFixAttach(attach, classLoader)` | QFix 路：`attachBaseContext` before 拦截 `BaseDexClassLoader` 全部构造捕获热更 loader（命中即摘构造函数 hook 并 `doRealStartup(loader)`），after 未捕获则 `doRealStartup(lpparam.classLoader)` 回退 |
+| `doRealStartup(realClassLoader)` | `startupHooked` CAS 保证仅一次：`unhookTemporaryHooks()` + `ReflectUtils.setHostClassLoader` + `hookApplicationOnCreate` |
+| `hookApplicationOnCreate(classLoader)` | 挂 `BaseApplicationImpl.onCreate`；回调内 `initialized` CAS 抢占后做 HostInfo/Parasitics 初始化与缓存校验（有效 -> `MainHook.loadHook()`，否则 `DexKitFinder.doFind()`） |
+| `addTemporaryHook` / `unhookTemporaryHooks` | `temporaryUnhooks` 列表登记 / 统一卸载临时 hook |
 | `getModulePathFromClassLoader()` | modulePath 为 null 时从 dexElements 反向查找 .apk 路径 |
 | `is32BitDevice()` / `reject32BitDevice(lpparam)` | 32 位设备仅 Toast 提示「QEdge 不支持 32 位系统版本」，不执行 Hook |
+
+三个 AtomicBoolean 分工：`startupHooked` 守护 `doRealStartup` 的挂载动作、`hasCapturedTinker` 守护热更 loader 的首次捕获、`initialized` 守护 onCreate 回调内的真正初始化。三者分离的原因见 [XposedEntry.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/XposedEntry.java#L315-L331) 注释。`loadHooksOffMainThread()`（把缓存读盘/校验/注册移到后台调度器）在类中定义但未找到调用点 —— [需确认]（见 [XposedEntry.java#L376-L400](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/XposedEntry.java#L376-L400)）。
 
 支持的宿主（`isNameSupported` 用 `startsWith` 匹配）：`com.tencent.mobileqq`, `com.tencent.tim`, `im.weshine.keyboard`, `com.iflytek.inputmethod`, `com.kugou.android`, `com.apowersoft.backgrounderaser`, `com.liuzh.deviceinfo`, `tech.xiangzi.painless`, `com.One.WoodenLetter`
 
@@ -227,7 +244,7 @@ Hook 加载调度中心。
 
 | 函数 | 说明 |
 |------|------|
-| `registerHookItems()` | 静态注册 45 个 BaseHookItem 到 HookRegistry（9 个 API 项 + 36 个其它项） |
+| `registerHookItems()` | 静态注册 47 个 BaseHookItem 到 HookRegistry（9 个 API 项 + 38 个其它项），见 [MainHook.java#L79-L127](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/MainHook.java#L79-L127) |
 | `loadHook()` | 主入口：ConfigWarmup 预热 -> 检查封禁 -> 注册 -> 服务消息分发 -> 加载 API Hook -> 初始化开关 Hook -> 账号切换 -> 3s 加载 ChatSettingLoader/MediaPanelLoader -> 5s 插件+冷雨 |
 | `loadApiHook()` | 遍历所有 BaseApiHookItem，`isInTargetProcess()` 则 `loadHook()` |
 | `initSwitchHookItem()` | 遍历所有 BaseSwitchHookItem，读取配置启用/禁用 |
@@ -264,7 +281,8 @@ BaseHookItem
 │   ├── ForceVip / DisableAIAvatar                 // 解锁本地会员 / 屏蔽 QQ秀·AI头像
 │   ├── DisableSecCheck / DisableWebSecurityCheck  // 安全校验拦截 / 网页安全 OCR 拦截
 │   ├── ForceModuleToast / ForceInputNoLimit       // 强制模块 Toast / 输入无限制
-│   └── ForceFullScreenBtnShow                     // 强制显示全屏按钮
+│   ├── ForceFullScreenBtnShow                     // 强制显示全屏按钮
+│   └── SplitScreenScan                            // 分屏允许扫码
 │
 ├── BaseSwitchHookItem                      // 开关型 Hook（UI 开关控制）
 │   ├── KeepAliveHook / PreventRecall / RepeatMsg  // 保活 / 防撤回 / 复读
@@ -275,6 +293,7 @@ BaseHookItem
 │   ├── VoiceSpeed / ImageRatioOverride            // 语音倍速 / 篡改图片比例
 │   ├── ImageSummary / EmotionAiTag                // 图片外显自定义 / 表情包 AI 标签
 │   ├── ForceSpeaker                               // 语音消息强制免提
+│   ├── WebJsBridgeAllowlist                       // 浏览器 JS 接口放行
 │   └── ...
 │
 └── BaseClickableHookItem                   // 可点击菜单项
@@ -492,6 +511,23 @@ OnReceiveMsg.INSTANCE.registerListener(msgRecord -> { ... });
 | 强制模块 Toast | `ForceModuleToast` | `force_module_toast` | 强制模块 Toast 提示 |
 | 输入无限制 | `ForceInputNoLimit` | `force_input_no_limit` | 解除输入框字数限制 |
 | 强制显示全屏按钮 | `ForceFullScreenBtnShow` | `force_fullscreen_btn_show` | 强制显示全屏按钮 |
+| 浏览器 JS 接口放行 | `WebJsBridgeAllowlist` | `web_js_allowlist_enable` / `web_js_allowlist_rules` | 放行自定义域名的 JS Bridge 命令与 scheme 跳转（详见 5.5.14） |
+| 分屏允许扫码 | `SplitScreenScan` | `split_screen_scan` | 分屏/小窗下允许打开扫一扫（DexKit 定位混淆判定方法） |
+
+#### 5.5.14 浏览器 JS 接口放行 `WebJsBridgeAllowlist`
+
+实现位于 [WebJsBridgeAllowlist.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/WebJsBridgeAllowlist.kt)（`object WebJsBridgeAllowlist : BaseSwitchHookItem()`）。
+
+**配置**：`web_js_allowlist_enable`（开关）/ `web_js_allowlist_rules`（逗号分隔域名）。
+
+**Hook 目标**：`com.tencent.biz.AuthorizeConfig`，不硬编码方法名，按参数签名特征匹配两个域名闸口，均在 HookReplace 中判断，命中规则返回 `true`，否则调用原方法：
+
+| 闸口 | 签名特征 | 说明 |
+|------|---------|------|
+| 命令闸口 | `(String, String, boolean) -> boolean` | JS Bridge 命令（`mqq.invoke` / `jsbridge://` 派发前） |
+| scheme 闸口 | `(String, String) -> boolean` 且**非静态** | 自定义 scheme 跳转；静态的 `(String,String)Z` 是域名 pattern 匹配器，须排除 |
+
+两个闸口的第一个参数均为页面 URL；`isAllowlisted` 先取 host（含 `://` 时用 `URI.host`），按「域名相等或 `.后缀` 结尾」匹配，见 [WebJsBridgeAllowlist.kt#L87-L106](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/WebJsBridgeAllowlist.kt#L87-L106)。
 
 ---
 
@@ -517,7 +553,13 @@ interface DexKitTask {
 
 #### [DexKitFinder.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitFinder.kt)
 
-DexKit 查找执行器：IO 协程中按需加载 DexKit → 执行所有 `DexKitTask` 的 FindClass/FindMethod → 写入 `DexKitCache` → 保存缓存 → 加载 Hook。首次运行时由 `SplashActivity.doOnCreate` 显示 Compose 进度弹窗。
+DexKit 查找执行器：IO 协程中按需加载 DexKit → 执行所有 `DexKitTask` 的 FindClass/FindMethod（任务集合 = `HookRegistry` 的 `DexKitTask` + `TroopTool` + `QZoneLikeTool`，按 `isApplicable()` 过滤）→ 写入 `DexKitCache` → 保存缓存 → 加载 Hook（`MainHook.loadHook()`）。首次/无缓存运行时 `doFind()` 先 `registerHookItems()`，再由 `showFindDialog()` 同时 hook `SplashActivity.doOnCreate` 与 `onCreate`，取先触发者显示 Compose 进度弹窗（`showFindDialogInternal`）。见 [DexKitFinder.kt#L114-L240](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitFinder.kt#L114-L240)。
+
+| 方法 | 说明 |
+|------|------|
+| `doFind()` | 注册 Hook 项后挂 `SplashActivity` hook 显示查找弹窗 |
+| `refind(context, onFinished): Boolean` | 清空缓存（`DexKitCache.clearAll()`）后复用进度弹窗重新查找，完成后主线程回调 `onFinished`；已有弹窗显示中时 Toast「正在查找方法，请稍候」并返回 false（不回调） |
+| `abortFind()` | 查找异常收尾（libdexkit.so 加载失败 / sourceDir 为空）：关弹窗并在主线程回调，避免「重新查找」按钮一直转圈 |
 
 #### [DexKitManager.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/utils/dexkit/DexKitManager.java)
 
@@ -529,8 +571,12 @@ DexKit 原生库加载管理器：解决 Hook 运行在宿主寄生 ClassLoader 
 
 | 方法 | 说明 |
 |------|------|
-| `initCache()` / `saveCache()` | 文件加载 / 写入 |
-| `validateAllTasks()` | 校验缓存中每个条目是否仍有效 |
+| `initCache()` / `saveCache()` | 文件加载 / 写入（saveCache 原子写：先写 `.tmp` 再 `renameTo`） |
+| `hasCacheFile()` | 缓存文件是否已存在（供冷启动分支判断） |
+| `expectedKeys()` | 生成该宿主需查找的全部 key，任务集合与 key 拼接与 `DexKitFinder.startFind` 完全一致（`HookRegistry` 的 `DexKitTask` + `TroopTool` + `QZoneLikeTool`，按 `isApplicable()` 过滤，key = `"${task.TAG}->$name"`） |
+| `validateAllTasks()` | 判定 `expectedKeys()` 是否全部命中 `cacheMap`（已改为复用 `expectedKeys()`） |
+| `clearAll()` | 清空内存 `cacheMap` 并删除磁盘缓存文件 |
+| `putUnresolved(key)` | 标记「已查找但无结果」（空串），区分「未查过」与「查过没结果」 |
 | `getDescriptor(key)` | 取 `TaskTAG->name` 的 descriptor 字符串 |
 | `getClass(key)` / `getMethod(key)` | descriptor -> Class / Method |
 
@@ -742,7 +788,9 @@ ui/
 | 2 | 更新日志 `UpdateLogCard`（API 拉取，纵向可滚动） | 更新日志按钮 |
 | 3 | 赞助墙 `SponsorCard`（微信赞赏码图片居中） | 赞助按钮 |
 
-头像 URL：`https://q.qlogo.cn/g?b=qq&nk=<uin>&s=100`（`q.qlogo.cn`）。首页功能区按卡片分组：QQ空间(`card_qzone`) → 聊天功能(`card_chat`) → 资料卡(`card_profile`) → 等级加速 → 保活。
+头像 URL：`https://q.qlogo.cn/headimg_dl?dst_uin=<uin>&spec=100&img_type=png`，以 `ARGB_8888` 解码（见 [HomeScreen.kt#L347-L364](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/HomeScreen.kt#L347-L364)）；`UserInfoCard` 头像容器仅在头像未加载时铺底色、已加载时透明（见 [HomeUserCards.kt#L156-L188](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeUserCards.kt#L156-L188)）。
+
+首页功能区（[HomeSettingsPage.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeSettingsPage.kt)）按卡片分组，顺序：电脑代挂(`hangup`) → QQ空间(`card_qzone`) → 聊天功能(`card_chat`) → 资料卡(`card_profile`) → 等级加速(`card_level`) → 应用保活(`card_keepalive`) → 基础配置(`card_system`) → 模块配置(`card_module_config`)。`card_module_config` 卡片（`ModuleConfigCard`，[HomeSettingsPage.kt#L748-L861](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeSettingsPage.kt#L748-L861)）展示 DexKit 缓存 `已就绪 / 总数` 与逐条缺失项（缺失标红 `accentRed`、全部就绪 `accentGreen`），并提供「重建 DexKit 缓存」点击行，点击调用 `DexKitFinder.refind`。文案常量 `CARD_MODULE_CONFIG` / `REBUILD_DEXKIT_CACHE` 见 [HomeRowText.kt#L210-L216](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeRowText.kt#L210-L216)。
 
 ### 9.3 主入口
 
@@ -980,3 +1028,21 @@ Hook `VipManager` 的 `isVip()`/`isVipValid()`/`isExpire()`/`isVipValidOrBalance
 3. **00:00 每日触发**：Timer 定时任务
 
 每日去重：`isDoneToday(tag)` / `markDoneToday(tag)` 幂等机制。
+
+---
+
+## 16. 扫描快照
+
+- 扫描时间：2026-10-07
+- 扫描范围：QEdge 模块本体（`app/`、`qqinterface/`、根 Gradle 脚本；不含 `QStory/`、`QFun-main/` 参照工程与 `build/` 产物）
+- 文件统计（实际计数）：
+  - `app/src` 下 `.java` = 286
+  - `app/src` 下 `.kt` = 92
+  - `qqinterface/src` 下 `.java` = 579（QQ 接口 stub）
+  - `.kts`：根目录 2（`build.gradle.kts` / `settings.gradle.kts`）+ `app/` 1 + `qqinterface/` 1 = 4
+  - `AndroidManifest.xml`：`app/src` 1 + `qqinterface/src` 1 = 2
+- 使用工具：Glob × 6（`.java` / `.kt` / `.kts` / `AndroidManifest.xml`，含 200 条上限截断，故用 PowerShell `Get-ChildItem` 精确计数）、Read × 12、Grep × 3
+
+### 本次未确认项
+
+- [需确认] `XposedEntry.loadHooksOffMainThread()` 在类中定义但未找到调用点 —— 涉及文件：[XposedEntry.java#L376-L400](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/XposedEntry.java#L376-L400)。原因：全仓库 Grep 仅命中定义处一处，无法确认其被调度路径。

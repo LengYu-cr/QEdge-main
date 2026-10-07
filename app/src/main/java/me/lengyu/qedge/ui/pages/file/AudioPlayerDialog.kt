@@ -106,7 +106,7 @@ fun AudioPlayerDialog(
                     // silk 播放进度 + 完成检测
                     val sp = silkPlayer
                     if (sp != null && isPrepared) {
-                        currentPosition = SilkPlayerProxy.currentPosition(sp).toInt()
+                        currentPosition = SilkPlayerProxy.currentPosition(sp)
                         if (!SilkPlayerProxy.isPlaying(sp)) {
                             if (duration > 0) currentPosition = duration
                             isPlaying = false
