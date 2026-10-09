@@ -26,8 +26,11 @@ import java.util.concurrent.TimeUnit;
 public class LogUtils {
 
     private static final String TAG = "[QEdge]";
-    private static final SimpleDateFormat DATE_FMT = new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault());
-    private static final SimpleDateFormat TIME_FMT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault());
+    // SimpleDateFormat 非线程安全：日志与建文件可能由任意线程调用，改用 ThreadLocal 各线程独立实例
+    private static final ThreadLocal<SimpleDateFormat> DATE_FMT =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()));
+    private static final ThreadLocal<SimpleDateFormat> TIME_FMT =
+            ThreadLocal.withInitial(() -> new SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault()));
 
     /** 待写入的日志行队列；容量上限防止极端情况下内存膨胀。 */
     private static final BlockingQueue<String> QUEUE = new LinkedBlockingQueue<>(4096);
@@ -77,7 +80,7 @@ public class LogUtils {
     private static File getLogFile() {
         File dir = new File(HostInfo.getModuleDataPath(), "log");
         if (!dir.exists()) dir.mkdirs();
-        return new File(dir, DATE_FMT.format(new Date()) + ".log");
+        return new File(dir, DATE_FMT.get().format(new Date()) + ".log");
     }
 
     /** 把日志行入队；队列满时丢弃，绝不阻塞调用线程。 */
@@ -86,13 +89,13 @@ public class LogUtils {
     }
 
     private static void writeToFile(String level, String tag, String message) {
-        enqueue(TIME_FMT.format(new Date()) + " " + level + " " + tag + ": " + message + "\n");
+        enqueue(TIME_FMT.get().format(new Date()) + " " + level + " " + tag + ": " + message + "\n");
     }
 
     private static void writeThrowable(String tag, Throwable throwable) {
         StringWriter sw = new StringWriter();
         throwable.printStackTrace(new PrintWriter(sw));
-        enqueue(TIME_FMT.format(new Date()) + " E " + tag + ": " + throwable.getMessage() + "\n" + sw + "\n");
+        enqueue(TIME_FMT.get().format(new Date()) + " E " + tag + ": " + throwable.getMessage() + "\n" + sw + "\n");
     }
 
     public static void d(String message) {

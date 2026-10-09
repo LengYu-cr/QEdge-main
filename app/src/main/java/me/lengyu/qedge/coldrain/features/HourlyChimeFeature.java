@@ -55,6 +55,11 @@ public class HourlyChimeFeature implements ColdRainFeature {
             return;
         }
 
+        // 切换报时方式 / 设置报时内容会改写本群配置，必须限管理员，避免任意群成员篡改
+        if (!core.isAdminOrSelf(msgData)) {
+            return;
+        }
+
         if (text.startsWith("切换") && text.endsWith("报时")) {
             String mode = text.replace("切换", "").replace("报时", "");
             if (mode.equals("文字") || mode.equals("语音") || mode.equals("图片") || mode.equals("自定义")) {

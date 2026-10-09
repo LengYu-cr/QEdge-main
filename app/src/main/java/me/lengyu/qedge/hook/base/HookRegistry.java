@@ -14,7 +14,7 @@ public class HookRegistry {
     private static final Set<Class<? extends BaseHookItem>> registeredClasses = new HashSet<>();
     private static volatile boolean allDisabled = false;
 
-    public static void register(BaseHookItem item) {
+    public static synchronized void register(BaseHookItem item) {
         if (item == null) return;
         Class<? extends BaseHookItem> cls = item.getClass();
         if (registeredClasses.contains(cls)) {
@@ -24,14 +24,14 @@ public class HookRegistry {
         hookItems.add(item);
     }
 
-    public static List<BaseHookItem> getHookItems() {
+    public static synchronized List<BaseHookItem> getHookItems() {
         return new ArrayList<>(hookItems);
     }
 
     /**
      * 全局禁用所有已注册的 Hook 项（如账号被拉黑时）
      */
-    public static void disableAllHooks() {
+    public static synchronized void disableAllHooks() {
         allDisabled = true;
         for (BaseHookItem item : hookItems) {
             item.setEnable(false);
@@ -42,7 +42,7 @@ public class HookRegistry {
         return allDisabled;
     }
 
-    public static <T extends BaseHookItem> List<T> getHookItemsByClass(Class<T> clazz) {
+    public static synchronized <T extends BaseHookItem> List<T> getHookItemsByClass(Class<T> clazz) {
         List<T> result = new ArrayList<>();
         for (BaseHookItem item : hookItems) {
             if (clazz.isInstance(item)) {

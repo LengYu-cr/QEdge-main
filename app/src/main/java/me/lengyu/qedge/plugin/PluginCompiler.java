@@ -160,6 +160,8 @@ public class PluginCompiler {
         } catch (Exception e) {
             PluginError.callError(e, info);
         } finally {
+            // 释放 Java 插件专属回调线程，避免反复启停累积线程
+            callback.shutdown();
             info.setRunning(false);
         }
     }

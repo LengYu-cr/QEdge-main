@@ -51,6 +51,9 @@ internal object HomeRowText {
     @field:RowText(title = "表情/泡泡/视频/语音下载", subtitle = "保存至 Download/QQ/QEdge/，点击复制", card = "card_chat")
     val EMOTION_DOWNLOAD = "表情/泡泡/视频/语音下载"
 
+    @field:RowText(title = "原生表情包下载", subtitle = "解除限制，开启QQ自带的表情包下载通道。但是会让图片带上[超级QQ秀表情]标签", card = "card_chat")
+    val NATIVE_EMOTION_DOWNLOAD = "原生表情包下载"
+
     @field:RowText(title = "屏蔽链接信息卡片", subtitle = "收到链接时，自动屏蔽", card = "card_chat")
     val REMOVE_LINK_INFO = "屏蔽链接信息卡片"
 

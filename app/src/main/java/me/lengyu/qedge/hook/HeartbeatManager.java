@@ -5,6 +5,13 @@ import android.os.Looper;
 
 import org.json.JSONObject;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -14,7 +21,6 @@ import com.tencent.common.app.BaseApplicationImpl;
 
 import me.lengyu.qedge.hook.base.HookRegistry;
 import me.lengyu.qedge.ui.components.dialogs.WelcomeDialog;
-import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.ModuleConfig;
 import me.lengyu.qedge.utils.HostInfo;
@@ -32,9 +38,9 @@ public class HeartbeatManager {
     private static final long HEARTBEAT_INTERVAL = 600000;
 
     private static HeartbeatManager instance;
-    private static boolean isBanned = false;
+    private static volatile boolean isBanned = false;
 
-    private Timer heartbeatTimer;
+    private volatile Timer heartbeatTimer;
     private String lastInitialPassword;
 
     private HeartbeatManager() {
@@ -51,8 +57,14 @@ public class HeartbeatManager {
         return isBanned;
     }
 
-    public void startHeartbeat() {
+    public synchronized void startHeartbeat() {
         stopHeartbeat();
+
+        // 启动留痕：此前心跳从启动到发送全程无日志，无法判断上游是否调用过来，这里补一条生命周期日志
+        LogUtils.i("HeartbeatManager", "startHeartbeat: 心跳已启动"
+                + " | qq=" + HostInfo.versionName
+                + " | module=" + HostInfo.moduleVersionName
+                + " | interval=" + HEARTBEAT_INTERVAL + "ms");
 
         heartbeatTimer = new Timer("QEdge_Heartbeat");
         heartbeatTimer.scheduleAtFixedRate(new TimerTask() {
@@ -63,7 +75,7 @@ public class HeartbeatManager {
         }, 0, HEARTBEAT_INTERVAL);
     }
 
-    public void stopHeartbeat() {
+    public synchronized void stopHeartbeat() {
         if (heartbeatTimer != null) {
             heartbeatTimer.cancel();
             heartbeatTimer = null;
@@ -71,24 +83,37 @@ public class HeartbeatManager {
     }
 
     private void sendHeartbeat() {
+        long start = System.currentTimeMillis();
+        String currentUin = null;
+        String uinSource = "none";
+
         try {
-            String currentUin = null;
-            
             try {
                 AppInterface app = (AppInterface) BaseApplicationImpl.getApplication().peekAppRuntime();
                 if (app != null) {
                     currentUin = app.getCurrentAccountUin();
+                    if (currentUin != null && !currentUin.isEmpty()) {
+                        uinSource = "host";
+                    }
                 }
             } catch (Throwable e) {
                 LogUtils.e("HeartbeatManager", "Failed to get uin from BaseApplicationImpl: " + e.getMessage());
             }
-            
+
             if (currentUin == null || currentUin.isEmpty()) {
                 currentUin = ModuleConfig.INSTANCE.getString("heartbeat_current_uin", null);
+                if (currentUin != null && !currentUin.isEmpty()) {
+                    uinSource = "config";
+                }
             }
-            
+
             if (currentUin == null || currentUin.isEmpty()) {
-                LogUtils.e("HeartbeatManager", "Uin is null or empty, skip heartbeat");
+                // 取不到 UIN 时首页用户卡片就没有可用的 key，必然显示"未登录"，这里把获取过程完整打出来
+                LogUtils.e("HeartbeatManager", "心跳失败：未取到当前 UIN，跳过本次心跳"
+                        + " | uin来源=" + uinSource
+                        + " | qq=" + HostInfo.versionName
+                        + " | module=" + HostInfo.moduleVersionName
+                        + " | url=" + API_URL);
                 return;
             }
 
@@ -107,12 +132,99 @@ public class HeartbeatManager {
 
             String hexData = stringToHex(json.toString());
 
-            String response = HttpUtils.post(API_URL, hexData);
-            if (response != null) {
-                parseResponse(response, currentUin);
-            }
+            sendHeartbeatRequest(API_URL, hexData, currentUin, uinSource, start);
         } catch (Exception e) {
-            LogUtils.e("HeartbeatManager", "Heartbeat failed: " + e.getMessage());
+            // 构造请求体等环节异常：同样带上完整上下文与堆栈，方便定位
+            LogUtils.e("HeartbeatManager", "心跳失败：构造请求异常"
+                    + " | uin=" + currentUin + "(" + uinSource + ")"
+                    + " | qq=" + HostInfo.versionName
+                    + " | module=" + HostInfo.moduleVersionName
+                    + " | url=" + API_URL
+                    + " | 耗时=" + (System.currentTimeMillis() - start) + "ms"
+                    + " | 原因=" + e.getClass().getSimpleName() + ": " + e.getMessage());
+            LogUtils.e("HeartbeatManager", e);
+        }
+    }
+
+    /**
+     * 心跳 POST 请求。成功（HTTP 200 且响应非空）不打任何日志，直接交给 parseResponse；
+     * 失败（非 200 / 空响应 / 网络异常）输出带完整上下文的详细日志。
+     *
+     * <p>这里不用 HttpUtils.post 是因为它把 IOException 与状态码全部吞掉只剩 null，
+     * 无法区分超时 / DNS 失败 / 非 200，定位不了"部分用户首页显示未登录"。
+     */
+    private void sendHeartbeatRequest(String urlStr, String body, String uin, String uinSource, long start) {
+        HttpURLConnection connection = null;
+        try {
+            URL url = new URL(urlStr);
+            connection = (HttpURLConnection) url.openConnection();
+            connection.setRequestMethod("POST");
+            connection.setConnectTimeout(10000);
+            connection.setReadTimeout(30000);
+            connection.setRequestProperty("Content-Type", "application/json");
+            connection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+            connection.setDoOutput(true);
+
+            try (OutputStream os = connection.getOutputStream()) {
+                os.write(body.getBytes("UTF-8"));
+                os.flush();
+            }
+
+            int code = connection.getResponseCode();
+            long cost = System.currentTimeMillis() - start;
+
+            if (code != HttpURLConnection.HTTP_OK) {
+                LogUtils.e("HeartbeatManager", "心跳失败：HTTP " + code
+                        + " | uin=" + uin + "(" + uinSource + ")"
+                        + " | qq=" + HostInfo.versionName
+                        + " | module=" + HostInfo.moduleVersionName
+                        + " | url=" + urlStr
+                        + " | 耗时=" + cost + "ms"
+                        + " | 返回=" + readQuietly(connection.getErrorStream()));
+                return;
+            }
+
+            String response = readQuietly(connection.getInputStream());
+            if (response == null || response.isEmpty()) {
+                LogUtils.e("HeartbeatManager", "心跳失败：响应为空"
+                        + " | uin=" + uin + "(" + uinSource + ")"
+                        + " | qq=" + HostInfo.versionName
+                        + " | module=" + HostInfo.moduleVersionName
+                        + " | url=" + urlStr
+                        + " | 耗时=" + cost + "ms");
+                return;
+            }
+
+            // 请求成功：不输出日志
+            parseResponse(response, uin);
+        } catch (IOException e) {
+            LogUtils.e("HeartbeatManager", "心跳失败：网络异常"
+                    + " | uin=" + uin + "(" + uinSource + ")"
+                    + " | qq=" + HostInfo.versionName
+                    + " | module=" + HostInfo.moduleVersionName
+                    + " | url=" + urlStr
+                    + " | 耗时=" + (System.currentTimeMillis() - start) + "ms"
+                    + " | 原因=" + e.getClass().getSimpleName() + ": " + e.getMessage());
+            LogUtils.e("HeartbeatManager", e);
+        } finally {
+            if (connection != null) {
+                connection.disconnect();
+            }
+        }
+    }
+
+    /** 读取流内容，出错或流为 null 时返回 null，绝不抛异常影响心跳主流程。 */
+    private String readQuietly(InputStream is) {
+        if (is == null) return null;
+        try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, "UTF-8"))) {
+            StringBuilder sb = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                sb.append(line);
+            }
+            return sb.toString();
+        } catch (Exception ignored) {
+            return null;
         }
     }
 
@@ -136,11 +248,10 @@ public class HeartbeatManager {
                 if (data != null) {
                     String initialPassword = data.optString("initial_password", null);
                     if (initialPassword != null && !initialPassword.isEmpty()) {
+                        // 口令只留在内存中，直接传给欢迎弹窗，不落盘（外部存储 JSON 为明文）
                         lastInitialPassword = initialPassword;
                         boolean hasShownWelcome = ModuleConfig.INSTANCE.getBoolean("has_shown_welcome_" + currentUin, false);
-                        
-                        ModuleConfig.INSTANCE.putString("initial_password_" + currentUin, initialPassword);
-                                
+
                         if (!hasShownWelcome) {
                             showWelcomeDialog(initialPassword, currentUin);
                         }
@@ -167,6 +278,12 @@ public class HeartbeatManager {
                         }
                     }
                 }
+            } else {
+                // HTTP 请求本身是成功的，但服务端返回了未处理的业务码：用户数据不会被写入，
+                // 首页用户卡片拿不到昵称就会显示"未登录"，需要日志留痕才能定位
+                LogUtils.e("HeartbeatManager", "心跳异常：服务端返回未处理的 code=" + code
+                        + " | uin=" + currentUin
+                        + " | 原始响应=" + response);
             }
         } catch (Exception e) {
             LogUtils.e("HeartbeatManager", "Parse response failed: " + e.getMessage());

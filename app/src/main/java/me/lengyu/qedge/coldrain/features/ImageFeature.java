@@ -220,17 +220,15 @@ public class ImageFeature implements ColdRainFeature {
             String rest = text.substring(function.length()).trim();
 
             String imgUrl = null;
-            if(msgData.msgType == 1){
-                if (msgData.atList != null && !msgData.atList.isEmpty()) {
+            if(msgData.msgType == 2){
+                if(msgData.picList != null && !msgData.picList.isEmpty()){
+                    imgUrl = msgData.picList.get(0);
+                }else if (msgData.atList != null && !msgData.atList.isEmpty()) {
                     imgUrl = "https://q2.qlogo.cn/headimg_dl?dst_uin=" + msgData.atList.get(0) + "&spec=640";
                 } else if (rest.startsWith("http://") || rest.startsWith("https://")) {
                     imgUrl = rest;
                 } else if (rest.matches("\\d{5,11}")) {
                     imgUrl = "https://q2.qlogo.cn/headimg_dl?dst_uin=" + rest + "&spec=640";
-                }
-            }else if(msgData.msgType == 2){
-                if(msgData.picList != null && !msgData.picList.isEmpty()){
-                    imgUrl = msgData.picList.get(0);
                 }
             }else if (msgData.msgType == 9){
                 MsgData replyMsgData = new MsgData(msgData.data.records.get(0));

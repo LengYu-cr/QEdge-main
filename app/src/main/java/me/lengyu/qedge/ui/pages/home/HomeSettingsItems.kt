@@ -147,6 +147,7 @@ private val hookItemClassNames: List<String> = listOf(
     "me.lengyu.qedge.hook.item.KeepAliveHook",
     "me.lengyu.qedge.hook.item.LevelBoost",
     "me.lengyu.qedge.hook.item.LongClickSendCard",
+    "me.lengyu.qedge.hook.item.NativeEmotionDownload",
     "me.lengyu.qedge.hook.item.PreventRecall",
     "me.lengyu.qedge.hook.item.QLogRedirect",
     "me.lengyu.qedge.hook.item.QZoneLikeTool",

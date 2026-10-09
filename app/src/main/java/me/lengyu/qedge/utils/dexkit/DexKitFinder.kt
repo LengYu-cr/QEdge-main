@@ -146,95 +146,102 @@ object DexKitFinder {
 
     private fun startFind() {
         ModuleScope.launchIO(TAG) {
-            // 在后台线程加载 dexkit so，避免阻塞宿主主线程启动。
-            // 通过 DexKitManager 兜底：寄生 ClassLoader 下 loadLibrary 会失败，需绝对路径加载。
-            if (!DexKitManager.ensureLibrary()) {
-                LogUtils.e(TAG, "dexkit lib unavailable, abort find")
-                progressText = "libdexkit.so 加载失败"
-                abortFind()
-                return@launchIO
-            }
+            try {
+                // 在后台线程加载 dexkit so，避免阻塞宿主主线程启动。
+                // 通过 DexKitManager 兜底：寄生 ClassLoader 下 loadLibrary 会失败，需绝对路径加载。
+                if (!DexKitManager.ensureLibrary()) {
+                    LogUtils.e(TAG, "dexkit lib unavailable, abort find")
+                    progressText = "libdexkit.so 加载失败"
+                    abortFind()
+                    return@launchIO
+                }
 
-            val tasks = HookRegistry.getHookItems().filterIsInstance<DexKitTask>().toMutableList().apply {
-                add(TroopTool)
-                add(QZoneLikeTool)
-            }.filter { it.isApplicable() }
+                val tasks = HookRegistry.getHookItems().filterIsInstance<DexKitTask>().toMutableList().apply {
+                    add(TroopTool)
+                    add(QZoneLikeTool)
+                }.filter { it.isApplicable() }
 
-            val sourceDir = HostInfo.getHostContext()?.applicationInfo?.sourceDir
-            if (sourceDir == null) {
-                LogUtils.e(TAG, "sourceDir is null")
-                progressText = "宿主 sourceDir 为空，查找失败"
-                abortFind()
-                return@launchIO
-            }
+                val sourceDir = HostInfo.getHostContext()?.applicationInfo?.sourceDir
+                if (sourceDir == null) {
+                    LogUtils.e(TAG, "sourceDir is null")
+                    progressText = "宿主 sourceDir 为空，查找失败"
+                    abortFind()
+                    return@launchIO
+                }
 
-            val bridge = DexKitBridge.create(sourceDir)
+                val bridge = DexKitBridge.create(sourceDir)
 
-            bridge.use { b ->
-                tasks.forEach { task ->
-                    runCatching {
-                        task.getQueryMap().forEach { (name, query) ->
-                            when (query) {
-                                is FindClass -> {
-                                    val classes = b.findClass(query)
-                                    classes.singleOrNull()?.let {
-                                        val tip = "${task.TAG}->$name"
-                                        progressText = tip
-                                        DexKitCache.cacheMap[tip] = it.descriptor
-                                    } ?: run {
-                                        if (classes.isNotEmpty()) {
-                                            val first = classes.first()
+                bridge.use { b ->
+                    tasks.forEach { task ->
+                        runCatching {
+                            task.getQueryMap().forEach { (name, query) ->
+                                when (query) {
+                                    is FindClass -> {
+                                        val classes = b.findClass(query)
+                                        classes.singleOrNull()?.let {
                                             val tip = "${task.TAG}->$name"
                                             progressText = tip
-                                            DexKitCache.cacheMap[tip] = first.descriptor
-                                        } else {
-                                            LogUtils.e(TAG, "No class found for: ${task.TAG}->$name")
-                                            // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
-                                            DexKitCache.putUnresolved("${task.TAG}->$name")
+                                            DexKitCache.cacheMap[tip] = it.descriptor
+                                        } ?: run {
+                                            if (classes.isNotEmpty()) {
+                                                val first = classes.first()
+                                                val tip = "${task.TAG}->$name"
+                                                progressText = tip
+                                                DexKitCache.cacheMap[tip] = first.descriptor
+                                            } else {
+                                                LogUtils.e(TAG, "No class found for: ${task.TAG}->$name")
+                                                // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
+                                                DexKitCache.putUnresolved("${task.TAG}->$name")
+                                            }
                                         }
                                     }
-                                }
 
-                                is FindMethod -> {
-                                    val methods = b.findMethod(query)
-                                    methods.singleOrNull()?.let {
-                                        val tip = "${task.TAG}->$name"
-                                        progressText = tip
-                                        DexKitCache.cacheMap[tip] = it.descriptor
-                                    } ?: run {
-                                        if (methods.isNotEmpty()) {
-                                            val first = methods.first()
+                                    is FindMethod -> {
+                                        val methods = b.findMethod(query)
+                                        methods.singleOrNull()?.let {
                                             val tip = "${task.TAG}->$name"
                                             progressText = tip
-                                            DexKitCache.cacheMap[tip] = first.descriptor
-                                        } else {
-                                            LogUtils.e(TAG, "No method found for: ${task.TAG}->$name")
-                                            // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
-                                            DexKitCache.putUnresolved("${task.TAG}->$name")
+                                            DexKitCache.cacheMap[tip] = it.descriptor
+                                        } ?: run {
+                                            if (methods.isNotEmpty()) {
+                                                val first = methods.first()
+                                                val tip = "${task.TAG}->$name"
+                                                progressText = tip
+                                                DexKitCache.cacheMap[tip] = first.descriptor
+                                            } else {
+                                                LogUtils.e(TAG, "No method found for: ${task.TAG}->$name")
+                                                // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
+                                                DexKitCache.putUnresolved("${task.TAG}->$name")
+                                            }
                                         }
                                     }
                                 }
                             }
+                        }.onFailure {
+                            LogUtils.e(task.TAG, it)
+                            // 查询抛异常同样要留痕，否则校验会一直判定缓存不完整而重复全量扫描
+                            task.getQueryMap().keys.forEach { DexKitCache.putUnresolved("${task.TAG}->$it") }
                         }
-                    }.onFailure {
-                        LogUtils.e(task.TAG, it)
-                        // 查询抛异常同样要留痕，否则校验会一直判定缓存不完整而重复全量扫描
-                        task.getQueryMap().keys.forEach { DexKitCache.putUnresolved("${task.TAG}->$it") }
                     }
                 }
-            }
-            progressText = "查找完成，正在初始化..."
-            DexKitCache.saveCache()
-            isFindComplete = true
-            val finished = onFindFinished
-            onFindFinished = null
-            Handler(Looper.getMainLooper()).post {
-                dialogRef?.dismiss()
-                finished?.invoke()
-            }
-            // 缓存已就绪，Hook 注册与安装交给后台调度器，不占用主线程
-            ModuleScope.launchHookJava("HookInit") {
-                MainHook.loadHook()
+                progressText = "查找完成，正在初始化..."
+                DexKitCache.saveCache()
+                isFindComplete = true
+                val finished = onFindFinished
+                onFindFinished = null
+                Handler(Looper.getMainLooper()).post {
+                    dialogRef?.dismiss()
+                    finished?.invoke()
+                }
+                // 缓存已就绪，Hook 注册与安装交给后台调度器，不占用主线程
+                ModuleScope.launchHookJava("HookInit") {
+                    MainHook.loadHook()
+                }
+            } catch (e: Throwable) {
+                // 查找任意环节抛异常都必须收尾，否则进度弹窗常驻、「重建缓存」永转圈、Hook 永不安装
+                LogUtils.e(TAG, e)
+                progressText = "查找失败，请重试"
+                abortFind()
             }
         }
     }

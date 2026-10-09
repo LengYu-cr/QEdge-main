@@ -125,8 +125,28 @@ public class HttpUtils {
                     }
                 }
 
+                // 净化文件名：剥离任何目录成分，防止 ../ 、/ 或绝对路径导致的路径穿越
+                fileName = new File(fileName).getName();
+                if (fileName.isEmpty() || ".".equals(fileName) || "..".equals(fileName)) {
+                    return null;
+                }
+
                 // 生成最终保存路径
                 File saveFile = new File(savePath, fileName);
+
+                // 校验 canonical 路径必须位于目标目录内，防止符号链接或特殊路径越界写入
+                try {
+                    String baseDir = new File(savePath).getCanonicalPath();
+                    String targetPath = saveFile.getCanonicalPath();
+                    if (!targetPath.startsWith(baseDir + File.separator)) {
+                        LogUtils.e("HttpUtils", "下载路径越界，已拒绝保存: " + fileName);
+                        return null;
+                    }
+                } catch (IOException e) {
+                    LogUtils.e(e);
+                    return null;
+                }
+
                 File parentDir = saveFile.getParentFile();
                 if (parentDir != null && !parentDir.exists()) {
                     parentDir.mkdirs();

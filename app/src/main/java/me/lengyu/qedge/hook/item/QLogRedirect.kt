@@ -12,9 +12,8 @@ import java.io.File
 import java.io.FileWriter
 import java.io.PrintWriter
 import java.io.StringWriter
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.time.LocalDateTime
+import java.time.format.DateTimeFormatter
 import java.util.concurrent.BlockingQueue
 import java.util.concurrent.LinkedBlockingQueue
 
@@ -46,8 +45,9 @@ object QLogRedirect : BaseSwitchHookItem() {
     /** 目标宿主类(QQ 9.3.25)，方法名稳定。 */
     private const val QLOG_CLASS = "com.tencent.qphone.base.util.QLog"
 
-    private val DATE_FMT = SimpleDateFormat("yyyy-MM-dd_HH", Locale.getDefault())
-    private val TIME_FMT = SimpleDateFormat("yyyy-MM-dd HH:mm:ss.SSS", Locale.getDefault())
+    // SimpleDateFormat 非线程安全：hook 回调可能来自多个 QQ 线程，改用线程安全的 DateTimeFormatter
+    private val DATE_FMT = DateTimeFormatter.ofPattern("uuuu-MM-dd_HH")
+    private val TIME_FMT = DateTimeFormatter.ofPattern("uuuu-MM-dd HH:mm:ss.SSS")
 
     /** 后台写日志队列，避免 Hook 线程/主线程同步文件 IO。 */
     private val queue: BlockingQueue<String> = LinkedBlockingQueue(8192)
@@ -158,10 +158,10 @@ object QLogRedirect : BaseSwitchHookItem() {
 
     private fun writeLog(levelByte: Byte, tag: String, msg: String, th: Throwable?) {
         val line = buildString {
-            append(TIME_FMT.format(Date()))
+            append(TIME_FMT.format(LocalDateTime.now()))
             append(" ")
             append(levelName(levelByte))
-    append(" [")
+            append(" [")
             append(tag)
             append("] ")
             append(msg)
@@ -192,6 +192,6 @@ object QLogRedirect : BaseSwitchHookItem() {
     private fun logFile(): File {
         val dir = File(HostInfo.getModuleDataPath(), "log/QLog")
         if (!dir.exists()) dir.mkdirs()
-        return File(dir, DATE_FMT.format(Date()) + ".log")
+        return File(dir, DATE_FMT.format(LocalDateTime.now()) + ".log")
     }
 }

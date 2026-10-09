@@ -1,6 +1,7 @@
 package me.lengyu.qedge.hook;
 
 import android.content.Context;
+import java.util.concurrent.atomic.AtomicBoolean;
 import me.lengyu.qedge.common.ModuleScope;
 import me.lengyu.qedge.hook.api.FromServiceMsgDispatcher;
 import me.lengyu.qedge.hook.item.DownloadEmotion;
@@ -66,6 +67,7 @@ import me.lengyu.qedge.hook.item.ForceModuleToast;
 import me.lengyu.qedge.hook.item.ForceInputNoLimit;
 import me.lengyu.qedge.hook.item.ForceFullScreenBtnShow;
 import me.lengyu.qedge.hook.item.WebJsBridgeAllowlist;
+import me.lengyu.qedge.hook.item.NativeEmotionDownload;
 
 import java.util.List;
 /**
@@ -74,7 +76,7 @@ import java.util.List;
  */
 public class MainHook {
 
-    private static boolean initialized = false;
+    private static final AtomicBoolean initialized = new AtomicBoolean(false);
 
     public static void registerHookItems() {
         HookRegistry.register(OnGetRKey.INSTANCE);
@@ -124,6 +126,7 @@ public class MainHook {
         HookRegistry.register(ForceInputNoLimit.INSTANCE);
         HookRegistry.register(ForceFullScreenBtnShow.INSTANCE);
         HookRegistry.register(WebJsBridgeAllowlist.INSTANCE);
+        HookRegistry.register(NativeEmotionDownload.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;
@@ -133,8 +136,8 @@ public class MainHook {
     private static final long HOOK_STAGGER_DELAY_MS = 20;
 
     public static void loadHook() {
-        if (initialized) return;
-        initialized = true;
+        // 多路注入线程可能并发进入，用 CAS 保证只加载一次
+        if (!initialized.compareAndSet(false, true)) return;
 
         // 早期预热：在 hook 加载阶段（后台线程）提前完成 JsonConfigUtils 类初始化与配置文件读取，
         // 避免第二次进入页面时主线程/QLog hook 线程在热路径上争抢 <clinit> 类初始化锁导致卡死闪退
@@ -175,6 +178,24 @@ public class MainHook {
         } catch (Throwable e) {
             LogUtils.e("MainHook", "hookAccountChange failed: " + e.getMessage());
         }
+
+        // 兜底账号初始化：hookAccountChange() 依赖 QQAppInterface 的构造/onCreate 回调，而模块的 hook
+        // 是在 BaseApplicationImpl.onCreate 之后才装上的，此时 QQAppInterface 通常已创建完毕，回调不会
+        // 再触发 → onAccountChanged() 永不执行 → 心跳永不启动、点击类 Hook 的 initData 也不执行
+        //（表现为首页用户卡片一直"未登录"）。这里主动补一次；账号切换时仍由原 hook 触发，不冲突。
+        ModuleScope.launchDelayedIO("AccountFallback", 3000, () -> {
+            try {
+                onAccountChanged();
+            } catch (Throwable e) {
+                LogUtils.e("MainHook", "Fallback onAccountChanged failed: " + e.getMessage());
+            }
+            // onAccountChanged() 内部已尝试写 UIN 并启动心跳；只有当时还没登录（拿不到 UIN）才快速重试，
+            // 否则首个心跳要空转满 10 分钟，首页会一直显示"未登录"。
+            String uin = QQCurrentEnv.getCurrentUin();
+            if (uin == null || uin.isEmpty()) {
+                retryHeartbeatUntilLoggedIn(0);
+            }
+        });
 
         // ChatSettingLoader 等基础 Hook 加载完后再执行
         ModuleScope.launchDelayedIO("ChatSettingLoader", 3000, () -> {
@@ -295,6 +316,36 @@ public class MainHook {
             }
         } catch (Throwable e) {
             LogUtils.e("onAccountChanged", e);
+        }
+    }
+
+    // 登录未就绪时心跳的快速重试：每 15s 探一次，最多 8 次（约 2 分钟）
+    private static final int HEARTBEAT_FALLBACK_MAX_RETRY = 8;
+    private static final long HEARTBEAT_FALLBACK_INTERVAL_MS = 15000;
+
+    /**
+     * 登录还没完成（拿不到 UIN）时的兜底：定期探测，一旦 UIN 就绪就落盘并立即重启心跳，
+     * 避免首个心跳要空转满一整个 10 分钟周期。
+     */
+    private static void retryHeartbeatUntilLoggedIn(int attempt) {
+        // getCurrentUin() 会把空结果也缓存下来，重试前必须先 reset，否则会一直读到旧的空值
+        QQCurrentEnv.reset();
+        String currentUin = QQCurrentEnv.getCurrentUin();
+        if (currentUin != null && !currentUin.isEmpty()) {
+            ModuleConfig.INSTANCE.putString("currentUin", currentUin);
+            ModuleConfig.INSTANCE.putString("heartbeat_current_uin", currentUin);
+            try {
+                HeartbeatManager.getInstance().startHeartbeat();
+            } catch (Throwable e) {
+                LogUtils.e("MainHook", "Failed to restart heartbeat: " + e.getMessage());
+            }
+            return;
+        }
+        if (attempt < HEARTBEAT_FALLBACK_MAX_RETRY) {
+            ModuleScope.launchDelayedIO("HeartbeatFallback", HEARTBEAT_FALLBACK_INTERVAL_MS,
+                    () -> retryHeartbeatUntilLoggedIn(attempt + 1));
+        } else {
+            LogUtils.w("MainHook", "UIN 仍未就绪，心跳交由周期任务自行重试");
         }
     }
 

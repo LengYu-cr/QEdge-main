@@ -5,6 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import me.lengyu.qedge.plugin.bean.PluginInfo;
 import me.lengyu.qedge.utils.LogUtils;
@@ -19,11 +21,12 @@ import me.lengyu.qedge.utils.Toasts;
  * @Description 插件管理器
  */
 public class PluginManager {
-    public static final List<PluginInfo> plugins = new ArrayList<>();
-    public static final List<String> autoLoadList = new ArrayList<>();
+    // UI 线程 / hook 线程 / Plugin-AutoLoad 线程会并发读写这些集合，用并发容器保证安全
+    public static final List<PluginInfo> plugins = new CopyOnWriteArrayList<>();
+    public static final List<String> autoLoadList = new CopyOnWriteArrayList<>();
     
     // 保存正在运行的插件的Compiler实例，key为pluginId
-    public static final Map<String, PluginCompiler> runningCompilers = new HashMap<>();
+    public static final Map<String, PluginCompiler> runningCompilers = new ConcurrentHashMap<>();
 
     private static File pluginDir;
 

@@ -12,6 +12,7 @@ import de.robv.android.xposed.callbacks.XC_LoadPackage;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicBoolean;
 import me.lengyu.qedge.BuildConfig;
@@ -115,6 +116,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
             Parasitics.INSTANCE.setModulePath(modulePath);
 
             if (lpparam.packageName.equals("com.tencent.mobileqq") || lpparam.packageName.equals("com.tencent.tim")) {
+                // XposedBridge.log("[QEdge] 进入QQ分支");
                 DynamicActivityRegistry dynamicActivityRegistry = DynamicActivityRegistry.INSTANCE;
                 DynamicActivityRegistry.register(SettingActivity.class);
                 hookBaseApplicationOnCreate(lpparam.classLoader);
@@ -219,7 +221,8 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
      *  2) BaseApplicationImpl.onCreate —— 直接用 lpparam.classLoader，兼容没有 QFix 的老版本（如 9.1.67）。
      */
     private void hookBaseApplicationOnCreate(final ClassLoader classLoader) {
-        // XposedBridge.log("[QEdge] asdfghj");
+        // XposedBridge.log("[QEdge] 时代马戏团牛逼");
+
         try {
             Method attach = classLoader
                     .loadClass("com.tencent.common.app.QFixApplicationImplProxy")
@@ -257,39 +260,66 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
      * BaseDexClassLoader 构造，捕获补丁 loader，附件结束后立即卸载临时 hook。
      */
     private XC_MethodHook.Unhook hookQFixAttach(final Method attach, final ClassLoader classLoader) {
-        final List<XC_MethodHook.Unhook> constructorUnhooks = new ArrayList<>();
+        // 这个列表会被 attach 线程（beforeHookedMethod 里装 hook）与构造回调线程（摘 hook）并发访问，
+        // 因此用同步列表 + 统一锁；并用 closed 标记保证"收尾之后新装的 hook 立刻摘掉"，避免残留。
+        final List<XC_MethodHook.Unhook> constructorUnhooks =
+                Collections.synchronizedList(new ArrayList<XC_MethodHook.Unhook>());
+        final AtomicBoolean constructorHookClosed = new AtomicBoolean(false);
+
+        final Runnable teardownConstructorHooks = new Runnable() {
+            @Override
+            public void run() {
+                synchronized (constructorUnhooks) {
+                    constructorHookClosed.set(true);
+                    for (XC_MethodHook.Unhook unhook : constructorUnhooks) {
+                        try {
+                            unhook.unhook();
+                        } catch (Throwable ignored) {
+                        }
+                    }
+                    constructorUnhooks.clear();
+                }
+            }
+        };
 
         return XposedBridge.hookMethod(attach, new XC_MethodHook() {
             @Override
             protected void beforeHookedMethod(MethodHookParam param) {
+                // XposedBridge.log("[QEdge] startQfix");
                 for (Constructor<?> constructor : BaseDexClassLoader.class.getDeclaredConstructors()) {
+                    // XposedBridge.log("[QEdge] constructor List = " + constructor);
                     try {
-                        XC_MethodHook.Unhook unhook = XposedBridge.hookMethod(constructor, new XC_MethodHook() {
+                        XC_MethodHook.Unhook unhook = XposedBridge.hookMethod(constructor, new XC_MethodHook(){
+                            // XposedBridge.log("[QEdge] constructor " + constructor +  " hook 安装成功");
                             @Override
                             protected void afterHookedMethod(MethodHookParam param) {
                                 ClassLoader loader = (ClassLoader) param.thisObject;
                                 String loaderStr = loader.toString();
                                 if (loaderStr.contains(BuildConfig.APPLICATION_ID)) {
+                                    // XposedBridge.log("[QEdge] constructor " + constructor +  " hook 安装成功，但不是补丁 loader, loader = " + loaderStr);
                                     return;
                                 }
+
                                 if ((loaderStr.contains("com.tencent.")
                                         || loaderStr.contains("TinkerClassLoader")
                                         || loaderStr.contains("DelegateLastClassLoader"))
                                         && hasCapturedTinker.compareAndSet(false, true)) {
+                                    // XposedBridge.log("[QEdge] constructor " + constructor +  " hook 安装成功，抢到补丁 loader, loader = " + loaderStr);
                                     // 抢到补丁 loader 了，构造函数上的临时 hook 立刻摘掉
-                                    for (XC_MethodHook.Unhook constructorUnhook : constructorUnhooks) {
-                                        try {
-                                            constructorUnhook.unhook();
-                                        } catch (Throwable ignored) {
-                                        }
-                                    }
-                                    constructorUnhooks.clear();
+                                    teardownConstructorHooks.run();
                                     doRealStartup(loader);
                                 }
                             }
                         });
                         if (unhook != null) {
-                            constructorUnhooks.add(unhook);
+                            synchronized (constructorUnhooks) {
+                                // 已经收尾就立刻摘掉，否则入表等待统一卸载（检查与入表同锁，杜绝漏摘）
+                                if (constructorHookClosed.get()) {
+                                    unhook.unhook();
+                                } else {
+                                    constructorUnhooks.add(unhook);
+                                }
+                            }
                         }
                     } catch (Throwable ignored) {
                     }
@@ -298,10 +328,7 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
 
             @Override
             protected void afterHookedMethod(MethodHookParam param) {
-                for (XC_MethodHook.Unhook unhook : constructorUnhooks) {
-                    unhook.unhook();
-                }
-                constructorUnhooks.clear();
+                teardownConstructorHooks.run();
 
                 // 补丁 loader 没抢到：QFix 这条路走不通，回退 BaseApplicationImpl + lpparam.classLoader
                 if (!hasCapturedTinker.get()) {

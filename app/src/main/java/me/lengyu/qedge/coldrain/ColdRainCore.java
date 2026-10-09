@@ -55,10 +55,13 @@ public class ColdRainCore {
     private static final String CONFIG_FILE_NAME = "config.dat";
     private static volatile ColdRainCore instance;
     private Context context;
-    private JSONObject configData;
+    private JSONObject configData = new JSONObject();
     private File configFile;
     private boolean initialized = false;
     private long lastFileModified = 0;
+
+    /** 配置读写共用锁：loadConfig/saveConfig 与所有 get/set 都走它，避免多进程/多线程读到半截内容 */
+    private final Object configLock = new Object();
 
     private final Map<String, ColdRainFeature> features = new HashMap<>();
 
@@ -147,8 +150,10 @@ public class ColdRainCore {
     }
 
     private void loadConfig() {
-        configData = new JSONObject();
-        if (configFile.exists()) {
+        synchronized (configLock) {
+            if (!configFile.exists()) {
+                return;
+            }
             try {
                 FileReader reader = new FileReader(configFile);
                 StringBuilder sb = new StringBuilder();
@@ -158,11 +163,11 @@ public class ColdRainCore {
                     sb.append(buffer, 0, len);
                 }
                 reader.close();
+                // 解析成功才替换内存配置；失败（如读到写入中的半截内容）保留上一次有效配置，避免清空数据
                 configData = new JSONObject(sb.toString());
                 lastFileModified = configFile.lastModified();
             } catch (Exception e) {
                 LogUtils.e(TAG, "loadConfig error: " + e.getMessage());
-                configData = new JSONObject();
             }
         }
     }
@@ -172,50 +177,70 @@ public class ColdRainCore {
     }
 
     private void saveConfig() {
-        try {
-            FileWriter writer = new FileWriter(configFile);
-            writer.write(configData.toString(4));
-            writer.close();
-        } catch (Exception e) {
-            LogUtils.e(TAG, "saveConfig error: " + e.getMessage());
+        synchronized (configLock) {
+            // 先写临时文件再原子重命名，避免其他进程读到被截断的半截 JSON
+            File tmpFile = new File(configFile.getParentFile(), configFile.getName() + ".tmp");
+            try (FileWriter writer = new FileWriter(tmpFile)) {
+                writer.write(configData.toString(4));
+                writer.flush();
+            } catch (Exception e) {
+                LogUtils.e(TAG, "saveConfig error: " + e.getMessage());
+                tmpFile.delete();
+                return;
+            }
+            if (!tmpFile.renameTo(configFile)) {
+                LogUtils.e(TAG, "saveConfig rename error");
+                tmpFile.delete();
+                return;
+            }
+            // 同步更新时间戳，避免自己的写入被 checkAndReloadIfModified 判为“外部修改”而立刻重读
+            lastFileModified = configFile.lastModified();
         }
     }
 
     private boolean getBoolean(String key, boolean defaultValue) {
-        if (configData == null) {
+        synchronized (configLock) {
+            if (configData == null) {
+                return defaultValue;
+            }
+            checkAndReloadIfModified();
+            if (configData.has(key)) {
+                return configData.optBoolean(key, defaultValue);
+            }
             return defaultValue;
         }
-        checkAndReloadIfModified();
-        if (configData.has(key)) {
-            return configData.optBoolean(key, defaultValue);
-        }
-        return defaultValue;
     }
 
     private void setBoolean(String key, boolean value) {
         try {
-            configData.put(key, value);
-            saveConfig();
+            synchronized (configLock) {
+                configData.put(key, value);
+                saveConfig();
+            }
         } catch (Exception e) {
             LogUtils.e(TAG, "setBoolean error: " + e.getMessage());
         }
     }
 
     private String getString(String key, String defaultValue) {
-        if (configData == null) {
+        synchronized (configLock) {
+            if (configData == null) {
+                return defaultValue;
+            }
+            checkAndReloadIfModified();
+            if (configData.has(key)) {
+                return configData.optString(key, defaultValue);
+            }
             return defaultValue;
         }
-        checkAndReloadIfModified();
-        if (configData.has(key)) {
-            return configData.optString(key, defaultValue);
-        }
-        return defaultValue;
     }
 
     private void setString(String key, String value) {
         try {
-            configData.put(key, value);
-            saveConfig();
+            synchronized (configLock) {
+                configData.put(key, value);
+                saveConfig();
+            }
         } catch (Exception e) {
             LogUtils.e(TAG, "setString error: " + e.getMessage());
         }
@@ -239,18 +264,22 @@ public class ColdRainCore {
 
     public void setConfigInt(String key, int value) {
         try {
-            configData.put(key, value);
-            saveConfig();
+            synchronized (configLock) {
+                configData.put(key, value);
+                saveConfig();
+            }
         } catch (Exception e) {
             LogUtils.e(TAG, "setConfigInt error: " + e.getMessage());
         }
     }
 
     public int getConfigInt(String key, int defaultValue) {
-        if (configData.has(key)) {
-            return configData.optInt(key, defaultValue);
+        synchronized (configLock) {
+            if (configData.has(key)) {
+                return configData.optInt(key, defaultValue);
+            }
+            return defaultValue;
         }
-        return defaultValue;
     }
 
     // ========== 数据文件操作 ==========
@@ -279,50 +308,85 @@ public class ColdRainCore {
         return file;
     }
 
+    // 数据文件内存缓存：shouldHandle 跑在消息线程上，禁止每条消息都读盘；
+    // 缓存原始文本并以 lastModified 判定失效，本类写入后同步刷新，跨进程外部改写也能检测到。
+    private final java.util.Map<String, String> dataFileCache = new java.util.HashMap<>();
+    private final java.util.Map<String, Long> dataFileCacheMtime = new java.util.HashMap<>();
+    private final Object dataLock = new Object();
+
     public JSONObject getDataFile(String fileName) {
-        File file = resolveDataFile(fileName);
-        if (!file.exists()) {
-            return new JSONObject();
-        }
-        try {
-            FileReader reader = new FileReader(file);
-            StringBuilder sb = new StringBuilder();
-            char[] buffer = new char[1024];
-            int len;
-            while ((len = reader.read(buffer)) != -1) {
-                sb.append(buffer, 0, len);
+        synchronized (dataLock) {
+            File file = resolveDataFile(fileName);
+            if (!file.exists()) {
+                dataFileCache.remove(fileName);
+                dataFileCacheMtime.remove(fileName);
+                return new JSONObject();
             }
-            reader.close();
-            return new JSONObject(sb.toString());
-        } catch (Exception e) {
-            LogUtils.e(TAG, "getDataFile error: " + e.getMessage());
-            return new JSONObject();
+
+            String cached = dataFileCache.get(fileName);
+            Long cachedMtime = dataFileCacheMtime.get(fileName);
+            if (cached != null && cachedMtime != null && cachedMtime.longValue() == file.lastModified()) {
+                try {
+                    // 命中缓存：只解析内存文本，不碰磁盘
+                    return new JSONObject(cached);
+                } catch (Exception ignored) {
+                    // 缓存文本异常时回退到磁盘重读
+                }
+            }
+
+            try {
+                FileReader reader = new FileReader(file);
+                StringBuilder sb = new StringBuilder();
+                char[] buffer = new char[1024];
+                int len;
+                while ((len = reader.read(buffer)) != -1) {
+                    sb.append(buffer, 0, len);
+                }
+                reader.close();
+                String raw = sb.toString();
+                dataFileCache.put(fileName, raw);
+                dataFileCacheMtime.put(fileName, file.lastModified());
+                return new JSONObject(raw);
+            } catch (Exception e) {
+                LogUtils.e(TAG, "getDataFile error: " + e.getMessage());
+                return new JSONObject();
+            }
         }
     }
 
     public void saveDataFile(String fileName, JSONObject data) {
-        try {
-            File file = resolveDataFile(fileName);
-            FileWriter writer = new FileWriter(file);
-            writer.write(data.toString(4));
-            writer.close();
-        } catch (Exception e) {
-            LogUtils.e(TAG, "saveDataFile error: " + e.getMessage());
+        synchronized (dataLock) {
+            try {
+                File file = resolveDataFile(fileName);
+                String raw = data.toString(4);
+                FileWriter writer = new FileWriter(file);
+                writer.write(raw);
+                writer.close();
+                // 同步刷新缓存，避免刚写完又被自己的 mtime 判定为外部修改而重读
+                dataFileCache.put(fileName, raw);
+                dataFileCacheMtime.put(fileName, file.lastModified());
+            } catch (Exception e) {
+                LogUtils.e(TAG, "saveDataFile error: " + e.getMessage());
+            }
         }
     }
 
     public java.util.Set<String> getAllConfigKeys() {
         java.util.Set<String> keys = new java.util.HashSet<>();
-        java.util.Iterator<String> it = configData.keys();
-        while (it.hasNext()) {
-            keys.add(it.next());
+        synchronized (configLock) {
+            java.util.Iterator<String> it = configData.keys();
+            while (it.hasNext()) {
+                keys.add(it.next());
+            }
         }
         return keys;
     }
 
     public void removeConfig(String key) {
-        configData.remove(key);
-        saveConfig();
+        synchronized (configLock) {
+            configData.remove(key);
+            saveConfig();
+        }
     }
 
     private void initDefaultConfig() {
@@ -622,11 +686,13 @@ public class ColdRainCore {
     }
 
     private void checkAndReloadIfModified() {
-        if (configFile == null) {
-            return;
-        }
-        if (configFile.exists() && configFile.lastModified() > lastFileModified) {
-            loadConfig();
+        synchronized (configLock) {
+            if (configFile == null) {
+                return;
+            }
+            if (configFile.exists() && configFile.lastModified() > lastFileModified) {
+                loadConfig();
+            }
         }
     }
 

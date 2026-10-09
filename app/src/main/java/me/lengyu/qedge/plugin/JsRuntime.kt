@@ -38,8 +38,15 @@ import java.util.concurrent.ThreadFactory
  */
 class JsRuntime(private val info: PluginInfo, private val api: PluginMethod) {
 
+    /** executor 线程引用：用于识别“当前已在脚本线程”的重入，避免 submitBlocking 自等死锁 */
+    @Volatile
+    private var scriptThread: Thread? = null
+
     private val executor = Executors.newSingleThreadExecutor(ThreadFactory { r ->
-        Thread(r, "JsPlugin-" + info.id).apply { isDaemon = true }
+        Thread(r, "JsPlugin-" + info.id).apply {
+            isDaemon = true
+            scriptThread = this
+        }
     })
 
     /** 绑定到专用线程的 Rhino Context，仅在 executor 线程内访问 */
@@ -316,6 +323,10 @@ class JsRuntime(private val info: PluginInfo, private val api: PluginMethod) {
 
     /** 提交任务到脚本线程并阻塞等待结果，异常原样抛出到调用方 */
     private fun <T> submitBlocking(block: () -> T): T {
+        // 已在脚本线程内再 submit 会排队等自己执行完 → 永久自等死锁，直接内联执行
+        if (Thread.currentThread() === scriptThread) {
+            return block()
+        }
         val future = executor.submit<T> { block() }
         try {
             return future.get()

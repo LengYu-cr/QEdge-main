@@ -216,6 +216,7 @@ public class GroupManagerFeature implements ColdRainFeature {
             if (msgData.atList != null && !msgData.atList.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
                 for (String uin : msgData.atList) {
+                    if (!canOperate(core, troopUin, uin, msgData)) continue;
                     TroopTool.INSTANCE.setGroupAdmin(troopUin, uin, true);
                     sb.append(uin).append("上管:成功\n");
                 }
@@ -228,6 +229,7 @@ public class GroupManagerFeature implements ColdRainFeature {
             if (msgData.atList != null && !msgData.atList.isEmpty()) {
                 StringBuilder sb = new StringBuilder();
                 for (String uin : msgData.atList) {
+                    if (!canOperate(core, troopUin, uin, msgData)) continue;
                     TroopTool.INSTANCE.setGroupAdmin(troopUin, uin, false);
                     sb.append(uin).append("下管:成功\n");
                 }

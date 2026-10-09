@@ -255,6 +255,7 @@ fun HomeScreen(
     var forceModuleToast by remember { mutableStateOf(ModuleConfig.getBoolean("force_module_toast", false)) }
     var forceInputNoLimit by remember { mutableStateOf(ModuleConfig.getBoolean("force_input_no_limit", false)) }
     var forceFullScreenBtnShow by remember { mutableStateOf(ModuleConfig.getBoolean("force_fullscreen_btn_show", false)) }
+    var nativeEmotionDownload by remember { mutableStateOf(ModuleConfig.getBoolean("native_emotion_download", false)) }
     var bgImageEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("bg_image_enabled", false)) }
     var bgImageUri by remember { mutableStateOf(ModuleConfig.getString("bg_image_uri", "")) }
     // 换图固定覆盖同一文件、uri 不变，靠版本号驱动 remember 重算并使缓存失效
@@ -631,6 +632,7 @@ fun HomeScreen(
                             forceModuleToast = forceModuleToast,
                             forceInputNoLimit = forceInputNoLimit,
                             forceFullScreenBtnShow = forceFullScreenBtnShow,
+                            nativeEmotionDownload = nativeEmotionDownload,
                             bgImageEnabled = bgImageEnabled,
                             bgImageUri = bgImageUri,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
@@ -811,6 +813,10 @@ fun HomeScreen(
                             onForceFullScreenBtnShowToggle = {
                                 forceFullScreenBtnShow = it
                                 Thread { ModuleConfig.putBoolean("force_fullscreen_btn_show", it) }.start()
+                            },
+                            onNativeEmotionDownloadToggle = {
+                                nativeEmotionDownload = it
+                                Thread { ModuleConfig.putBoolean("native_emotion_download", it) }.start()
                             },
                             onBgImageToggle = { enable ->
                                 if (enable) {

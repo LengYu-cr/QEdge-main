@@ -16,6 +16,8 @@ import me.lengyu.qedge.plugin.bean.PluginInfo;
 import me.lengyu.qedge.plugin.bean.QuitData;
 
 import java.util.Arrays;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
  * @Author 冷雨
@@ -181,6 +183,34 @@ public class PluginCallback {
         );
     }
 
+    /** Java(BeanShell) 插件专属单线程：Interpreter 非线程安全，串行后天然互斥；同时避免每条消息 new Thread 造成线程无界增长 */
+    private volatile ExecutorService javaExecutor;
+
+    private ExecutorService javaExecutor() {
+        ExecutorService e = javaExecutor;
+        if (e == null || e.isShutdown()) {
+            synchronized (this) {
+                if (javaExecutor == null || javaExecutor.isShutdown()) {
+                    javaExecutor = Executors.newSingleThreadExecutor(r -> {
+                        Thread t = new Thread(r, "Plugin-Java-" + info.getId());
+                        t.setDaemon(true);
+                        return t;
+                    });
+                }
+                e = javaExecutor;
+            }
+        }
+        return e;
+    }
+
+    /** 插件停止时释放专属线程；下次 start 会按需重建 */
+    public void shutdown() {
+        ExecutorService e = javaExecutor;
+        if (e != null) {
+            e.shutdownNow();
+        }
+    }
+
     private void runOnBackground(String methodName, Class<?>[] paramTypes, Object[] args) {
         if (info.isJs()) {
             // JS 插件走自己的专用单线程 Executor，不能再包 new Thread(跨线程碰 Rhino scope 会崩)
@@ -190,7 +220,8 @@ public class PluginCallback {
             }
             return;
         }
-        new Thread(() -> invokeMethodExists(methodName, paramTypes, args), "Plugin-" + info.getId()).start();
+        // Java 插件同样串行到专属单线程：既保证 Interpreter 不被并发访问，也避免线程无界增长
+        javaExecutor().execute(() -> invokeMethodExists(methodName, paramTypes, args));
     }
 
     private void invokeMethodExists(String methodName, Class<?>[] paramTypes, Object[] args) {

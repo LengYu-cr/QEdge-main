@@ -244,6 +244,16 @@ internal fun HomePage(
                     }
                 )
 
+                if (HostInfo.isQQ) {
+                    SettingGap(12)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.NATIVE_EMOTION_DOWNLOAD,
+                        checked = state.nativeEmotionDownload,
+                        onCheckedChange = callbacks.onNativeEmotionDownloadToggle
+                    )
+                }
+
                 SettingSwitchItem(
                     title = HomeRowText.REMOVE_LINK_INFO,
                     checked = state.removeLinkInfo,

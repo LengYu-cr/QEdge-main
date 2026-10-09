@@ -1,6 +1,8 @@
 package me.lengyu.qedge.ui.components.dialogs
 
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.view.Gravity
 import android.view.ViewGroup
 import android.widget.Toast
@@ -26,14 +28,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.core.compatibility.XposedComposeDialog
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
+import me.lengyu.qedge.utils.LogUtils
+
+/** 后台地址：弹窗里可点击跳浏览器 */
+private const val BACKEND_URL = "https://v.yuafeng.cn/QEdge/user/"
 
 class WelcomeDialog(
     context: Context,
@@ -72,6 +80,7 @@ private fun WelcomeContent(
     onDismiss: () -> Unit
 ) {
     val colors = QEdgeTheme.colors
+    val context = LocalContext.current
 
     AnimatedVisibility(
         visible = visible,
@@ -139,10 +148,28 @@ private fun WelcomeContent(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            text = "后台地址：https://v.yuafeng.cn/QEdge/user/",
+                            text = "后台地址：",
                             fontSize = 13.sp,
                             color = colors.textSecondary,
                             textAlign = TextAlign.Center
+                        )
+
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        // 后台地址做成可点击链接：点击跳系统浏览器
+                        Text(
+                            text = BACKEND_URL,
+                            fontSize = 13.sp,
+                            color = colors.accentBlue,
+                            textDecoration = TextDecoration.Underline,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) { openInBrowser(context, BACKEND_URL) }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
                         )
 
                         Spacer(modifier = Modifier.height(12.dp))
@@ -175,7 +202,7 @@ private fun WelcomeContent(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
                                         onClick = {
-                                            copyToClipboard(currentUin)
+                                            copyToClipboard(context, currentUin)
                                         }
                                     )
                             )
@@ -211,7 +238,7 @@ private fun WelcomeContent(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null,
                                         onClick = {
-                                            copyToClipboard(initialPassword)
+                                            copyToClipboard(context, initialPassword)
                                         }
                                     )
                             )
@@ -257,13 +284,28 @@ private fun WelcomeContent(
     }
 }
 
-private fun copyToClipboard(text: String) {
-    val context = me.lengyu.qedge.utils.HostInfo.getHostContext() ?: return
+/** 复制文本到剪贴板；showToast=false 时由调用方自己提示，避免连续弹两个 Toast */
+private fun copyToClipboard(context: Context, text: String, showToast: Boolean = true) {
     val clipboard = ContextCompat.getSystemService(
         context,
         android.content.ClipboardManager::class.java
     )
     val clip = android.content.ClipData.newPlainText("QEdge", text)
     clipboard?.setPrimaryClip(clip)
-    Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+    if (showToast) Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
+}
+
+/** 用系统浏览器打开链接；宿主里弹窗上下文非 Activity，必须带 NEW_TASK */
+private fun openInBrowser(context: Context, url: String) {
+    try {
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url.trim())).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+        context.startActivity(intent)
+    } catch (e: Exception) {
+        // 打不开浏览器兜底：记日志 + 把链接复制到剪贴板，用户可自行粘贴打开
+        LogUtils.e(e)
+        copyToClipboard(context, url, showToast = false)
+        Toast.makeText(context, "无法打开浏览器，链接已复制", Toast.LENGTH_SHORT).show()
+    }
 }

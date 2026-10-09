@@ -74,7 +74,8 @@ public final class ZipUtil {
                 File file = new File(desDir, entryName);
 
                 // 防 Zip Slip：确保解出的文件仍在目标目录内（同时覆盖绝对路径/.. 穿越）
-                if (!file.getCanonicalPath().startsWith(desDir.getCanonicalPath())) {
+                // 必须带上 File.separator，否则 ".../plugins_evil/x" 会命中 ".../plugins" 前缀而绕过
+                if (!file.getCanonicalPath().startsWith(desDir.getCanonicalPath() + File.separator)) {
                     throw new IOException("非法压缩路径: " + entryName);
                 }
 
