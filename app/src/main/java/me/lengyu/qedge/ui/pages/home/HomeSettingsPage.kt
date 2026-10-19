@@ -63,6 +63,8 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.common.ModuleScope
+import me.lengyu.qedge.hook.item.HideQmateTitleIcon
+import me.lengyu.qedge.hook.item.HideAioPet
 import me.lengyu.qedge.ui.components.atoms.ActionButton
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.molecules.AnimatedListItem
@@ -253,12 +255,6 @@ internal fun HomePage(
                         onCheckedChange = callbacks.onNativeEmotionDownloadToggle
                     )
                 }
-
-                SettingSwitchItem(
-                    title = HomeRowText.REMOVE_LINK_INFO,
-                    checked = state.removeLinkInfo,
-                    onCheckedChange = callbacks.onRemoveLinkInfoToggle
-                )
 
                 if (HostInfo.isQQ) {
                     SettingGap(12)
@@ -585,6 +581,131 @@ internal fun HomePage(
         }
         }
 
+        item(key = "card_purify") {
+        if (!isCardVisibleForSearch(searchQuery, "card_purify")) return@item
+        val expanded = searching || expandedCard == "card_purify"
+        val qmateTitleIconSupported = remember { HideQmateTitleIcon.isSupported() }
+        val aioPetSupported = remember { HideAioPet.isSupported() }
+        CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_purify")) {
+        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+            Column(modifier = Modifier.padding(20.dp)) {
+                CardHeader(
+                    title = HomeRowText.CARD_PURIFY,
+                    expanded = expanded,
+                    onClick = { toggleCard("card_purify") }
+                )
+
+                CollapsibleContent(expanded) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    HorizontalDivider(color = colors.textSecondary.copy(0.08f))
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    SettingSwitchItem(
+                        title = HomeRowText.DISABLE_AI_AVATAR,
+                        checked = state.disableAIAvatar,
+                        onCheckedChange = callbacks.onDisableAIAvatarToggle
+                    )
+
+                    // 虚拟形象页签是 QQ 专属，TIM 没有该项
+                    if (HostInfo.isQQ) {
+                        SettingGap(4)
+
+                        SettingSwitchItem(
+                            title = HomeRowText.HIDE_VIRTUAL_AVATAR,
+                            checked = state.hideVirtualAvatar,
+                            onCheckedChange = callbacks.onHideVirtualAvatarToggle
+                        )
+                    }
+
+                    SettingGap(4)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.HIDE_SUPER_EMOTION,
+                        checked = state.hideSuperEmotion,
+                        onCheckedChange = callbacks.onHideSuperEmotionToggle
+                    )
+
+                    // 合养秋秋人 / 装扮提示 / Q宠 都是 QQ 专属，TIM 没有这些功能
+                    if (HostInfo.isQQ) {
+                        SettingGap(4)
+
+                        SettingSwitchItem(
+                            title = HomeRowText.HIDE_QMATE_TITLE_ICON,
+                            subtitle = if (qmateTitleIconSupported) null else "仅支持 QQ 9.3.30 及以上",
+                            checked = state.hideQmateTitleIcon && qmateTitleIconSupported,
+                            onCheckedChange = callbacks.onHideQmateTitleIconToggle,
+                            enabled = qmateTitleIconSupported,
+                            unsupportedText = if (qmateTitleIconSupported) null else "不支持"
+                        )
+
+                        SettingGap(4)
+
+                        SettingSwitchItem(
+                            title = HomeRowText.HIDE_DRESS_BEANCURD,
+                            checked = state.hideDressBeancurd,
+                            onCheckedChange = callbacks.onHideDressBeancurdToggle
+                        )
+
+                        SettingGap(4)
+
+                        SettingSwitchItem(
+                            title = HomeRowText.HIDE_AIO_PET,
+                            subtitle = if (aioPetSupported) null else "仅支持 QQ 9.3.30 及以上",
+                            checked = state.hideAioPet && aioPetSupported,
+                            onCheckedChange = callbacks.onHideAioPetToggle,
+                            enabled = aioPetSupported,
+                            unsupportedText = if (aioPetSupported) null else "不支持"
+                        )
+                    }
+
+                    SettingGap(4)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.APK1_AS_APK,
+                        checked = state.apk1AsApk,
+                        onCheckedChange = callbacks.onApk1AsApkToggle
+                    )
+
+                    SettingGap(4)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.REMOVE_ADS,
+                        checked = state.removeAds,
+                        onCheckedChange = callbacks.onRemoveAdsToggle
+                    )
+
+                    SettingGap(4)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.REMOVE_LINK_INFO,
+                        checked = state.removeLinkInfo,
+                        onCheckedChange = callbacks.onRemoveLinkInfoToggle
+                    )
+
+                    SettingGap(4)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.DISABLE_AIO_LEFT_SWIPE,
+                        checked = state.disableAioLeftSwipe,
+                        onCheckedChange = callbacks.onDisableAioLeftSwipeToggle
+                    )
+
+                    // 首页下拉小程序是 QQ 专属，TIM 没有小程序面板
+                    if (HostInfo.isQQ) {
+                        SettingGap(4)
+
+                        SettingSwitchItem(
+                            title = HomeRowText.DISABLE_HOME_PULL_DOWN,
+                            checked = state.disableHomePullDown,
+                            onCheckedChange = callbacks.onDisableHomePullDownToggle
+                        )
+                    }
+                }
+            }
+        }
+        }
+        }
+
         item(key = "card_system") {
         if (!isCardVisibleForSearch(searchQuery, "card_system")) return@item
         val expanded = searching || expandedCard == "card_system"
@@ -622,14 +743,6 @@ internal fun HomePage(
                         title = HomeRowText.FORCE_VIP,
                         checked = state.forceVip,
                         onCheckedChange = callbacks.onForceVipToggle
-                    )
-
-                    SettingGap(4)
-
-                    SettingSwitchItem(
-                        title = HomeRowText.DISABLE_AI_AVATAR,
-                        checked = state.disableAIAvatar,
-                        onCheckedChange = callbacks.onDisableAIAvatarToggle
                     )
 
                     SettingGap(4)
@@ -699,14 +812,6 @@ internal fun HomePage(
                         title = HomeRowText.BYPASS_PROFILE_BAN,
                         checked = state.bypassProfileBan,
                         onCheckedChange = callbacks.onBypassProfileBanToggle
-                    )
-
-                    SettingGap(4)
-
-                    SettingSwitchItem(
-                        title = HomeRowText.REMOVE_ADS,
-                        checked = state.removeAds,
-                        onCheckedChange = callbacks.onRemoveAdsToggle
                     )
 
                     SettingGap(4)

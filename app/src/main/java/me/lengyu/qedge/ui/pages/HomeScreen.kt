@@ -97,6 +97,8 @@ import me.lengyu.qedge.utils.Toasts
 import me.lengyu.qedge.plugin.view.ChatSettingLoader
 import me.lengyu.qedge.plugin.view.MediaPanelLoader
 import me.lengyu.qedge.hook.item.LevelBoost
+import me.lengyu.qedge.hook.item.HideQmateTitleIcon
+import me.lengyu.qedge.hook.item.HideAioPet
 import me.lengyu.qedge.hook.item.KeepAliveHook
 import me.lengyu.qedge.hook.item.QLogRedirect
 import me.lengyu.qedge.hook.UserData
@@ -125,6 +127,7 @@ import me.lengyu.qedge.ui.pages.home.LocalHomeSearchQuery
 import me.lengyu.qedge.ui.pages.home.HomePageState
 import me.lengyu.qedge.ui.pages.home.JavaPluginsPage
 import me.lengyu.qedge.ui.pages.home.OnlinePluginItem
+import me.lengyu.qedge.ui.pages.home.HomeAdBanner
 import me.lengyu.qedge.ui.pages.home.SponsorCard
 import me.lengyu.qedge.ui.pages.home.UpdateLogCard
 import me.lengyu.qedge.ui.pages.home.UserInfoCard
@@ -241,6 +244,14 @@ fun HomeScreen(
     var antiReport by remember { mutableStateOf(ModuleConfig.getBoolean("anti_report", false)) }
     var forceVip by remember { mutableStateOf(ModuleConfig.getBoolean("force_vip", false)) }
     var disableAIAvatar by remember { mutableStateOf(ModuleConfig.getBoolean("disable_ai_avatar", false)) }
+    var hideVirtualAvatar by remember { mutableStateOf(ModuleConfig.getBoolean("hide_virtual_avatar", false)) }
+    var hideSuperEmotion by remember { mutableStateOf(ModuleConfig.getBoolean("hide_super_emotion", false)) }
+    var hideQmateTitleIcon by remember { mutableStateOf(ModuleConfig.getBoolean("hide_qmate_title_icon", false)) }
+    var hideDressBeancurd by remember { mutableStateOf(ModuleConfig.getBoolean("hide_dress_beancurd", false)) }
+    var hideAioPet by remember { mutableStateOf(ModuleConfig.getBoolean("hide_aio_pet", false)) }
+    var apk1AsApk by remember { mutableStateOf(ModuleConfig.getBoolean("apk1_as_apk", false)) }
+    var disableAioLeftSwipe by remember { mutableStateOf(ModuleConfig.getBoolean("disable_aio_left_swipe", false)) }
+    var disableHomePullDown by remember { mutableStateOf(ModuleConfig.getBoolean("disable_home_pull_down", false)) }
     var removeRiskWebpage by remember { mutableStateOf(ModuleConfig.getBoolean("remove_risk_webpage", false)) }
     var disableWebSecurityCheck by remember { mutableStateOf(ModuleConfig.getBoolean("disable_web_security_check", false)) }
     var webJsAllowlistEnabled by remember { mutableStateOf(ModuleConfig.getBoolean("web_js_allowlist_enable", false)) }
@@ -542,7 +553,10 @@ fun HomeScreen(
             }
 
             AnimatedVisibility(visible = expandedPanel == 2) {
-                UpdateLogCard()
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    UpdateLogCard()
+                    HomeAdBanner()
+                }
             }
 
             AnimatedVisibility(visible = expandedPanel == 3) {
@@ -619,6 +633,14 @@ fun HomeScreen(
                             antiReport = antiReport,
                             forceVip = forceVip,
                             disableAIAvatar = disableAIAvatar,
+                            hideVirtualAvatar = hideVirtualAvatar,
+                            hideSuperEmotion = hideSuperEmotion,
+                            hideQmateTitleIcon = hideQmateTitleIcon,
+                            hideDressBeancurd = hideDressBeancurd,
+                            hideAioPet = hideAioPet,
+                            apk1AsApk = apk1AsApk,
+                            disableAioLeftSwipe = disableAioLeftSwipe,
+                            disableHomePullDown = disableHomePullDown,
                             removeRiskWebpage = removeRiskWebpage,
                             disableWebSecurityCheck = disableWebSecurityCheck,
                             webJsAllowlistEnabled = webJsAllowlistEnabled,
@@ -763,6 +785,56 @@ fun HomeScreen(
                                 disableAIAvatar = it
                                 Thread { ModuleConfig.putBoolean("disable_ai_avatar", it) }.start()
                             },
+                            onHideVirtualAvatarToggle = {
+                                hideVirtualAvatar = it
+                                Thread { ModuleConfig.putBoolean("hide_virtual_avatar", it) }.start()
+                                // 钩子只在启动时按配置安装
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
+                            },
+                            onHideSuperEmotionToggle = {
+                                hideSuperEmotion = it
+                                Thread { ModuleConfig.putBoolean("hide_super_emotion", it) }.start()
+                                // 钩子只在启动时按配置安装
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
+                            },
+                            onHideQmateTitleIconToggle = {
+                                if (!HideQmateTitleIcon.isSupported()) {
+                                    Toasts.toast("当前QQ版本不支持，需 9.3.30 及以上")
+                                } else {
+                                    hideQmateTitleIcon = it
+                                    Thread { ModuleConfig.putBoolean("hide_qmate_title_icon", it) }.start()
+                                    // 钩子只在启动时按配置安装
+                                    if (it) Toasts.toast("已开启，重启QQ后生效")
+                                }
+                            },
+                            onHideDressBeancurdToggle = {
+                                hideDressBeancurd = it
+                                Thread { ModuleConfig.putBoolean("hide_dress_beancurd", it) }.start()
+                            },
+                            onHideAioPetToggle = {
+                                if (!HideAioPet.isSupported()) {
+                                    Toasts.toast("当前QQ版本不支持，需 9.3.30 及以上")
+                                } else {
+                                    hideAioPet = it
+                                    Thread { ModuleConfig.putBoolean("hide_aio_pet", it) }.start()
+                                }
+                            },
+                            onApk1AsApkToggle = {
+                                apk1AsApk = it
+                                Thread { ModuleConfig.putBoolean("apk1_as_apk", it) }.start()
+                            },
+                            onDisableAioLeftSwipeToggle = {
+                                disableAioLeftSwipe = it
+                                Thread { ModuleConfig.putBoolean("disable_aio_left_swipe", it) }.start()
+                                // 钩子只在启动时按配置安装
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
+                            },
+                            onDisableHomePullDownToggle = {
+                                disableHomePullDown = it
+                                Thread { ModuleConfig.putBoolean("disable_home_pull_down", it) }.start()
+                                // 钩子只在启动时按配置安装
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
+                            },
                             onRemoveRiskWebpageToggle = {
                                 removeRiskWebpage = it
                                 Thread { ModuleConfig.putBoolean("remove_risk_webpage", it) }.start()
@@ -774,6 +846,8 @@ fun HomeScreen(
                             onWebJsAllowlistToggle = {
                                 webJsAllowlistEnabled = it
                                 Thread { ModuleConfig.putBoolean("web_js_allowlist_enable", it) }.start()
+                                // Hook 只在 QQ 启动时按开关安装，关闭状态不会介入宿主
+                                if (it) Toasts.toast("已开启，重启QQ后生效")
                             },
                             onWebJsAllowlistConfigClick = { showWebJsAllowlistDialog = true },
                             onDisableSecCheckToggle = {

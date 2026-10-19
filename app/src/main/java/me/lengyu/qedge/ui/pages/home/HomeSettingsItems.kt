@@ -19,6 +19,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -104,9 +105,15 @@ import androidx.compose.foundation.layout.Box as ComposeBox
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.CircularProgressIndicator
+import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.URL
 
@@ -372,7 +379,9 @@ internal fun SettingSwitchItem(
     subtitle: String? = null,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    enabled: Boolean = true,
+    unsupportedText: String? = null
 ) {
     val colors = QEdgeTheme.colors
     val rowTitle = homeRowTitle(title)
@@ -388,6 +397,7 @@ internal fun SettingSwitchItem(
                 if (onClick != null) Modifier.clickable(
                     interactionSource = remember { MutableInteractionSource() },
                     indication = null,
+                    enabled = enabled,
                     onClick = onClick
                 ) else Modifier
             )
@@ -395,20 +405,31 @@ internal fun SettingSwitchItem(
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                rowTitle,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Medium,
-                color = colors.textPrimary
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    rowTitle,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = if (enabled) colors.textPrimary else colors.textSecondary.copy(alpha = 0.5f)
+                )
+                if (unsupportedText != null) {
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        unsupportedText,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = colors.accentRed
+                    )
+                }
+            }
             Spacer(modifier = Modifier.height(2.dp))
             Text(
                 rowSubtitle,
                 fontSize = 12.sp,
-                color = colors.textSecondary
+                color = if (enabled) colors.textSecondary else colors.textSecondary.copy(alpha = 0.5f)
             )
         }
-        QEdgeSwitch(checked = checked, onCheckedChange = onCheckedChange)
+        QEdgeSwitch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
     }
 }
 
@@ -540,6 +561,190 @@ internal fun UpdateLogCard() {
                     fontSize = 14.sp,
                     color = colors.textSecondary,
                     lineHeight = 20.sp
+                )
+            }
+        }
+    }
+}
+
+/** 广告数据：接口字段两端可能带反引号，解析时已清洗 */
+private data class HomeAdItem(val title: String, val imageUrl: String, val linkUrl: String)
+
+private const val HOME_ADS_URL = "https://v.yuafeng.cn/QEdge/api/ads.php"
+private const val KEY_HOME_ADS_CACHE = "home_ads_cache"
+private const val KEY_HOME_ADS_CACHE_TIME = "home_ads_cache_time"
+private const val HOME_ADS_CACHE_TTL = 6 * 60 * 60 * 1000L
+private const val HOME_ADS_SWITCH_INTERVAL = 5000L
+
+/** 广告图片内存缓存，轮播回同一条时不再重复下载 */
+private val homeAdBitmapCache = HashMap<String, Bitmap>()
+
+private fun cleanAdUrl(raw: String?): String = raw.orEmpty().trim().trim('`').trim()
+
+private fun parseHomeAds(json: String): List<HomeAdItem> {
+    return try {
+        val data = org.json.JSONObject(json).optJSONArray("data") ?: return emptyList()
+        (0 until data.length()).mapNotNull { i ->
+            val item = data.optJSONObject(i) ?: return@mapNotNull null
+            val imageUrl = cleanAdUrl(item.optString("image_url"))
+            if (imageUrl.isEmpty()) return@mapNotNull null
+            HomeAdItem(
+                title = item.optString("title"),
+                imageUrl = imageUrl,
+                linkUrl = cleanAdUrl(item.optString("link_url"))
+            )
+        }
+    } catch (_: Throwable) {
+        emptyList()
+    }
+}
+
+private fun requestHomeAds(): String {
+    val connection = URL(HOME_ADS_URL).openConnection() as java.net.HttpURLConnection
+    connection.connectTimeout = 5000
+    connection.readTimeout = 5000
+    connection.requestMethod = "GET"
+    val reader = java.io.BufferedReader(java.io.InputStreamReader(connection.inputStream, "UTF-8"))
+    val response = StringBuilder()
+    var line: String?
+    while (reader.readLine().also { line = it } != null) {
+        response.append(line)
+    }
+    reader.close()
+    connection.disconnect()
+    return response.toString()
+}
+
+/** 更新日志面板下方的广告位：单条轮播，缓存优先，点击跳浏览器 */
+@Composable
+internal fun HomeAdBanner() {
+    val colors = QEdgeTheme.colors
+    val context = LocalContext.current
+    var ads by remember { mutableStateOf(emptyList<HomeAdItem>()) }
+    var index by remember { mutableIntStateOf(0) }
+    var bitmap by remember { mutableStateOf<Bitmap?>(null) }
+    var imageLoading by remember { mutableStateOf(true) }
+
+    LaunchedEffect(Unit) {
+        val cachedJson = ModuleConfig.getString(KEY_HOME_ADS_CACHE, "")
+        val cachedTime = ModuleConfig.getLong(KEY_HOME_ADS_CACHE_TIME, 0L)
+        val age = System.currentTimeMillis() - cachedTime
+        if (cachedJson.isNotEmpty() && age >= 0 && age < HOME_ADS_CACHE_TTL) {
+            ads = parseHomeAds(cachedJson)
+        }
+        if (ads.isEmpty()) {
+            ads = withContext(Dispatchers.IO) {
+                try {
+                    val raw = requestHomeAds()
+                    val list = parseHomeAds(raw)
+                    if (list.isNotEmpty()) {
+                        ModuleConfig.putString(KEY_HOME_ADS_CACHE, raw)
+                        ModuleConfig.putLong(KEY_HOME_ADS_CACHE_TIME, System.currentTimeMillis())
+                    }
+                    list
+                } catch (_: Throwable) {
+                    emptyList()
+                }
+            }
+        }
+    }
+
+    val currentAd = ads.getOrNull(index)
+
+    LaunchedEffect(currentAd?.imageUrl) {
+        val ad = currentAd ?: return@LaunchedEffect
+        homeAdBitmapCache[ad.imageUrl]?.let {
+            bitmap = it
+            imageLoading = false
+            return@LaunchedEffect
+        }
+        bitmap = null
+        imageLoading = true
+        val loaded = withContext(Dispatchers.IO) {
+            try {
+                val connection = URL(ad.imageUrl).openConnection()
+                connection.connectTimeout = 10000
+                connection.readTimeout = 10000
+                BitmapFactory.decodeStream(connection.getInputStream())
+            } catch (_: Throwable) {
+                null
+            }
+        }
+        if (loaded != null) homeAdBitmapCache[ad.imageUrl] = loaded
+        bitmap = loaded
+        imageLoading = false
+    }
+
+    LaunchedEffect(ads.size) {
+        index = 0
+        if (ads.size <= 1) return@LaunchedEffect
+        while (true) {
+            delay(HOME_ADS_SWITCH_INTERVAL)
+            index = (index + 1) % ads.size
+        }
+    }
+
+    if (currentAd == null) return
+
+    QEdgeCard(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        glass = true
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .clickable {
+                    if (currentAd.linkUrl.isNotEmpty()) {
+                        try {
+                            context.startActivity(
+                                Intent(Intent.ACTION_VIEW, Uri.parse(currentAd.linkUrl))
+                                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            )
+                        } catch (_: Throwable) {
+                        }
+                    }
+                }
+        ) {
+            val bannerShape = RoundedCornerShape(12.dp)
+            val bannerModifier = Modifier
+                .fillMaxWidth()
+                .aspectRatio(16f / 9f)
+                .clip(bannerShape)
+            val image = bitmap
+            if (image != null) {
+                Image(
+                    bitmap = image.asImageBitmap(),
+                    contentDescription = currentAd.title,
+                    contentScale = ContentScale.Crop,
+                    modifier = bannerModifier
+                )
+            } else {
+                Box(
+                    modifier = bannerModifier.background(colors.textSecondary.copy(alpha = 0.08f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (imageLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(28.dp),
+                            color = AccentBlue
+                        )
+                    }
+                }
+            }
+            if (currentAd.title.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    currentAd.title,
+                    modifier = Modifier.padding(horizontal = 2.dp),
+                    fontSize = 17.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = colors.textPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }

@@ -46,6 +46,11 @@ import me.lengyu.qedge.hook.item.AntiQfixPatch;
 import me.lengyu.qedge.hook.item.AntiReport;
 import me.lengyu.qedge.hook.item.ForceVip;
 import me.lengyu.qedge.hook.item.DisableAIAvatar;
+import me.lengyu.qedge.hook.item.HideVirtualAvatar;
+import me.lengyu.qedge.hook.item.HideSuperEmotion;
+import me.lengyu.qedge.hook.item.HideQmateTitleIcon;
+import me.lengyu.qedge.hook.item.DisableAioLeftSwipe;
+import me.lengyu.qedge.hook.item.DisableHomePullDown;
 import me.lengyu.qedge.hook.item.CopyArkMessage;
 import me.lengyu.qedge.hook.item.LongClickSendCard;
 import me.lengyu.qedge.hook.item.RepeatMsg;
@@ -68,6 +73,9 @@ import me.lengyu.qedge.hook.item.ForceInputNoLimit;
 import me.lengyu.qedge.hook.item.ForceFullScreenBtnShow;
 import me.lengyu.qedge.hook.item.WebJsBridgeAllowlist;
 import me.lengyu.qedge.hook.item.NativeEmotionDownload;
+import me.lengyu.qedge.hook.item.HideDressBeancurd;
+import me.lengyu.qedge.hook.item.HideAioPet;
+import me.lengyu.qedge.hook.item.Apk1AsApk;
 
 import java.util.List;
 /**
@@ -118,6 +126,11 @@ public class MainHook {
         HookRegistry.register(AntiReport.INSTANCE);
         HookRegistry.register(ForceVip.INSTANCE);
         HookRegistry.register(DisableAIAvatar.INSTANCE);
+        HookRegistry.register(HideVirtualAvatar.INSTANCE);
+        HookRegistry.register(HideSuperEmotion.INSTANCE);
+        HookRegistry.register(HideQmateTitleIcon.INSTANCE);
+        HookRegistry.register(DisableAioLeftSwipe.INSTANCE);
+        HookRegistry.register(DisableHomePullDown.INSTANCE);
         HookRegistry.register(BypassProfileBan.INSTANCE);
         HookRegistry.register(ForceSpeaker.INSTANCE);
         HookRegistry.register(DisableWebSecurityCheck.INSTANCE);
@@ -127,6 +140,9 @@ public class MainHook {
         HookRegistry.register(ForceFullScreenBtnShow.INSTANCE);
         HookRegistry.register(WebJsBridgeAllowlist.INSTANCE);
         HookRegistry.register(NativeEmotionDownload.INSTANCE);
+        HookRegistry.register(HideDressBeancurd.INSTANCE);
+        HookRegistry.register(HideAioPet.INSTANCE);
+        HookRegistry.register(Apk1AsApk.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;
@@ -303,7 +319,8 @@ public class MainHook {
             if (currentUin != null && !currentUin.isEmpty()) {
                 ModuleConfig.INSTANCE.putString("currentUin", currentUin);
                 ModuleConfig.INSTANCE.putString("heartbeat_current_uin", currentUin);
-            } else {
+            } else if (HeartbeatManager.isMainProcess()) {
+                // 子进程（:tool / :MSF 等）本来就读不到账号，不再刷这条警告
                 LogUtils.w("onAccountChanged", "currentUin is null or empty, skip saving to config.");
             }
             processDataForCurrent("init");
@@ -328,6 +345,10 @@ public class MainHook {
      * 避免首个心跳要空转满一整个 10 分钟周期。
      */
     private static void retryHeartbeatUntilLoggedIn(int attempt) {
+        // 子进程拿不到账号，重试只会白跑 8 轮并刷日志；心跳统一由主进程负责
+        if (!HeartbeatManager.isMainProcess()) {
+            return;
+        }
         // getCurrentUin() 会把空结果也缓存下来，重试前必须先 reset，否则会一直读到旧的空值
         QQCurrentEnv.reset();
         String currentUin = QQCurrentEnv.getCurrentUin();

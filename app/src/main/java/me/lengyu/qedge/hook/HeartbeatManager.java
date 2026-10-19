@@ -36,12 +36,19 @@ public class HeartbeatManager {
 
     private static final String API_URL = "https://v.yuafeng.cn/QEdge/heartbeat/index.php";
     private static final long HEARTBEAT_INTERVAL = 600000;
+    /** 心跳网络失败后的重试间隔与次数上限，避免启动瞬间网络未就绪时要空等一整个周期。 */
+    private static final long HEARTBEAT_RETRY_DELAY = 30000;
+    private static final int HEARTBEAT_MAX_RETRY = 2;
 
     private static HeartbeatManager instance;
     private static volatile boolean isBanned = false;
 
     private volatile Timer heartbeatTimer;
     private String lastInitialPassword;
+
+    /** 连续失败的重试计数，收到成功响应后清零。仅由 Timer 线程与 startHeartbeat 访问。 */
+    private int retryAttempt;
+    private boolean retryScheduled;
 
     private HeartbeatManager() {
     }
@@ -58,13 +65,28 @@ public class HeartbeatManager {
     }
 
     public synchronized void startHeartbeat() {
+        // 心跳只在主进程运行：子进程（:tool / :MSF / :qzone 等）的 AppRuntime 不是 AppInterface，
+        // 既取不到 UIN，又会重复发送同一个账号的心跳。进程名取不到时按主进程处理，避免误伤。
+        if (!isMainProcess()) {
+            return;
+        }
+        // Timer 已在运行：多路账号回调只需要补发一次，不能 stop/重建，否则 30 秒内会重复打多条启动日志
+        if (heartbeatTimer != null) {
+            try {
+                heartbeatTimer.schedule(new TimerTask() {
+                    @Override
+                    public void run() {
+                        sendHeartbeat();
+                    }
+                }, 0);
+            } catch (IllegalStateException ignored) {
+                // Timer 已被 cancel，交给下次调用重建
+            }
+            return;
+        }
         stopHeartbeat();
-
-        // 启动留痕：此前心跳从启动到发送全程无日志，无法判断上游是否调用过来，这里补一条生命周期日志
-        LogUtils.i("HeartbeatManager", "startHeartbeat: 心跳已启动"
-                + " | qq=" + HostInfo.versionName
-                + " | module=" + HostInfo.moduleVersionName
-                + " | interval=" + HEARTBEAT_INTERVAL + "ms");
+        retryAttempt = 0;
+        retryScheduled = false;
 
         heartbeatTimer = new Timer("QEdge_Heartbeat");
         heartbeatTimer.scheduleAtFixedRate(new TimerTask() {
@@ -82,6 +104,51 @@ public class HeartbeatManager {
         }
     }
 
+    /** 当前是否宿主主进程。进程名未知时按主进程处理，避免因拿不到进程名导致心跳完全不启动。 */
+    public static boolean isMainProcess() {
+        String pkg = HostInfo.packageName;
+        String proc = HostInfo.processName;
+        if (pkg == null || pkg.isEmpty() || proc == null || proc.isEmpty()) {
+            return true;
+        }
+        return pkg.equals(proc);
+    }
+
+    /**
+     * 网络失败后在当前 Timer 上补发一次心跳。
+     * 连续失败最多重试 {@link #HEARTBEAT_MAX_RETRY} 次，之后回到 10 分钟的正常周期，避免网络长期不可用时死循环。
+     */
+    private synchronized void scheduleRetry() {
+        if (retryScheduled || retryAttempt >= HEARTBEAT_MAX_RETRY) {
+            return;
+        }
+        Timer timer = heartbeatTimer;
+        if (timer == null) {
+            return;
+        }
+        retryAttempt++;
+        retryScheduled = true;
+        try {
+            timer.schedule(new TimerTask() {
+                @Override
+                public void run() {
+                    synchronized (HeartbeatManager.this) {
+                        retryScheduled = false;
+                    }
+                    sendHeartbeat();
+                }
+            }, HEARTBEAT_RETRY_DELAY);
+        } catch (IllegalStateException e) {
+            retryScheduled = false;
+        }
+    }
+
+    /** 心跳成功：清空失败计数，允许下一轮网络故障重新快速重试。 */
+    private synchronized void clearRetry() {
+        retryAttempt = 0;
+        retryScheduled = false;
+    }
+
     private void sendHeartbeat() {
         long start = System.currentTimeMillis();
         String currentUin = null;
@@ -89,8 +156,12 @@ public class HeartbeatManager {
 
         try {
             try {
-                AppInterface app = (AppInterface) BaseApplicationImpl.getApplication().peekAppRuntime();
-                if (app != null) {
+                // 只有主进程的 Runtime 是 AppInterface；:tool / :MSF 等子进程拿到的是
+                // ToolAppRuntime / QzoneMainRuntime / ToolRuntimePeak / WadlRuntime，
+                // 强转会抛 ClassCastException，这里先判断类型，避免每次心跳都刷一条异常日志。
+                Object runtime = BaseApplicationImpl.getApplication().peekAppRuntime();
+                if (runtime instanceof AppInterface) {
+                    AppInterface app = (AppInterface) runtime;
                     currentUin = app.getCurrentAccountUin();
                     if (currentUin != null && !currentUin.isEmpty()) {
                         uinSource = "host";
@@ -101,7 +172,9 @@ public class HeartbeatManager {
             }
 
             if (currentUin == null || currentUin.isEmpty()) {
-                currentUin = ModuleConfig.INSTANCE.getString("heartbeat_current_uin", null);
+                // defaultValue 不能传 null：ModuleConfig.getString 的第二个参数是 Kotlin 非空 String，
+                // Java 传 null 会在方法入口直接抛 NullPointerException，导致下面的"未取到 UIN"分支永远走不到。
+                currentUin = ModuleConfig.INSTANCE.getString("heartbeat_current_uin", "");
                 if (currentUin != null && !currentUin.isEmpty()) {
                     uinSource = "config";
                 }
@@ -196,6 +269,7 @@ public class HeartbeatManager {
             }
 
             // 请求成功：不输出日志
+            clearRetry();
             parseResponse(response, uin);
         } catch (IOException e) {
             LogUtils.e("HeartbeatManager", "心跳失败：网络异常"
@@ -206,6 +280,8 @@ public class HeartbeatManager {
                     + " | 耗时=" + (System.currentTimeMillis() - start) + "ms"
                     + " | 原因=" + e.getClass().getSimpleName() + ": " + e.getMessage());
             LogUtils.e("HeartbeatManager", e);
+            // 进程刚启动时网络可能还没就绪，等 10 分钟太久，这里快速补发
+            scheduleRetry();
         } finally {
             if (connection != null) {
                 connection.disconnect();

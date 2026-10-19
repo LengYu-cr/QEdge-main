@@ -61,7 +61,7 @@ QEdge/
 │       ├── bsh/                             # BeanShell 解释器（Java 插件引擎，含内嵌 org.objectweb.asm）
 │       ├── com/liquidglass/java/miba/       # LiquidGlass 液态玻璃组件源码
 │       └── me/lengyu/qedge/
-│           ├── coldrain/                    # 冷雨机器人核心（22 功能）
+│           ├── coldrain/                    # 冷雨机器人核心（21 功能策略 + 菜单）
 │           │   ├── ColdRainCore.java / ColdRainFeature.java
 │           │   └── features/                # 各功能策略（At/群管/签到/天气/解析/...）
 │           ├── hook/                        # Hook 系统
@@ -69,7 +69,7 @@ QEdge/
 │           │   ├── annotation/  # HookItemAnnotation / HookCategory
 │           │   ├── api/         # 事件分发（OnReceiveMsg/OnSendMsg/OnMenuBuild/...）
 │           │   ├── base/        # 基类 + HookRegistry 注册中心
-│           │   ├── item/        # 功能项（防撤回/闪照破解/保活/复读/...34 项）
+│           │   ├── item/        # 功能项（防撤回/闪照破解/保活/复读/...46 项）
 │           │   ├── entry/       # QQPlusInject / QQSettingInject（设置入口劫持）
 │           │   ├── kk/          # KK键盘
 │           │   ├── kugou/       # 酷狗音乐（大字版 / 概念版）
@@ -170,8 +170,11 @@ XposedEntry.handleLoadPackage()    -- 按包名分流（32 位设备直接拒绝
     |       │       -> hookApplicationOnCreate(realClassLoader)
     |       └─ BaseApplicationImpl.onCreate 回调（initialized CAS 保证仅一次）:
     |               HostInfo.init() + Parasitics.initForStubActivity()
-    |               ├─ 缓存有效(DexKitCache.initCache() && validateAllTasks())? 是 -> MainHook.loadHook()
-    |               │                                               否 -> DexKitFinder.doFind() -> 显示查找弹窗
+    |               ├─ DexKitCache.initCache() -> MainHook.registerHookItems()
+    |               │       （必须先注册：expectedKeys() 从 HookRegistry 收集任务，
+    |               │         否则新增 DexKitTask 的 key 不参与校验，缓存缺项会被误判为完整）
+    |               ├─ 缓存有效(validateAllTasks())? 是 -> MainHook.loadHook()
+    |               │                              否 -> DexKitFinder.doFind() -> 显示查找弹窗
     |               └─ MainHook.loadHook():
     |                   ├─ ConfigWarmup              异步预热 JsonConfigUtils 类初始化
     |                   ├─ HeartbeatManager.isBanned() 封禁检查
@@ -244,7 +247,7 @@ Hook 加载调度中心。
 
 | 函数 | 说明 |
 |------|------|
-| `registerHookItems()` | 静态注册 47 个 BaseHookItem 到 HookRegistry（9 个 API 项 + 38 个其它项），见 [MainHook.java#L79-L127](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/MainHook.java#L79-L127) |
+| `registerHookItems()` | 静态注册 56 个 BaseHookItem 到 HookRegistry，见 [MainHook.java#L89-L146](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/MainHook.java#L89-L146) |
 | `loadHook()` | 主入口：ConfigWarmup 预热 -> 检查封禁 -> 注册 -> 服务消息分发 -> 加载 API Hook -> 初始化开关 Hook -> 账号切换 -> 3s 加载 ChatSettingLoader/MediaPanelLoader -> 5s 插件+冷雨 |
 | `loadApiHook()` | 遍历所有 BaseApiHookItem，`isInTargetProcess()` 则 `loadHook()` |
 | `initSwitchHookItem()` | 遍历所有 BaseSwitchHookItem，读取配置启用/禁用 |
@@ -282,7 +285,8 @@ BaseHookItem
 │   ├── DisableSecCheck / DisableWebSecurityCheck  // 安全校验拦截 / 网页安全 OCR 拦截
 │   ├── ForceModuleToast / ForceInputNoLimit       // 强制模块 Toast / 输入无限制
 │   ├── ForceFullScreenBtnShow                     // 强制显示全屏按钮
-│   └── SplitScreenScan                            // 分屏允许扫码
+│   ├── SplitScreenScan                            // 分屏允许扫码
+│   └── NativeEmotionDownload                      // 原生表情包下载（QQ 专属，DexKit 定位）
 │
 ├── BaseSwitchHookItem                      // 开关型 Hook（UI 开关控制）
 │   ├── KeepAliveHook / PreventRecall / RepeatMsg  // 保活 / 防撤回 / 复读
@@ -293,6 +297,11 @@ BaseHookItem
 │   ├── VoiceSpeed / ImageRatioOverride            // 语音倍速 / 篡改图片比例
 │   ├── ImageSummary / EmotionAiTag                // 图片外显自定义 / 表情包 AI 标签
 │   ├── ForceSpeaker                               // 语音消息强制免提
+│   ├── HideVirtualAvatar / HideSuperEmotion       // 表情面板移除虚拟形象 / 超级表情页签
+│   ├── HideQmateTitleIcon                         // 隐藏好友单聊标题栏合养秋秋人入口
+│   ├── HideDressBeancurd / HideAioPet             // 隐藏好友装扮豆腐块 / 屏蔽聊天页 Q宠
+│   ├── DisableAioLeftSwipe / DisableHomePullDown  // 禁用聊天页左滑 / 禁用首页下拉小程序
+│   ├── Apk1AsApk                                 // .apk.1 归一化为 APK
 │   ├── WebJsBridgeAllowlist                       // 浏览器 JS 接口放行
 │   └── ...
 │
@@ -529,6 +538,65 @@ OnReceiveMsg.INSTANCE.registerListener(msgRecord -> { ... });
 
 两个闸口的第一个参数均为页面 URL；`isAllowlisted` 先取 host（含 `://` 时用 `URI.host`），按「域名相等或 `.后缀` 结尾」匹配，见 [WebJsBridgeAllowlist.kt#L87-L106](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/WebJsBridgeAllowlist.kt#L87-L106)。
 
+#### 5.5.15 表情面板与标题栏精简
+
+| 功能 | 类 | 配置键 | Hook 点 | 说明 |
+|------|------|------|------|------|
+| 屏蔽虚拟形象 | `HideVirtualAvatar` | `hide_virtual_avatar` | `BasePanelView.filterPanelDataListInLiveChannel`（after）+ `EmoticonTabAdapter.updateData`（before） | 数据层移除 `EmotionPanelInfo.type == 22` 的页签，页签与 ViewPager 一起消失；无 `filterPanelDataListInLiveChannel` 的老版本回退 Hook `initTabView`。`onInit()` = `HostInfo.isQQ` |
+| 移除超级表情 | `HideSuperEmotion` | `hide_super_emotion` | `BasePanelView.filterPanelDataListInLiveChannel`（before 重置标记 / after 删条目）+ `EmoticonTabAdapter.updateData`（before）+ `EmotionPanelViewPagerAdapter.getItemPosition`（after 返回 `POSITION_NONE`） | 移除 `type == 19` 的页签（收藏左侧）；与虚拟形象共用同一面板，Hook 点重叠 |
+| 隐藏合养秋秋人入口 | `HideQmateTitleIcon` | `hide_qmate_title_icon` | `QmateEntryIconManager` 的 `(Z)V` / `(ImageView, ?)V` 方法（before 置空）+ `Right3IvData` 构造函数（`type == "4"` 时改 `visiable=false`） | `showQmateIcon` 即使 `visiable=false` 仍会执行 clickAction 把图标 `setVisibility(VISIBLE)`，必须从源头拦截；QQ < 9.3.70 时 `isApplicable()` 返回 false |
+
+三者均声明 `process = "Main"`：表情面板与标题栏只在宿主主进程渲染，子进程（`:MSF` / `:qzone` / `:tool` 等）不再加载 `BasePanelView` / `EmoticonTabAdapter` / Qmate 类并安装永不触发的 Hook。`HideVirtualAvatar` 与 `HideQmateTitleIcon` 通过 `onInit()` 收窄为 QQ 专属（TIM 下跳过）。
+
+**删除页签的两处坑**（[HideSuperEmotion.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/item/HideSuperEmotion.kt) 已处理）：
+
+1. **ViewPager 页面不会跟着重排**。`EmotionPanelViewPagerAdapter.instantiateItem` 只在返回 `EmotionPanelListView` 时 `setTag(info)`；Z-plan（type 0x13）/ 动画贴纸（type 0x15，即超级表情页）走 `getZPlanEmoticonLayout` / `getSystemSmallEmoticonRelativeLayout` 分支返回外层 `RelativeLayout`，**没有 tag**，于是 `getItemPosition` 落到 `PagerAdapter` 默认实现返回 `POSITION_UNCHANGED`。删条目后索引整体前移，旧超级表情页原地不动正好顶到「收藏」页签位置 —— 表现为「页签没了、收藏页却是超级表情、收藏表情发不出去」。修复：在本轮确实删过条目时（`filterPanelDataListInLiveChannel` before 重置标记、after 置位）让 `getItemPosition` 返回 `POSITION_NONE(-2)`，强制按新列表重建页面；未删条目的轮次仍走原方法，保留 ViewPager 页面复用。
+2. **`type` 字段不能跨类共用缓存**。`tabType()` 同时接收 `EmotionPanelInfo`（面板项）与 `EmoticonTabAdapter$EmoticonTabItem`（页签项），共用一个缓存 `Field` 时其中一方的 `getInt` 会因声明类不匹配抛异常被吞成 -1，导致过滤静默失效；现改为 `XposedHelpers.getIntField(item, "type")` 按实例取字段。
+
+`onHook()` 内不再前置 `if (!isEnabled()) return`：钩子无条件安装、开关在回调内判断，进程启动后才打开开关也能立即生效，无需重启宿主。
+
+**官方隐藏流程对照**：`BasePanelModel.hideItemByType` 除 `removeAt` 外还会调 `EmoticonStoreTabEntryUtils.removeDisSelectedDataByType(helper.getFrontDisSelectedDataList(), type)` 清理未选中页签排序数据；本模块当前未同步这一步（仅在 `panelDataList` 层删除并重建 ViewPager）。
+
+性能约束落实：
+- `EmotionPanelInfo.type` 取值只做一次 `XposedHelpers.getIntField`，不循环按名反射；
+- `filterTabItems` 先扫描是否命中目标页签，未命中直接返回，命中才复制列表；
+- `HideQmateTitleIcon` / `DisableAioLeftSwipe` 的开关在 `onHook()` 时快照为 `@Volatile enabled` 字段（UI 提示「重启 QQ 后生效」），高频回调不再读配置文件。
+
+#### 5.5.16 APK.1 识别为安装包 `Apk1AsApk`
+
+**配置**：`apk1_as_apk`，默认关闭，UI 位于「QQ净化」卡片。
+
+**问题**：别人通过 QQ 发来的 APK 会被宿主自动改成 `xxx.apk.1`；落到本地时若同目录已有同名文件，还会再插一段重名序号（**带前导空格**），变成 `xxx.apk (1).1` / `xxx.apk (2).1`。两者最后一个点后面的扩展名都是 `1`，文件不再被识别为安装包，既不显示 APK 图标也无法安装。
+
+**实现**：聊天页那条链路的目标类在 `com.tencent.qqnt.aio.element.file.util` 包下且**整体被混淆**（类名、方法名随版本变），因此不使用任何硬编码类名/方法名：DexKit 按「包名 + 类内字符串特征（`.apk.rename` / `.rename` / `[0-9]*`）」`FindClass` 定位类（key `Apk1AsApk->aio_file_util`），再在该类里按「静态、入参 `String`、返回 `String`」取「文件名 -> 扩展名」方法并 Hook 入参做归一化。DexKit 未命中时只记录日志跳过，不安装该条钩子。
+
+文件管理器侧再 Hook `FileUtilImpl.getExtension` 与 `FileUtils.getExtension`（属未混淆的公开类，按类名 + 方法名即可）统一返回 `.apk`。
+
+正则 `(?i)^(.*)\.apk((?:\s*\(\d+\))*)(\.\d+)(\.rename)?$`，分组 1 = 主体，2 = 重名序号 `(n)`（可无、可多段，QQ 落盘时前面会带空格），3 = QQ 的 `.1` 保护后缀，4 = `.rename`。归一化规则（重名序号里的空格会被去掉）：
+
+| 原文件名 | 归一化结果 |
+|------|------|
+| `xxx.apk.1` | `xxx.apk` |
+| `xxx.apk (1).1` | `xxx(1).apk` |
+| `xxx.apk (2).1.rename` | `xxx(2).apk.rename` |
+| `xxx.apk` | 不匹配，不动 |
+| `xxx.apk .1` / `notes.apk.bak` | 不匹配，不动 |
+
+重名序号必须挪到 `.apk` 之前（`xxx(1).apk`），否则名字仍不是以 `.apk` 结尾、装不上。`.rename` 段原样保留不破坏 QQ 的改名保护。文件管理器侧的扩展名映射表本就含 `.apk` -> 类型 5，扩展名归一化后自然按 APK 显示。
+
+**已知限制**：聊天页卡片标题显示的是发送方的 `FileElement.fileName`（`xxx.apk.1`），而本地落盘的才是 `xxx.apk (1).1`；本功能只归一化「用于判类型/扩展名」的字符串，不改物理文件名与卡片标题，因此两者会不一致，不影响识别为安装包。
+
+#### 5.5.17 QQ 净化类（左滑 / 首页下拉 / Q宠 / 装扮豆腐块）
+
+| 功能 | 类 | 配置键 | Hook 点 | 说明 |
+|------|------|------|------|------|
+| 禁用聊天页左滑 | `DisableAioLeftSwipe` | `disable_aio_left_swipe` | `com.tencent.aio.frame.drawer.DrawerFrameViewGroup` 的滑动判定方法（before，`xDetail < 0` 时返回 false） | 按「参数 `(float, String)`、返回 boolean」运行时定位混淆方法；只拦左滑（露出群应用 / 聊天关系右帧），右滑关闭抽屉与纵向滚动不受影响 |
+| 禁用首页下拉小程序 | `DisableHomePullDown` | `disable_home_pull_down` | 下拉头/进度方法的 `(float)` 参数判定（before） | 保留短距离下拉刷新，长距离下拉不再呼出小程序面板；`onInit()` = `HostInfo.isQQ` |
+| 屏蔽聊天页 Q宠 | `HideAioPet` | `hide_aio_pet` | `TabPetController#createMainFrameQQPet`（`(Activity,int)V`，before 返回 null）+ `com.tencent.mobileqq.qqpet.aio` 下 `AIOPetVB` 的 `doInitC2CPetView`（静态 6 参、首参自身、次参 FragmentActivity，before 返回 null） | 两条创建路径都拦截，聊天页不再出现贴边 Q宠，也没有双击进入 Adelie 的入口；QQ < 9.3.30 时 `isApplicable()` 返回 false |
+| 隐藏好友装扮提示 | `HideDressBeancurd` | `hide_dress_beancurd` | `com.tencent.mobileqq.aio.msglist.msgprocessor` 下豆腐块过滤器（after 从结果列表移除装扮项） | DexKit 按「入参/返回都是 List + 方法体调用 `IAIOTofuApi.isTheTofuNeedFiltered`」定位；判定依据 `beancurstyle == 8` / `busiid == 17` / 文案含「装扮/气泡/字体/背景」兜底 |
+
+后三者（Q宠 / 装扮豆腐块 / 首页下拉）与 `NativeEmotionDownload` 均按 `HostInfo.isQQ` 收窄：TIM 下不参与 DexKit 查找也不安装钩子。
+
 ---
 
 ## 6. DexKit 动态查找
@@ -588,9 +656,9 @@ DexKit 原生库加载管理器：解决 Hook 运行在宿主寄生 ClassLoader 
 
 ### 7.1 架构
 
-[ColdRainCore.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainCore.java) 采用**单例 + 策略模式**，维护 `Map<String, ColdRainFeature>` 功能策略表（22 个功能），每个功能实现 `shouldHandle(msgData)` + `handle(msgData, core)` 接口。
+[ColdRainCore.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainCore.java) 采用**单例 + 策略模式**，`registerFeatures()` 维护 `Map<String, ColdRainFeature>` 功能策略表（21 个 `feature_*` 策略，见 [ColdRainCore.java#L406-L427](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/ColdRainCore.java#L406-L427)），每个功能实现 `shouldHandle(msgData)` + `handle(msgData, core)` 接口。
 
-功能包括：状态查询、菜单、问答、签到、群管、禁言检测、视频/音乐/图片解析、天气、整点报时、头衔、点赞、自动上管、头像菜单、进退群欢迎、黑白名单等。
+功能包括：状态查询、问答、签到、群管、黑名单、进退群欢迎、禁言检测、查询、视频解析、图片/视频菜单、音乐菜单、图片、天气、整点报时、头衔、点赞、自动上管、头像菜单、@ 等；「菜单」由 `MenuFeature` 在 `handleMessage` 中单独处理，不占 `feature_*` 键。
 
 ### 7.2 消息处理流水线
 
@@ -658,6 +726,46 @@ handleMessage(msgRecord)
     │           会话过期(ec=70000) -> 重新艾特管家
     └─ 任何失败 -> 回退为纯文本发送
 ```
+
+### 7.7 音乐点歌与音质 `MusicMenuFeature`
+
+实现位于 [MusicMenuFeature.java](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/coldrain/features/MusicMenuFeature.java)，`feature_music` 策略。
+
+**两条接口通道**：
+
+| 常量 | 地址 | 用途 |
+|------|------|------|
+| `MY_WEB` | `https://api.yuafeng.cn/API/ly/` | 旧通道：抖音点歌、逆天语音、随机音乐/随机网易、坤坤音乐等 |
+| `API_V1` | `https://v.yuafeng.cn/QEdge/api/internal/` | 赞助通道：QQ / 网易云 / 酷狗 / 酷我 / 咪咕 / 汽水点歌，请求统一追加 `sponsorParam()` |
+
+**点歌指令**（均为 `前缀+关键词`，触发条件见 `shouldHandle`）：
+
+| 指令 | 平台 | 音质可配 |
+|------|------|:--:|
+| `点歌` | QQ（默认通道） | ✅ |
+| `QQ点歌` / `网易点歌` / `酷狗点歌` / `酷我点歌` / `咪咕点歌` | 对应平台 | ✅ |
+| `汽水点歌` | 汽水（`qsmusic.php`） | ❌ |
+| `抖音点歌` | 抖音（旧通道，原名「汽水点歌」已更正） | ❌ |
+
+另有 `随机音乐` / `随机网易` / `逆天语音` / `坤坤音乐` / `取消点歌` / `切换卡片·语音·链接·文件·下载·空间·播放点歌`。
+
+**音质配置**：`QUALITY_ALIAS`（平台别名 -> key）/ `QUALITY_NAME` / `QUALITY_TABLE`（音质值 -> 说明）/ `QUALITY_DEFAULT`。
+
+| 平台 key | 档位示例 |
+|----------|----------|
+| `qq` | OGG 96k~640k、臻品全景声 3.0、M4A、MP3 128k/320k、试听片段、无损 FLAC、Hi-Res、臻品母带、全景声 1.0/2.0 |
+| `wy` | standard / higher / exhigh / lossless / hires / jyeffect / dolby / jymaster |
+| `kg` | 128 / 320 / flac / hires |
+| `kw` | 100kogg / 192kogg / 300kogg / 48kaac / 128kmp3 / 320kmp3 / 2000kflac / 20900kmflac（未设置时默认 `320kmp3`，保持原行为） |
+| `mg` | 128k / 320k / flac / flac24bit / hires / atmos / master |
+
+- 指令：`设置(QQ|网易|酷狗|酷我|咪咕)音质<值>` / `查看(QQ|网易|酷狗|酷我|咪咕)音质列表`。触发条件放宽为「以 `设置`/`查看` 开头且包含『音质』」，不再要求出现「音质列表」字样。
+- 未主动设置时不追加 `type` 参数（仅酷我保留原默认 `320kmp3`），即沿用接口默认音质。
+- 配置按聊天维度存储：`<CurrentDir>/data/<群号>音质.txt`（JSON）。
+
+**赞助密钥**：发送 `配置赞助密钥xxxxx`（密钥到用户后台申请，赞助 20）写入 `<CurrentDir>/data/sponsor_key.txt`，静态缓存；`sponsorParam()` 为 `API_V1` 的全部请求追加 `sponsor_key=xxxx`。仅 `v.yuafeng.cn` 通道需要该参数，`api.yuafeng.cn` 通道不受影响。
+
+**汽水 / 抖音**无音质档位，收到相关音质指令时明确回复不支持。
 
 ---
 
@@ -790,7 +898,7 @@ ui/
 
 头像 URL：`https://q.qlogo.cn/headimg_dl?dst_uin=<uin>&spec=100&img_type=png`，以 `ARGB_8888` 解码（见 [HomeScreen.kt#L347-L364](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/HomeScreen.kt#L347-L364)）；`UserInfoCard` 头像容器仅在头像未加载时铺底色、已加载时透明（见 [HomeUserCards.kt#L156-L188](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeUserCards.kt#L156-L188)）。
 
-首页功能区（[HomeSettingsPage.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeSettingsPage.kt)）按卡片分组，顺序：电脑代挂(`hangup`) → QQ空间(`card_qzone`) → 聊天功能(`card_chat`) → 资料卡(`card_profile`) → 等级加速(`card_level`) → 应用保活(`card_keepalive`) → 基础配置(`card_system`) → 模块配置(`card_module_config`)。`card_module_config` 卡片（`ModuleConfigCard`，[HomeSettingsPage.kt#L748-L861](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeSettingsPage.kt#L748-L861)）展示 DexKit 缓存 `已就绪 / 总数` 与逐条缺失项（缺失标红 `accentRed`、全部就绪 `accentGreen`），并提供「重建 DexKit 缓存」点击行，点击调用 `DexKitFinder.refind`。文案常量 `CARD_MODULE_CONFIG` / `REBUILD_DEXKIT_CACHE` 见 [HomeRowText.kt#L210-L216](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeRowText.kt#L210-L216)。
+首页功能区（[HomeSettingsPage.kt](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeSettingsPage.kt)）按卡片分组，顺序：电脑代挂(`hangup`) → QQ空间(`card_qzone`) → 聊天功能(`card_chat`) → 资料卡(`card_profile`) → 等级加速(`card_level`) → 应用保活(`card_keepalive`) → QQ净化(`card_purify`) → 基础配置(`card_system`) → 模块配置(`card_module_config`)。`card_module_config` 卡片（`ModuleConfigCard`，[HomeSettingsPage.kt#L748-L861](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeSettingsPage.kt#L748-L861)）展示 DexKit 缓存 `已就绪 / 总数` 与逐条缺失项（缺失标红 `accentRed`、全部就绪 `accentGreen`），并提供「重建 DexKit 缓存」点击行，点击调用 `DexKitFinder.refind`。文案常量 `CARD_MODULE_CONFIG` / `REBUILD_DEXKIT_CACHE` 见 [HomeRowText.kt#L210-L216](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/ui/pages/home/HomeRowText.kt#L210-L216)。
 
 ### 9.3 主入口
 
@@ -907,7 +1015,7 @@ HttpUtils.java - GET/POST 封装，支持自定义 Headers，用于 Q群管家 A
 
 | 项目 | 要求 |
 |------|------|
-| 模块版本 | 0.2.9（versionCode 29） |
+| 模块版本 | 0.3.2（versionCode 32） |
 | Android | 10.0 ~ 16 (API 29 ~ 37) |
 | Xposed 框架 | LSPosed / LSPatch / FPA / 原子 / 无极（Zygisk 模式） |
 | NT QQ | 8.9.58 ~ 9.3.xx |
@@ -1010,6 +1118,7 @@ Hook `VipManager` 的 `isVip()`/`isVipValid()`/`isExpire()`/`isVipValidOrBalance
 | **必须 keep 模块代码** | `-keep class me.lengyu.qedge.** { *; }` |
 | **DexKitTask 必须 isApplicable()** | 宿主专属功能覆写，任务列表必须 `.filter { it.isApplicable() }` |
 | **HTTP/IO 必须异步** | 所有 Hook 回调 O(1)，耗时操作丢新 Thread |
+| **Hook 进程收窄** | 只在主进程生效的功能加 `process = "Main"`，避免子进程加载无关宿主类、装无效 Hook |
 | **定时任务仅主进程** | `HostInfo.processName == HostInfo.packageName` 判断 |
 | **QQServiceHelper 直接泛型调用** | `getRuntimeService` 禁止反射，QRouteApi 必须用 `getApi()` |
 | **多账号路径隔离** | 禁止硬编码 `/storage/emulated/0/`，使用 `QQCurrentEnv.getLocalPath()` |
@@ -1018,6 +1127,9 @@ Hook `VipManager` 的 `isVip()`/`isVipValid()`/`isExpire()`/`isVipValidOrBalance
 | **LogUtils 异常日志** | 必须重定向到 `QEdge/log/yyyy-MM-dd.log`，禁止 `XposedBridge.log(throwable)` |
 | **JS 插件** | Rhino 单线程 Executor、解释执行(opt=-1)+ES6；`console` 走 LogUtils；回调走 `callFunctionAsync/Sync` |
 | **KeepAliveHook** | 必须主线程 Looper，通知每 3 秒重新下发（QQ onResume 会 cancelAll） |
+| **QQ 专属功能宿主门禁** | `HideVirtualAvatar` / `HideQmateTitleIcon` / `HideAioPet` / `HideDressBeancurd` / `DisableHomePullDown` / `NativeEmotionDownload` 等 QQ 专属项必须用 `HostInfo.isQQ`（`isApplicable()` / `onInit()`）收窄，TIM 下既不参与 DexKit 查找也不安装钩子 |
+| **删除列表项需兼容 ViewPager** | 在数据层删除面板条目后，必须确认关联的 PagerAdapter 会重建页面；对未 `setTag` 的外层 View（Z-plan/贴纸分支）要让 `getItemPosition` 返回 `POSITION_NONE`，否则页面与数据错位 |
+| **混淆类/方法禁止硬编码** | 被混淆的宿主类名、方法名（如 `xxx.util.a#b`）随版本变化，必须用 DexKit 按「包名 + 类内字符串/调用特征」定位，禁止写死混淆名；只有未混淆的公开类（如 `com.tencent.mobileqq.utils.FileUtils`）才可按名查找。查找失败只记日志跳过，不设硬编码回退 |
 
 ### 等级加速三重触发
 
@@ -1033,16 +1145,17 @@ Hook `VipManager` 的 `isVip()`/`isVipValid()`/`isExpire()`/`isVipValidOrBalance
 
 ## 16. 扫描快照
 
-- 扫描时间：2026-10-07
+- 扫描时间：2026-10-18
 - 扫描范围：QEdge 模块本体（`app/`、`qqinterface/`、根 Gradle 脚本；不含 `QStory/`、`QFun-main/` 参照工程与 `build/` 产物）
 - 文件统计（实际计数）：
   - `app/src` 下 `.java` = 286
-  - `app/src` 下 `.kt` = 92
+  - `app/src` 下 `.kt` = 101
   - `qqinterface/src` 下 `.java` = 579（QQ 接口 stub）
+  - `app/src/main/java/me/lengyu/qedge/hook/item/` 下功能项文件 = 46
   - `.kts`：根目录 2（`build.gradle.kts` / `settings.gradle.kts`）+ `app/` 1 + `qqinterface/` 1 = 4
   - `AndroidManifest.xml`：`app/src` 1 + `qqinterface/src` 1 = 2
-- 使用工具：Glob × 6（`.java` / `.kt` / `.kts` / `AndroidManifest.xml`，含 200 条上限截断，故用 PowerShell `Get-ChildItem` 精确计数）、Read × 12、Grep × 3
+- 使用工具：PowerShell `Get-ChildItem` 精确计数、Read、Grep
 
 ### 本次未确认项
 
-- [需确认] `XposedEntry.loadHooksOffMainThread()` 在类中定义但未找到调用点 —— 涉及文件：[XposedEntry.java#L376-L400](file:///c:/Users/ASUS/AndroidStudioProjects/QEdge/app/src/main/java/me/lengyu/qedge/hook/XposedEntry.java#L376-L400)。原因：全仓库 Grep 仅命中定义处一处，无法确认其被调度路径。
+- 无。

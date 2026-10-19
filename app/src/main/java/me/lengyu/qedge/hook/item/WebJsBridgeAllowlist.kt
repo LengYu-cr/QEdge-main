@@ -28,6 +28,14 @@ object WebJsBridgeAllowlist : BaseSwitchHookItem() {
     override fun onInit(): Boolean = true
 
     override fun onHook() {
+        // 开关关闭时完全不介入：不加载 AuthorizeConfig，也不安装任何 Hook。
+        // 之前是"无论开关都装 Hook、只在回调里判断"，导致 QQ 每个子进程（含内置浏览器 :tool）
+        // 启动期都会提前加载并改写这个宿主类；关掉功能却仍然介入，既无法做对照排查，
+        // 也把宿主启动期的类加载时序改动了。
+        if (!ModuleConfig.getBoolean(KEY_ENABLE, false)) {
+            LogUtils.d(TAG, "开关未开启，跳过 Hook")
+            return
+        }
         try {
             val clazz = ReflectUtils.findClassIfExists(TARGET_CLASS) ?: run {
                 LogUtils.e(TAG, "未找到 $TARGET_CLASS")
@@ -62,16 +70,19 @@ object WebJsBridgeAllowlist : BaseSwitchHookItem() {
             targets.forEach { method ->
                 method.isAccessible = true
                 HookUtils.hookReplace(method) { param ->
-                    // 两个闸口的第一个参数都是页面(当前) URL
-                    val domain = param.args?.getOrNull(0) as? String
-                    if (isAllowlisted(domain)) {
-                        LogUtils.d(TAG, "放行 " + method.name + " args=" + safeArgs(param.args))
-                        true
-                    } else {
-                        val result = HookUtils.invokeOriginalMethod(param)
-                        // 未命中规则也记录，便于按其他页面的日志推断参数格式
-                        LogUtils.d(TAG, "原逻辑 " + method.name + " args=" + safeArgs(param.args) + " result=" + result)
-                        result
+                    try {
+                        val domain = param.args?.getOrNull(0) as? String
+                        if (isAllowlisted(domain)) {
+                            LogUtils.d(TAG, "放行 " + method.name + " args=" + safeArgs(param.args))
+                            true
+                        } else {
+                            HookUtils.invokeOriginalMethod(param)
+                        }
+                    } catch (e: Throwable) {
+                        // 回调抛出的异常会沿宿主调用栈冒泡，直接打断网页加载/鉴权流程，
+                        // 这里兜底回落原逻辑，绝不让异常逃逸到 QQ。
+                        LogUtils.e(TAG, "hook " + method.name + " failed: $e")
+                        runCatching { HookUtils.invokeOriginalMethod(param) }.getOrDefault(false)
                     }
                 }
             }
@@ -100,8 +111,11 @@ object WebJsBridgeAllowlist : BaseSwitchHookItem() {
     private fun matchRules(value: String, rules: List<String>): Boolean {
         val v = value.trim().lowercase()
         if (v.isEmpty()) return false
-        // 参数可能是完整 URL，先取 host 再比较
-        val host = if (v.contains("://")) runCatching { java.net.URI(v).host }.getOrNull() ?: v else v
+        // 只认 http/https 页面 URL。AuthorizeConfig 里同为 (String,String)Z 的方法中，
+        // 有的第一个参数是业务名（如 B(String businessName, String param)），不是 URL，
+        // 必须在参数层面排除，不能只靠"域名恰好撞上业务名"这种概率兜底。
+        if (!v.startsWith("http://") && !v.startsWith("https://")) return false
+        val host = runCatching { java.net.URI(v).host }.getOrNull() ?: return false
         return rules.any { r -> host == r || host.endsWith(".$r") }
     }
 }

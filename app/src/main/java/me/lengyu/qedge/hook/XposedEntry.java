@@ -374,6 +374,9 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                             Parasitics.initForStubActivity(hostContext);
                             
                             boolean cacheValid = DexKitCache.initCache();
+                            // 必须先注册 Hook 项：DexKitCache.expectedKeys() 从 HookRegistry 收集任务，
+                            // 否则新加的 DexKitTask key 永远不会参与校验，缓存缺项也会被误判为完整。
+                            MainHook.registerHookItems();
                             if (cacheValid && DexKitCache.validateAllTasks()) {
                                 MainHook.loadHook();
                             } else {
@@ -392,38 +395,6 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
             XposedBridge.log("[QEdge] Hook BaseApplicationImpl.onCreate 失败: " + e.getMessage());
             return null;
         }
-    }
-
-    /**
-     * 缓存读盘、反射校验、Hook 注册与 DexKit 查找都不是首帧必需，整体移到后台调度器执行，
-     * 主线程只保留 initialized 抢占与 HostInfo/Parasitics 这类必须尽早生效的初始化。
-     * 例外：首次安装/升级后没有缓存时，必须先在主线程同步挂上 SplashActivity 的查找 hook
-     * （DexKitFinder.doFind），否则查找流程永远不会被触发，Hook 也就永远不会加载。
-     */
-    private void loadHooksOffMainThread() {
-        if (!DexKitCache.hasCacheFile()) {
-            DexKitFinder.doFind();
-            return;
-        }
-        ModuleScope.launchHookJava("HookInit", () -> {
-            try {
-                // 必须先注册：validateAllTasks() 靠 HookRegistry 收集 DexKitTask 列表，
-                // 未注册时列表为空、校验恒为 true，缓存缺条目也不会被发现，会直接 hook 失败。
-                // loadHook() 内部会再注册一次，HookRegistry 按类去重，无副作用。
-                MainHook.registerHookItems();
-                if (DexKitCache.initCache() && DexKitCache.validateAllTasks()) {
-                    MainHook.loadHook();
-                    XposedBridge.log("[QEdge] Hook 初始化成功");
-                } else {
-                    // 缓存损坏或缺条目：退回重新查找
-                    ModuleScope.postToMain(DexKitFinder::doFind);
-                    XposedBridge.log("[QEdge] Hook 初始化失败，退回重新查找");
-                }
-            } catch (Throwable e) {
-                XposedBridge.log("[QEdge] Hook 初始化失败: " + e.getMessage());
-                XposedBridge.log(e);
-            }
-        });
     }
 
     private void hookKuGouElder(final ClassLoader classLoader) {

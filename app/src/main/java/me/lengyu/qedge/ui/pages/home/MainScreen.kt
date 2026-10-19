@@ -24,6 +24,7 @@ fun MainScreen(
     updateStatus: HomeUpdateStatus,
     onQQGroupClick: () -> Unit,
     onTGClick: () -> Unit,
+    onGithubClick: () -> Unit,
     onUserBackendClick: () -> Unit,
     onUpdateLogClick: () -> Unit,
     onCheckUpdateClick: () -> Unit,
@@ -43,6 +44,11 @@ fun MainScreen(
             iconRes = R.drawable.ic_logo_telegram,
             label = "Telegram",
             onClick = onTGClick
+        ),
+        HomeRailAction(
+            iconRes = R.drawable.ic_logo_github,
+            label = "QEdge 开源仓库",
+            onClick = onGithubClick
         ),
         HomeRailAction(
             iconRes = R.drawable.ic_user,

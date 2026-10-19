@@ -32,6 +32,12 @@
 | 强制显示全屏按钮 | ✅ | ✅ | 强制显示输入框全屏按钮 |
 | 聊天页脚本菜单入口 | ✅ | ✅ | 长按聊天页指定按钮（默认「更多功能」）打开脚本菜单，入口可在首页切换（重启 QQ 生效） |
 | 综合面板（表情/语音/视频） | ✅ | ✅ [待确认] | 长按聊天页指定按钮（默认「相册」）打开表情 / 语音 / 视频综合面板，入口可配置且需与脚本菜单入口错开 |
+| 原生表情包下载 | ✅ | ❌ | 解除 QQ 原生表情包下载通道限制（DexKit 定位判定方法，开启后图片会带「超级QQ秀表情」标签） |
+| APK.1 识别为安装包 | ✅ | ✅ | 宿主把别人发来的 APK 改名为 `xxx.apk.1`（本地重名落盘为 `xxx.apk (1).1`）时，仍按安装包显示并可直接安装 |
+| 屏蔽聊天页 Q宠 | ✅ | ❌ | 拦截会话页 / 单聊页贴边 Q宠 的创建，也不再双击进入 Q宠主页（QQ 9.3.30+） |
+| 隐藏好友装扮提示 | ✅ | ❌ | 聊天页不再显示对方更换气泡 / 背景等装扮的豆腐块提示 |
+| 禁用聊天页左滑 | ✅ | ❌ | 聊天页左滑不再进入「群应用」或「聊天关系」页面（右滑关闭抽屉不受影响） |
+| 禁用首页下拉小程序 | ✅ | ❌ | 保留短距离下拉刷新，长距离下拉不再呼出小程序面板 |
 
 ### 🛰️ QQ 空间系列
 
@@ -42,11 +48,14 @@
 | **名片自动回赞** | 收到"资料卡赞 N 次"推送 → 回赞 N 次（上限 20 防刷） |
 | **定时发说说** | 用户自定义 HH:mm + 文本内容，到点自动发布，支持多进程幂等去重（三保险：主进程 Timer + SP 日 key + 成功才写标记） |
 
-### 🪪 资料卡 · 扫码 · 日志（QQ）
+### 🪪 资料卡 · 扫码 · 净化（QQ 专属）
 
 | 功能 | 说明 |
 |------|------|
 | **绕过资料卡封禁** | Hook `ProfileCardForbidAccountHelper` 封禁判断，强制返回未封禁状态，强制显示被封禁用户的资料卡主页；并在数据刷新时重置 `Card.isForbidAccount`、回填本地昵称兜底，避免按钮/头像变暗与昵称空缺 |
+| **屏蔽虚拟形象** | 表情面板数据层移除「虚拟形象」页签（`EmotionPanelInfo.type == 22`），页签与页面一起消失（TIM 下跳过） |
+| **移除超级表情** | 移除表情面板「收藏」左侧的「超级表情」页签（`type == 19`）；删除后同步重建 ViewPager 页面，避免收藏页被超级表情页顶替、收藏表情发不出去 |
+| **隐藏合养秋秋人入口** | 隐藏好友单聊标题栏右侧的「合养秋秋人」图标（`QmateEntryIconManager` 源头拦截，QQ 9.3.70+） |
 | **解除扫码限制** | Hook `QrAgentLoginManager` 扫码风险检查，改写首个 boolean 参数，解除长按识别 / 相册扫描二维码时的风险校验 |
 | **跳过扫码确认等待** | Hook `QRLoginAuthActivity`，直接启用确认按钮（QUIButton）并忽略倒计时，可立即点击确认 |
 | **QLog 日志处理** | Hook `com.tencent.qphone.base.util.QLog`，三种模式：关闭（放行）/ 纯拦截（丢弃 QQ 日志）/ 重定向（拦截并写入 `QEdge/log/QLog/yyyy-MM-dd_HH.log`） |
@@ -97,10 +106,18 @@
 - 服务器端定时任务：每日 00:00 自动上线（`hangup_auto_online.php`）、每 10 分钟检测超时下线（`hangup_check.php`）
 - 自动上线失败记录原因并可通过 `isOnline.php?uin=` 查询在线状态
 
+### 🎵 音乐点歌（冷雨）
+
+- **多平台点歌**：`点歌` / `QQ点歌` / `网易点歌` / `酷狗点歌` / `酷我点歌` / `咪咕点歌` / `汽水点歌` / `抖音点歌`（后两者无音质档位）
+- **音质切换**：`设置(QQ|网易|酷狗|酷我|咪咕)音质<值>`、`查看(QQ|网易|酷狗|酷我|咪咕)音质列表`；配置按聊天独立保存，未设置时沿用接口默认音质
+- **播放方式切换**：`切换卡片/语音/链接/文件/下载/空间/播放点歌`
+- **赞助密钥**：`配置赞助密钥xxxxx`（密钥到用户后台申请，赞助 20）——仅 `v.yuafeng.cn` 音乐接口需要，配置后 QQ / 网易云 / 酷狗 / 酷我 / 咪咕 / 汽水点歌才可用
+- 酷我音乐卡片发送失败时仅 Toast 提示，功能照常尝试发送
+
 ### 🎨 模块 UI
 
 - Material 3 配色（Light/Dark 双主题，暗色为 OLED 纯黑，首启跟随系统）
-- 首页卡片分组：电脑代挂 → QQ空间 → 聊天功能 → 资料卡 → 等级加速 → 应用保活 → 基础配置 → 模块配置
+- 首页卡片分组：电脑代挂 → QQ空间 → 聊天功能 → 资料卡 → 等级加速 → 应用保活 → QQ净化 → 基础配置 → 模块配置
 - 所有设置项点击即时写入，无需退出页面
 - 模块内页底部液态玻璃导航条：模块首页 / 拓展脚本 / 冷雨Java / 文件管理；顶栏含用户信息、更新日志、赞助墙与首页功能搜索
 - 模块配置卡片：展示 DexKit 缓存就绪/缺失情况（缺失项标红），支持「重建 DexKit 缓存」（清缓存后重新扫描，完成后重启 QQ 生效）
@@ -164,12 +181,12 @@ QEdge/
 │       ├── MainActivity.kt / LauncherActivity.kt  # 独立首页（桌面图标 / 模块设置入口）/ 启动页
 │       ├── activity/               # SettingActivity（模块内页）+ ThemeHelper
 │       ├── common/                 # ModuleScope（协程/线程调度）
-│       ├── coldrain/               # 冷雨 QQ 机器人核心（22 功能，ColdRainCore + features/）
+│       ├── coldrain/               # 冷雨 QQ 机器人核心（21 功能策略 + 菜单，ColdRainCore + features/）
 │       ├── hook/
 │       │   ├── base/               # BaseHookItem / BaseApiHookItem / BaseSwitchHookItem / BaseClickableHookItem / HookRegistry
 │       │   ├── api/                # 通用 Hook 能力（OnMenuBuild / OnSendMsg / OnQZonePush…）
 │       │   ├── entry/              # QQPlusInject / QQSettingInject（设置入口劫持）
-│       │   ├── item/               # QQ/TIM 具体功能项（每功能一个文件，37 项）
+│       │   ├── item/               # QQ/TIM 具体功能项（每功能一个文件，46 项）
 │       │   │   ├── PreventRecall.kt      # 防撤回（协议层拦截）
 │       │   │   ├── KeepAliveHook.kt      # 保活（像素窗/前台/后台通知三策略）
 │       │   │   ├── RepeatMsg.kt          # 复读机
@@ -207,6 +224,15 @@ QEdge/
 │       │   │   ├── ForceInputNoLimit.java       # 解除输入框字数限制
 │       │   │   ├── ForceFullScreenBtnShow.java  # 强制显示输入框全屏按钮
 │       │   │   ├── ForceSpeaker.java     # 语音消息强制免提，不走听筒
+│       │   │   ├── NativeEmotionDownload.kt  # 原生表情包下载（DexKit，QQ 专属）
+│       │   │   ├── HideVirtualAvatar.kt      # 表情面板移除「虚拟形象」页签（QQ 专属）
+│       │   │   ├── HideSuperEmotion.kt       # 表情面板移除「超级表情」页签 + ViewPager 重建
+│       │   │   ├── HideQmateTitleIcon.kt     # 隐藏单聊标题栏「合养秋秋人」入口（QQ 9.3.70+）
+│       │   │   ├── HideDressBeancurd.kt      # 隐藏好友装扮豆腐块提示（DexKit，QQ 专属）
+│       │   │   ├── HideAioPet.kt             # 屏蔽聊天页贴边 Q宠（DexKit，QQ 9.3.30+）
+│       │   │   ├── DisableAioLeftSwipe.kt    # 禁用聊天页左滑进群应用/聊天关系
+│       │   │   ├── DisableHomePullDown.kt    # 禁用首页长距离下拉呼出小程序面板（QQ 专属）
+│       │   │   ├── Apk1AsApk.kt              # .apk.1 归一化为 APK（DexKit 定位）
 │       │   │   └── ...                   # 详见 CodeWiki
 │       │   ├── kk/                       # KK 键盘（im.weshine.keyboard）VIP/去广告 Hook
 │       │   ├── kugou/                    # 酷狗音乐（大字版/概念版）开屏跳过 + 乐固签名绕过

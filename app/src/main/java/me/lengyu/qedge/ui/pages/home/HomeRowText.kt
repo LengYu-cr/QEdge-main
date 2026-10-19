@@ -54,9 +54,6 @@ internal object HomeRowText {
     @field:RowText(title = "原生表情包下载", subtitle = "解除限制，开启QQ自带的表情包下载通道。但是会让图片带上[超级QQ秀表情]标签", card = "card_chat")
     val NATIVE_EMOTION_DOWNLOAD = "原生表情包下载"
 
-    @field:RowText(title = "屏蔽链接信息卡片", subtitle = "收到链接时，自动屏蔽", card = "card_chat")
-    val REMOVE_LINK_INFO = "屏蔽链接信息卡片"
-
     @field:RowText(title = "视频转泡泡消息", subtitle = "发送视频时，自动替换为泡泡", card = "card_chat")
     val VIDEO_TO_BUBBLE = "视频转泡泡消息"
 
@@ -107,6 +104,44 @@ internal object HomeRowText {
 
     @field:RowText(title = "强制显示输入框全屏按钮", subtitle = "强制全屏输入按钮始终显示，不随行数隐藏", card = "card_chat")
     val FORCE_FULLSCREEN_BTN = "强制显示输入框全屏按钮"
+
+    // ==================== QQ净化 ====================
+
+    @field:RowText(title = "QQ净化", subtitle = "屏蔽广告、多余入口与干扰信息", card = "card_purify", cardHeader = true)
+    val CARD_PURIFY = "QQ净化"
+
+    @field:RowText(title = "屏蔽QQ秀/AI头像", subtitle = "屏蔽QQ秀与AI头像相关显示", card = "card_purify")
+    val DISABLE_AI_AVATAR = "屏蔽QQ秀/AI头像"
+
+    @field:RowText(title = "屏蔽虚拟形象", subtitle = "移除表情面板中的「虚拟形象」页签", card = "card_purify")
+    val HIDE_VIRTUAL_AVATAR = "屏蔽虚拟形象"
+
+    @field:RowText(title = "移除超级表情", subtitle = "移除表情面板中的「超级表情」页签", card = "card_purify")
+    val HIDE_SUPER_EMOTION = "移除超级表情"
+
+    @field:RowText(title = "隐藏合养秋秋人入口", subtitle = "隐藏好友单聊标题栏右侧的「合养秋秋人」图标", card = "card_purify")
+    val HIDE_QMATE_TITLE_ICON = "隐藏合养秋秋人入口"
+
+    @field:RowText(title = "隐藏好友装扮提示", subtitle = "聊天页不再显示对方更换气泡/背景等装扮的豆腐块提示", card = "card_purify")
+    val HIDE_DRESS_BEANCURD = "隐藏好友装扮提示"
+
+    @field:RowText(title = "屏蔽聊天页 Q宠", subtitle = "聊天页不再显示贴边浮动的 Q宠，也不会双击进入 Q宠主页", card = "card_purify")
+    val HIDE_AIO_PET = "屏蔽聊天页 Q宠"
+
+    @field:RowText(title = "APK.1 识别为安装包", subtitle = "QQ 收到 APK 会自动改名为 xxx.apk.1（本地重名落盘为 xxx.apk (1).1），开启后仍按安装包显示并可直接安装", card = "card_purify")
+    val APK1_AS_APK = "APK.1 识别为安装包"
+
+    @field:RowText(title = "去页面内横幅广告", subtitle = "清理QQ主界面顶部横幅广告等广告数据源", card = "card_purify")
+    val REMOVE_ADS = "去页面内横幅广告"
+
+    @field:RowText(title = "屏蔽链接信息卡片", subtitle = "收到链接时，自动屏蔽", card = "card_purify")
+    val REMOVE_LINK_INFO = "屏蔽链接信息卡片"
+
+    @field:RowText(title = "禁用聊天页左滑", subtitle = "聊天页左滑不再进入群应用或聊天关系页面", card = "card_purify")
+    val DISABLE_AIO_LEFT_SWIPE = "禁用聊天页左滑"
+
+    @field:RowText(title = "禁用首页下拉小程序", subtitle = "保留短距离下拉刷新，长距离下拉不再呼出小程序面板", card = "card_purify")
+    val DISABLE_HOME_PULL_DOWN = "禁用首页下拉小程序"
 
     // ==================== 资料卡 ====================
 
@@ -171,9 +206,6 @@ internal object HomeRowText {
     )
     val FORCE_VIP = "解锁本地会员"
 
-    @field:RowText(title = "屏蔽QQ秀/AI头像", subtitle = "屏蔽QQ秀与AI头像相关显示", card = "card_system")
-    val DISABLE_AI_AVATAR = "屏蔽QQ秀/AI头像"
-
     @field:RowText(title = "解除风险网页拦截", subtitle = "点击消息中链接时不再拦截风险网页", card = "card_system")
     val REMOVE_RISK_WEBPAGE = "解除风险网页拦截"
 
@@ -197,9 +229,6 @@ internal object HomeRowText {
 
     @field:RowText(title = "绕过资料卡封禁", subtitle = "强制显示被封禁用户的 QQ 资料卡主页，绕过封禁拦截弹窗", card = "card_system")
     val BYPASS_PROFILE_BAN = "绕过资料卡封禁"
-
-    @field:RowText(title = "去页面内横幅广告", subtitle = "清理QQ主界面顶部横幅广告等广告数据源", card = "card_system")
-    val REMOVE_ADS = "去页面内横幅广告"
 
     @field:RowText(title = "QLog日志重定向/拦截", subtitle = "QQ日志拦截或重定向，点击选择模式", card = "card_system")
     val QLOG_REDIRECT = "QLog日志重定向/拦截"

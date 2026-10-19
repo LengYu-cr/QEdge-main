@@ -22,8 +22,8 @@ android {
         applicationId = "me.lengyu.qedge"
         minSdk = 29
         targetSdk = 37
-        versionCode = 31
-        versionName = "0.3.1"
+        versionCode = 32
+        versionName = "0.3.2"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -75,6 +75,14 @@ android {
     }
 
     packaging {
+        // AGP 默认以 STORED（不压缩）方式把 dex/so 放进 APK，导致安装包体积远大于 zip 结果。
+        // 改为压缩入库后体积可降到约一半，代价是安装时需解压，安装耗时略增。
+        dex {
+            useLegacyPackaging = true
+        }
+        jniLibs {
+            useLegacyPackaging = true
+        }
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             // 去除依赖 jar 打进来的无用资源：Rhino 调试/工具(test.js 等)、protobuf 源描述文本
