@@ -57,11 +57,10 @@ fun ColdRainConfigSection(
     var masterEnabled by remember { mutableStateOf(ColdRainConfig.isMasterEnabled) }
     var menuName by remember { mutableStateOf(ColdRainConfig.menuName) }
     var replyMode by remember { mutableStateOf(ColdRainConfig.replyMode) }
-    var masterUin by remember { mutableStateOf(ColdRainConfig.masterUin) }
+    var globalAdmins by remember { mutableStateOf(ColdRainConfig.globalAdmins) }
 
     var showMenuNameDialog by remember { mutableStateOf(false) }
     var showReplyModeDialog by remember { mutableStateOf(false) }
-    var showMasterUinDialog by remember { mutableStateOf(false) }
 
     QEdgeCard(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
@@ -138,9 +137,9 @@ fun ColdRainConfigSection(
                     onClick = { showReplyModeDialog = true }
                 )
                 MiniConfigItem(
-                    title = "主人QQ",
-                    value = masterUin.ifEmpty { "-" },
-                    onClick = { showMasterUinDialog = true }
+                    title = "全局代管",
+                    value = globalAdmins.ifEmpty { "-" },
+                    onClick = onFullScreenClick
                 )
             }
 
@@ -240,35 +239,6 @@ fun ColdRainConfigSection(
         )
     }
 
-    if (showMasterUinDialog) {
-        var inputText by remember { mutableStateOf(masterUin) }
-        AlertDialog(
-            onDismissRequest = { showMasterUinDialog = false },
-            title = { Text("主人QQ") },
-            text = {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    singleLine = true,
-                    label = { Text("请输入主人QQ号") }
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    masterUin = inputText.trim()
-                    ColdRainConfig.setString("master_uin", masterUin)
-                    showMasterUinDialog = false
-                }) {
-                    Text("确定", color = AccentBlue)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMasterUinDialog = false }) {
-                    Text("取消")
-                }
-            }
-        )
-    }
 }
 
 @Composable

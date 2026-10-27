@@ -26,6 +26,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import me.lengyu.qedge.ui.core.theme.Dimens
@@ -43,15 +44,16 @@ fun QEdgeCard(
     modifier: Modifier = Modifier,
     glass: Boolean = false,
     animateContentSize: Boolean = false,
+    cornerRadius: Dp = Dimens.CardCornerRadius,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     if (glass) {
-        QEdgeGlassCard(modifier, animateContentSize, onClick, content)
+        QEdgeGlassCard(modifier, animateContentSize, cornerRadius, onClick, content)
         return
     }
 
-    val shape = RoundedCornerShape(Dimens.CardCornerRadius)
+    val shape = RoundedCornerShape(cornerRadius)
     val colors = QEdgeTheme.colors
     val dark = colors.isDark
 
@@ -173,12 +175,13 @@ fun QEdgeCard(
 private fun QEdgeGlassCard(
     modifier: Modifier,
     animateContentSize: Boolean,
+    cornerRadius: Dp,
     onClick: (() -> Unit)?,
     content: @Composable BoxScope.() -> Unit
 ) {
     val colors = QEdgeTheme.colors
     val dark = colors.isDark
-    val shape = RoundedCornerShape(Dimens.CardCornerRadius)
+    val shape = RoundedCornerShape(cornerRadius)
     val interactionSource = remember { MutableInteractionSource() }
     val pressed by interactionSource.collectIsPressedAsState()
     val pressScale by animateFloatAsState(

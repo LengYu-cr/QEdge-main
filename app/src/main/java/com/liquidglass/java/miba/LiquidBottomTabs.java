@@ -72,6 +72,10 @@ public class LiquidBottomTabs extends ViewGroup implements LiquidGlassOverlay, R
     private int containerColor;
     private float pressHighlightIntensity = 1f;
 
+    /** 面板/内层高度（dp），默认 64 / 56，宿主可按需要调矮 */
+    private float panelHeightDp = 64f;
+    private float innerHeightDp = 56f;
+
     // Java/Lua extension based on AdaptiveLuminanceGlassContent.kt. The original
     // LiquidBottomTabs.kt itself uses system theme black/white content.
     private boolean adaptiveContentColorEnabled = true;
@@ -275,11 +279,13 @@ public class LiquidBottomTabs extends ViewGroup implements LiquidGlassOverlay, R
         indicator.setOnDrawSurface(new LiquidGlassView.DrawCallback() {
             private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
             public void draw(Canvas canvas, LiquidGlassView view, Path path) {
+                // Same container veil as the visible panel: the bubble must never be
+                // darker than the bar it sits on, otherwise dragging it to another
+                // cell reads as "the bar went dark".
                 float p = ktPressProgress();
-                int edge = lightTheme ? Color.BLACK : Color.WHITE;
-                paint.setColor(ColorUtils.withAlpha(edge, 0.1f * (1f - p)));
+                paint.setColor(containerColor);
                 canvas.drawRect(0f, 0f, view.getWidth(), view.getHeight(), paint);
-                paint.setColor(ColorUtils.withAlpha(Color.BLACK, 0.03f * p));
+                paint.setColor(ColorUtils.withAlpha(Color.WHITE, 0.06f * p));
                 canvas.drawRect(0f, 0f, view.getWidth(), view.getHeight(), paint);
             }
         });
@@ -322,8 +328,11 @@ public class LiquidBottomTabs extends ViewGroup implements LiquidGlassOverlay, R
         indicator.setScaleY(sy);
 
         indicator.setHighlight(Highlight.DEFAULT.withAlpha(highlightAlpha));
-        indicator.setShadow(Shadow.DEFAULT.withAlpha(p));
-        indicator.setInnerShadow(new InnerShadow(8f * p, p));
+        // Keep a light drop shadow so the bubble still floats, but never darken the
+        // bubble itself while it is being dragged (the inner shadow used to make the
+        // whole bar look dimmed as soon as the indicator left its cell).
+        indicator.setShadow(Shadow.DEFAULT.withAlpha(0.5f * p));
+        indicator.clearInnerShadow();
 
         float tabWidth = getTabWidth();
         float tx;
@@ -978,16 +987,31 @@ public class LiquidBottomTabs extends ViewGroup implements LiquidGlassOverlay, R
         drawChild(canvas, indicator, time);
     }
 
+    /** 面板高度 / 内层高度（dp），宿主可调矮。 */
+    public void setBarHeightDp(float panelDp, float innerDp) {
+        float newPanel = Math.max(1f, panelDp);
+        float newInner = Math.max(1f, Math.min(innerDp, newPanel));
+        if (newPanel == panelHeightDp && newInner == innerHeightDp) return;
+        panelHeightDp = newPanel;
+        innerHeightDp = newInner;
+        requestLayout();
+        invalidate();
+    }
+
+    public float getPanelHeightDp() { return panelHeightDp; }
+
+    public float getInnerHeightDp() { return innerHeightDp; }
+
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         int desiredW = dp(320f);
-        int desiredH = dp(64f);
+        int desiredH = dp(panelHeightDp);
         int w = resolveSize(desiredW, widthMeasureSpec);
         int h = resolveSize(desiredH, heightMeasureSpec);
         setMeasuredDimension(w, h);
 
-        int panelH = dp(64f);
-        int innerH = dp(56f);
+        int panelH = dp(panelHeightDp);
+        int innerH = dp(innerHeightDp);
         int rowW = Math.max(0, w - dp(8f));
         int indicatorW = Math.max(1, Math.round((w - dpF(8f)) / Math.max(1, getTabCount())));
 
@@ -1005,8 +1029,8 @@ public class LiquidBottomTabs extends ViewGroup implements LiquidGlassOverlay, R
 
     @Override
     protected void onLayout(boolean changed, int l, int t, int r, int b) {
-        int panelH = dp(64f);
-        int innerH = dp(56f);
+        int panelH = dp(panelHeightDp);
+        int innerH = dp(innerHeightDp);
         int top = Math.max(0, (getHeight() - panelH) / 2);
         int inset = dp(4f);
 

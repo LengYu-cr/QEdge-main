@@ -112,7 +112,7 @@ QEdge/
 
 | 项目 | 版本 | 用途 |
 |------|------|------|
-| compileSdk / targetSdk / minSdk | 37 / 37 / 29 (Android 10) | |
+| compileSdk / targetSdk / minSdk | 37 / 37 / 28 (Android 9) | |
 | AGP / Kotlin | 9.1.1 / 2.4.10 | |
 | Compose BOM | 2026.06.01 | UI 框架 |
 | DexKit | 2.2.0 | 动态查找混淆类/方法 |
@@ -1015,8 +1015,8 @@ HttpUtils.java - GET/POST 封装，支持自定义 Headers，用于 Q群管家 A
 
 | 项目 | 要求 |
 |------|------|
-| 模块版本 | 0.3.2（versionCode 32） |
-| Android | 10.0 ~ 16 (API 29 ~ 37) |
+| 模块版本 | 0.3.3（versionCode 33） |
+| Android | 9.0 ~ 16 (API 28 ~ 37)，仅 arm64-v8a |
 | Xposed 框架 | LSPosed / LSPatch / FPA / 原子 / 无极（Zygisk 模式） |
 | NT QQ | 8.9.58 ~ 9.3.xx |
 | NT TIM | 3.9.0 ~ 4.1.0 |

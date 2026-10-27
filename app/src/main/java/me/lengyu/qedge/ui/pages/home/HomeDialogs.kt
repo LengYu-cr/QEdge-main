@@ -617,6 +617,112 @@ fun HomeImageRatioDialog(
     }
 }
 
+/**
+ * 液态玻璃底栏尺寸弹窗：调节高度与左右留白（dp），留白越小底栏越宽。
+ */
+@Composable
+fun HomeGlassBarSizeDialog(
+    show: Boolean,
+    height: String,
+    sideMargin: String,
+    onDismiss: () -> Unit,
+    onConfirm: (height: Int, sideMargin: Int) -> Unit
+) {
+    if (!show) return
+
+    val colors = QEdgeTheme.colors
+    var curHeight by remember(height) { mutableStateOf(height) }
+    var curMargin by remember(sideMargin) { mutableStateOf(sideMargin) }
+
+    Dialog(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(20.dp))
+                .background(colors.cardBackground)
+                .padding(20.dp)
+        ) {
+            Text(
+                "玻璃底栏尺寸",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = colors.textPrimary
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                "默认高度 58dp、左右留白 36dp（即当前比例），留白越小底栏越宽",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(14.dp))
+            ImageRatioNumberField(
+                label = "高度 (dp)",
+                value = curHeight,
+                placeholder = "默认 58",
+                onValueChange = { curHeight = it }
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            ImageRatioNumberField(
+                label = "左右留白 (dp)",
+                value = curMargin,
+                placeholder = "默认 36",
+                onValueChange = { curMargin = it }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                "高度范围 36-88dp，留白范围 0-120dp，留空按默认值保存",
+                fontSize = 12.sp,
+                color = colors.textSecondary
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = onDismiss
+                        )
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("取消", fontSize = 14.sp, color = colors.textSecondary)
+                }
+                Spacer(modifier = Modifier.width(8.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(AccentGreen)
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            onClick = {
+                                val h = curHeight.trim().toIntOrNull() ?: 58
+                                val m = curMargin.trim().toIntOrNull() ?: 36
+                                onConfirm(h.coerceIn(36, 88), m.coerceIn(0, 120))
+                            }
+                        )
+                        .padding(horizontal = 20.dp, vertical = 10.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        "保存",
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color.White
+                    )
+                }
+            }
+        }
+    }
+}
+
 @Composable
 fun HomeVoiceSpeedDialog(
     show: Boolean,

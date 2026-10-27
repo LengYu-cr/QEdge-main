@@ -20,6 +20,13 @@ object DexKitCache {
      */
     private const val NOT_FOUND = ""
 
+    /**
+     * 宿主 APK 指纹在缓存文件中的保留 key，不参与查找结果读写。
+     * 同一 QQ 版本可能存在不同安装包（官方包 / 壳包），versionCode 无法区分，
+     * 指纹不一致说明 APK 换了，旧结果（尤其是壳包扫出来的全空串）必须作废。
+     */
+    private const val FINGERPRINT_KEY = "__host_apk__"
+
     var cacheMap = mutableMapOf<String, String>()
 
     private val cacheFile by lazy {
@@ -27,6 +34,13 @@ object DexKitCache {
             "${HostInfo.getModuleDataPath()}dexkit",
             "CacheMap_${HostInfo.versionCode}_${me.lengyu.qedge.BuildConfig.VERSION_CODE}"
         )
+    }
+
+    /** 宿主 APK 路径 + 大小 + 修改时间，安装/更新/换包都会变化 */
+    private fun hostFingerprint(): String {
+        val apk = HostInfo.getHostContext()?.applicationInfo?.sourceDir ?: return ""
+        val file = File(apk)
+        return "${file.absolutePath}:${file.length()}:${file.lastModified()}"
     }
 
     @JvmStatic
@@ -82,9 +96,17 @@ object DexKitCache {
         return runCatching {
             val content = cacheFile.readText()
             val jsonObject = JSONObject(content)
+            // 取不到宿主 APK 信息时不做指纹校验，避免误删有效缓存
+            val fingerprint = hostFingerprint()
+            if (fingerprint.isNotEmpty() && jsonObject.optString(FINGERPRINT_KEY) != fingerprint) {
+                LogUtils.i("DexKitCache", "host apk changed, drop stale cache")
+                clearAll()
+                return@runCatching false
+            }
             val keys = jsonObject.keys()
             while (keys.hasNext()) {
                 val key = keys.next()
+                if (key == FINGERPRINT_KEY) continue
                 cacheMap[key] = jsonObject.getString(key)
             }
             // LogUtils.d("DexKitCache", "Loaded ${cacheMap.size} entries from cache")
@@ -102,6 +124,7 @@ object DexKitCache {
                 parentDir.mkdirs()
             }
             val jsonObject = JSONObject()
+            jsonObject.put(FINGERPRINT_KEY, hostFingerprint())
             cacheMap.forEach { (key, value) ->
                 jsonObject.put(key, value)
             }

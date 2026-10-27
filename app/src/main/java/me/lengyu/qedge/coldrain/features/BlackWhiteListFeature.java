@@ -65,39 +65,15 @@ public class BlackWhiteListFeature implements ColdRainFeature {
             return;
         }
 
-        Pattern globalBlack = Pattern.compile("拉黑([0-9]+)");
-        Matcher m = globalBlack.matcher(text);
+        // 匹配顺序很重要：带「本群」的指令和「解除」类指令必须排在前面，
+        // 否则「拉黑123本群」会被「拉黑([0-9]+)」抢先命中写进全局黑名单，
+        // 「解除白名单123」也会被「白名单([0-9]+)」抢先命中变成添加。
+        Pattern removeGroupBlack = Pattern.compile("解除黑名单([0-9]+)本群");
+        Matcher m = removeGroupBlack.matcher(text);
         if (m.find()) {
             String uin = m.group(1);
-            addToGlobalBlacklist(core, uin);
-            core.reply(msgData, "已将 " + uin + " 添加到全局黑名单");
-            return;
-        }
-
-        Pattern groupBlack = Pattern.compile("拉黑([0-9]+)本群");
-        m = groupBlack.matcher(text);
-        if (m.find()) {
-            String uin = m.group(1);
-            addToGroupBlacklist(core, troopUin, uin);
-            core.reply(msgData, "已将 " + uin + " 添加到本群黑名单");
-            return;
-        }
-
-        Pattern globalWhite = Pattern.compile("白名单([0-9]+)");
-        m = globalWhite.matcher(text);
-        if (m.find()) {
-            String uin = m.group(1);
-            addToGlobalWhitelist(core, uin);
-            core.reply(msgData, "已将 " + uin + " 添加到全局白名单");
-            return;
-        }
-
-        Pattern groupWhite = Pattern.compile("白名单([0-9]+)本群");
-        m = groupWhite.matcher(text);
-        if (m.find()) {
-            String uin = m.group(1);
-            addToGroupWhitelist(core, troopUin, uin);
-            core.reply(msgData, "已将 " + uin + " 添加到本群白名单");
+            removeFromGroupBlacklist(core, troopUin, uin);
+            core.reply(msgData, "已将 " + uin + " 从本群黑名单移除");
             return;
         }
 
@@ -110,12 +86,12 @@ public class BlackWhiteListFeature implements ColdRainFeature {
             return;
         }
 
-        Pattern removeGroupBlack = Pattern.compile("解除黑名单([0-9]+)本群");
-        m = removeGroupBlack.matcher(text);
+        Pattern removeGroupWhite = Pattern.compile("解除白名单([0-9]+)本群");
+        m = removeGroupWhite.matcher(text);
         if (m.find()) {
             String uin = m.group(1);
-            removeFromGroupBlacklist(core, troopUin, uin);
-            core.reply(msgData, "已将 " + uin + " 从本群黑名单移除");
+            removeFromGroupWhitelist(core, troopUin, uin);
+            core.reply(msgData, "已将 " + uin + " 从本群白名单移除");
             return;
         }
 
@@ -128,22 +104,39 @@ public class BlackWhiteListFeature implements ColdRainFeature {
             return;
         }
 
-        Pattern removeGroupWhite = Pattern.compile("解除白名单([0-9]+)本群");
-        m = removeGroupWhite.matcher(text);
+        Pattern groupBlack = Pattern.compile("拉黑([0-9]+)本群");
+        m = groupBlack.matcher(text);
         if (m.find()) {
             String uin = m.group(1);
-            removeFromGroupWhitelist(core, troopUin, uin);
-            core.reply(msgData, "已将 " + uin + " 从本群白名单移除");
+            addToGroupBlacklist(core, troopUin, uin);
+            core.reply(msgData, "已将 " + uin + " 添加到本群黑名单");
             return;
         }
 
-        if (text.startsWith("拉黑@")) {
-            if (msgData.atList != null && !msgData.atList.isEmpty()) {
-                for (String uin : msgData.atList) {
-                    addToGlobalBlacklist(core, uin);
-                }
-                core.reply(msgData, "已将选中成员添加到全局黑名单");
-            }
+        Pattern globalBlack = Pattern.compile("拉黑([0-9]+)");
+        m = globalBlack.matcher(text);
+        if (m.find()) {
+            String uin = m.group(1);
+            addToGlobalBlacklist(core, uin);
+            core.reply(msgData, "已将 " + uin + " 添加到全局黑名单");
+            return;
+        }
+
+        Pattern groupWhite = Pattern.compile("白名单([0-9]+)本群");
+        m = groupWhite.matcher(text);
+        if (m.find()) {
+            String uin = m.group(1);
+            addToGroupWhitelist(core, troopUin, uin);
+            core.reply(msgData, "已将 " + uin + " 添加到本群白名单");
+            return;
+        }
+
+        Pattern globalWhite = Pattern.compile("白名单([0-9]+)");
+        m = globalWhite.matcher(text);
+        if (m.find()) {
+            String uin = m.group(1);
+            addToGlobalWhitelist(core, uin);
+            core.reply(msgData, "已将 " + uin + " 添加到全局白名单");
             return;
         }
 
@@ -157,12 +150,12 @@ public class BlackWhiteListFeature implements ColdRainFeature {
             return;
         }
 
-        if (text.startsWith("白名单@")) {
+        if (text.startsWith("拉黑@")) {
             if (msgData.atList != null && !msgData.atList.isEmpty()) {
                 for (String uin : msgData.atList) {
-                    addToGlobalWhitelist(core, uin);
+                    addToGlobalBlacklist(core, uin);
                 }
-                core.reply(msgData, "已将选中成员添加到全局白名单");
+                core.reply(msgData, "已将选中成员添加到全局黑名单");
             }
             return;
         }
@@ -173,6 +166,16 @@ public class BlackWhiteListFeature implements ColdRainFeature {
                     addToGroupWhitelist(core, troopUin, uin);
                 }
                 core.reply(msgData, "已将选中成员添加到本群白名单");
+            }
+            return;
+        }
+
+        if (text.startsWith("白名单@")) {
+            if (msgData.atList != null && !msgData.atList.isEmpty()) {
+                for (String uin : msgData.atList) {
+                    addToGlobalWhitelist(core, uin);
+                }
+                core.reply(msgData, "已将选中成员添加到全局白名单");
             }
             return;
         }

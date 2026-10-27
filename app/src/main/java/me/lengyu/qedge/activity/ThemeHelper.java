@@ -27,7 +27,7 @@ public class ThemeHelper {
     }
 
     public static void setNightModeForApp(Context context, boolean isDark) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             UiModeManager uiModeManager = ContextCompat.getSystemService(context, UiModeManager.class);
             if (uiModeManager != null) {
                 uiModeManager.setApplicationNightMode(isDark

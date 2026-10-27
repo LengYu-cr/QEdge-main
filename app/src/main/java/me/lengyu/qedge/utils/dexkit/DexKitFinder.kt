@@ -15,6 +15,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.sp
+import dalvik.system.BaseDexClassLoader
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XC_MethodHook.MethodHookParam
 import de.robv.android.xposed.XposedHelpers
@@ -169,61 +170,18 @@ object DexKitFinder {
                     return@launchIO
                 }
 
-                val bridge = DexKitBridge.create(sourceDir)
+                // 第一源：宿主 APK 本身。正常安装包一次即可全部命中。
+                progressText = "正在读取宿主 APK..."
+                scanSource("host apk", tasks) { DexKitBridge.create(sourceDir) }
 
-                bridge.use { b ->
-                    tasks.forEach { task ->
-                        runCatching {
-                            task.getQueryMap().forEach { (name, query) ->
-                                when (query) {
-                                    is FindClass -> {
-                                        val classes = b.findClass(query)
-                                        classes.singleOrNull()?.let {
-                                            val tip = "${task.TAG}->$name"
-                                            progressText = tip
-                                            DexKitCache.cacheMap[tip] = it.descriptor
-                                        } ?: run {
-                                            if (classes.isNotEmpty()) {
-                                                val first = classes.first()
-                                                val tip = "${task.TAG}->$name"
-                                                progressText = tip
-                                                DexKitCache.cacheMap[tip] = first.descriptor
-                                            } else {
-                                                LogUtils.e(TAG, "No class found for: ${task.TAG}->$name")
-                                                // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
-                                                DexKitCache.putUnresolved("${task.TAG}->$name")
-                                            }
-                                        }
-                                    }
-
-                                    is FindMethod -> {
-                                        val methods = b.findMethod(query)
-                                        methods.singleOrNull()?.let {
-                                            val tip = "${task.TAG}->$name"
-                                            progressText = tip
-                                            DexKitCache.cacheMap[tip] = it.descriptor
-                                        } ?: run {
-                                            if (methods.isNotEmpty()) {
-                                                val first = methods.first()
-                                                val tip = "${task.TAG}->$name"
-                                                progressText = tip
-                                                DexKitCache.cacheMap[tip] = first.descriptor
-                                            } else {
-                                                LogUtils.e(TAG, "No method found for: ${task.TAG}->$name")
-                                                // 留痕：否则 validateAllTasks 会认为缓存不完整，每次都重扫
-                                                DexKitCache.putUnresolved("${task.TAG}->$name")
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }.onFailure {
-                            LogUtils.e(task.TAG, it)
-                            // 查询抛异常同样要留痕，否则校验会一直判定缓存不完整而重复全量扫描
-                            task.getQueryMap().keys.forEach { DexKitCache.putUnresolved("${task.TAG}->$it") }
-                        }
-                    }
+                // 第二源：运行时已加载的 dex。壳包的外壳 APK 只有几 KB，
+                // 真实代码在运行时加载的 dex 里，只能从 ClassLoader 读到。
+                if (hasUnresolved(tasks)) {
+                    scanRuntimeDex(tasks)
                 }
+
+                // 所有来源都扫完再统一留痕，避免单源扫不到就写入空串把缓存锁死
+                markUnresolved(tasks)
                 progressText = "查找完成，正在初始化..."
                 DexKitCache.saveCache()
                 isFindComplete = true
@@ -243,6 +201,83 @@ object DexKitFinder {
                 progressText = "查找失败，请重试"
                 abortFind()
             }
+        }
+    }
+
+    /** 打开一个来源并扫描未命中的 key；单个来源失败不影响后续来源 */
+    private fun scanSource(label: String, tasks: List<DexKitTask>, create: () -> DexKitBridge) {
+        runCatching { create().use { scanBridge(it, tasks) } }
+            .onFailure { LogUtils.e(TAG, "$label scan failed: $it") }
+    }
+
+    /** 只扫描尚未解析的 key；多个来源依次兜底时避免重复查询 */
+    private fun scanBridge(bridge: DexKitBridge, tasks: List<DexKitTask>) {
+        tasks.forEach { task ->
+            runCatching {
+                task.getQueryMap().forEach query@{ (name, query) ->
+                    val key = "${task.TAG}->$name"
+                    if (DexKitCache.contains(key)) return@query
+                    queryOne(bridge, key, query)
+                }
+            }.onFailure { LogUtils.e(task.TAG, it) }
+        }
+    }
+
+    private fun queryOne(bridge: DexKitBridge, key: String, query: BaseFinder) {
+        when (query) {
+            is FindClass -> {
+                val descriptor = bridge.findClass(query).firstOrNull()?.descriptor
+                if (descriptor != null) {
+                    progressText = key
+                    DexKitCache.put(key, descriptor)
+                } else {
+                    LogUtils.e(TAG, "No class found for: $key")
+                }
+            }
+
+            is FindMethod -> {
+                val descriptor = bridge.findMethod(query).firstOrNull()?.descriptor
+                if (descriptor != null) {
+                    progressText = key
+                    DexKitCache.put(key, descriptor)
+                } else {
+                    LogUtils.e(TAG, "No method found for: $key")
+                }
+            }
+        }
+    }
+
+    /**
+     * 沿宿主 ClassLoader 的 parent 链逐个读取已加载的 dex（含内存 dex）。
+     * 壳包的真实代码可能挂在当前 loader 的 pathList 上，也可能在其父 loader 上，两条都要覆盖。
+     * 仅在第一个来源未全部命中时才执行，正常安装包不会走到这里。
+     */
+    private fun scanRuntimeDex(tasks: List<DexKitTask>) {
+        progressText = "正在读取运行时 dex..."
+        var current: ClassLoader? = ReflectUtils.hostClassLoader
+        var depth = 0
+        while (current != null && depth < 8 && hasUnresolved(tasks)) {
+            val loader = current
+            if (loader is BaseDexClassLoader) {
+                scanSource("runtime dex #$depth", tasks) { DexKitBridge.create(loader, true) }
+            }
+            current = loader.parent
+            depth++
+        }
+    }
+
+    private fun hasUnresolved(tasks: List<DexKitTask>): Boolean = tasks.any { task ->
+        runCatching {
+            task.getQueryMap().keys.any { !DexKitCache.contains("${task.TAG}->$it") }
+        }.getOrDefault(false)
+    }
+
+    /** 所有来源扫完后统一留痕：查过但没命中，避免 validateAllTasks 每次都判缓存不完整 */
+    private fun markUnresolved(tasks: List<DexKitTask>) {
+        tasks.forEach { task ->
+            runCatching {
+                task.getQueryMap().keys.forEach { DexKitCache.putUnresolved("${task.TAG}->$it") }
+            }.onFailure { LogUtils.e(task.TAG, it) }
         }
     }
 

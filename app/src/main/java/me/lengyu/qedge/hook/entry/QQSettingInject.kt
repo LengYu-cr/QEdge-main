@@ -31,13 +31,38 @@ object QQSettingInject : BaseApiHookItem<Listener>(), DexKitTask {
     private const val BOTTOM_TITLE = "送君茉莉，愿君莫离。"
     private const val MODULE_ORDER = 6
 
+    private const val NEW_PROVIDER = "com.tencent.mobileqq.setting.main.NewSettingConfigProvider"
+    private const val OLD_PROVIDER = "com.tencent.mobileqq.setting.main.MainSettingConfigProvider"
+
+    /** 设置页入口类从 QQ 9.1.65 起改名。 */
+    private const val MIN_MAJOR = 9
+    private const val MIN_MINOR = 1
+    private const val MIN_PATCH = 65
+
+    /**
+     * 用 versionName 判断设置页入口类是否已改名。
+     * 不用 versionCode：改包时 versionCode 常被改写，versionName 一般保持原值。
+     */
+    private fun isProviderRenamed(): Boolean {
+        if (!HostInfo.isQQ) return false
+        val parts = HostInfo.versionName.split(".")
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: return true
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: return true
+        val patch = parts.getOrNull(2)?.filter { it.isDigit() }?.toIntOrNull() ?: return true
+        return when {
+            major != MIN_MAJOR -> major > MIN_MAJOR
+            minor != MIN_MINOR -> minor > MIN_MINOR
+            else -> patch >= MIN_PATCH
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     override fun loadHook() {
 
-        val providerClass =
-            if (HostInfo.isQQ && HostInfo.versionCode >= 12288) requireClass("provider")
-            else "com.tencent.mobileqq.setting.main.NewSettingConfigProvider".clazz
-                ?: "com.tencent.mobileqq.setting.main.MainSettingConfigProvider".clazz
+        val providerClass = runCatching { requireClass("provider") }.getOrElse {
+            if (isProviderRenamed()) NEW_PROVIDER.clazz ?: OLD_PROVIDER.clazz
+            else OLD_PROVIDER.clazz ?: NEW_PROVIDER.clazz
+        }
 
         if (providerClass == null) throw ClassNotFoundException("SettingConfigProvider")
 

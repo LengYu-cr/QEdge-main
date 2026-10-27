@@ -16,6 +16,7 @@ import me.lengyu.qedge.utils.LogUtils
 import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.Toasts
+import me.lengyu.qedge.utils.reflect.ClassUtils
 /**
  * @Author 冷雨
  * @Description 复制卡片消息
@@ -27,6 +28,11 @@ class CopyArkMessage : BaseSwitchHookItem() {
         private const val TAG = "CopyArkMessage"
         private const val SP_KEY = "copy_ark_message"
         private const val COPY_BUTTON_ID = 0x293284
+        private const val AIO_MSG_ITEM_CLASS = "com.tencent.mobileqq.aio.msg.AIOMsgItem"
+
+        /** 按 VB 的 Class 缓存 AIOMsgItem 字段（视图复用同一 Class，命中后 O(1)） */
+        private val aioMsgItemFieldCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Any>()
+        private val FIELD_NOT_FOUND = Any()
 
         fun isEnabled(): Boolean {
             return ModuleConfig.getBoolean(SP_KEY, false)
@@ -74,10 +80,7 @@ class CopyArkMessage : BaseSwitchHookItem() {
             val rootView = itemView as? ViewGroup ?: return
 
             // 获取 AIOMsgItem
-            val aioMsgItem = findFirstFieldOfType(
-                thisObject,
-                "com.tencent.mobileqq.aio.msg.AIOMsgItem"
-            ) ?: return
+            val aioMsgItem = findAioMsgItem(thisObject) ?: return
 
             // 获取 msgRecord
             val msgRecord = ReflectUtils.callMethod(aioMsgItem, "getMsgRecord") ?: return
@@ -100,9 +103,13 @@ class CopyArkMessage : BaseSwitchHookItem() {
                 }
             }
 
-            val existingCopyBtn = rootView.findViewById<View?>(COPY_BUTTON_ID)
+            // 用 View tag 记录按钮，避免每次 findViewById 走一遍子树
+            val existingCopyBtn = rootView.getTag(COPY_BUTTON_ID) as? View
             if (cardData == null) {
-                if (existingCopyBtn != null) rootView.removeView(existingCopyBtn)
+                if (existingCopyBtn != null) {
+                    rootView.removeView(existingCopyBtn)
+                    rootView.setTag(COPY_BUTTON_ID, null)
+                }
                 return
             }
 
@@ -115,11 +122,13 @@ class CopyArkMessage : BaseSwitchHookItem() {
     }
 
     private fun getVBView(thisObject: Any): View? {
+        // 字段查找走 ClassUtils 的缓存，命中后不再反射扫描
         try {
-            val field = thisObject.javaClass.getDeclaredField("e")
-            field.isAccessible = true
-            val view = field.get(thisObject) as? View
-            if (view != null) return view
+            val field = ClassUtils.findFieldOrNull(thisObject.javaClass, "e")
+            if (field != null) {
+                val view = field.get(thisObject) as? View
+                if (view != null) return view
+            }
         } catch (_: Exception) {}
         try {
             return ReflectUtils.callMethod(thisObject, "getHostView") as? View
@@ -145,6 +154,7 @@ class CopyArkMessage : BaseSwitchHookItem() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ))
+        rootView.setTag(COPY_BUTTON_ID, textView)
     }
 
     private fun copyToClipboard(context: Context, text: String) {
@@ -155,19 +165,39 @@ class CopyArkMessage : BaseSwitchHookItem() {
         }
     }
 
-    private fun findFirstFieldOfType(obj: Any, typeName: String): Any? {
+    /** 按 Class 缓存 AIOMsgItem 字段，避免每次气泡更新都全字段扫描 */
+    private fun findAioMsgItem(obj: Any): Any? {
+        val clazz = obj.javaClass
+        val cached = aioMsgItemFieldCache[clazz]
+        val field: java.lang.reflect.Field = when {
+            cached === FIELD_NOT_FOUND -> return null
+            cached != null -> cached as java.lang.reflect.Field
+            else -> {
+                val found = findFirstFieldOfType(clazz, AIO_MSG_ITEM_CLASS)
+                aioMsgItemFieldCache.putIfAbsent(clazz, found ?: FIELD_NOT_FOUND)
+                found
+            }
+        } ?: return null
+        return try {
+            field.get(obj)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    private fun findFirstFieldOfType(clazz: Class<*>, typeName: String): java.lang.reflect.Field? {
         try {
             val hostCL = ReflectUtils.hostClassLoader ?: return null
             val targetType = XposedHelpers.findClass(typeName, hostCL)
-            var clazz: Class<*>? = obj.javaClass
-            while (clazz != null) {
-                for (field in clazz.declaredFields) {
+            var current: Class<*>? = clazz
+            while (current != null) {
+                for (field in current.declaredFields) {
                     if (targetType.isAssignableFrom(field.type)) {
                         field.isAccessible = true
-                        return field.get(obj)
+                        return field
                     }
                 }
-                clazz = clazz.superclass
+                current = current.superclass
             }
         } catch (_: Exception) {}
         return null

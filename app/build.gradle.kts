@@ -20,10 +20,10 @@ android {
 
     defaultConfig {
         applicationId = "me.lengyu.qedge"
-        minSdk = 29
+        minSdk = 28
         targetSdk = 37
-        versionCode = 32
-        versionName = "0.3.2"
+        versionCode = 33
+        versionName = "0.3.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
@@ -80,9 +80,9 @@ android {
         dex {
             useLegacyPackaging = true
         }
-        jniLibs {
-            useLegacyPackaging = true
-        }
+        // 注意：jniLibs 不能压缩。Xposed 寄生 ClassLoader 的 nativeLibraryDirectories
+        // 指向 "base.apk!/lib/<abi>"，so 一旦被 DEFLATE 压缩就无法被 linker 直接映射，
+        // System.loadLibrary 必然失败；保持 STORED + 对齐才能加载 libdexkit.so。
         resources {
             excludes += "/META-INF/{AL2.0,LGPL2.1}"
             // 去除依赖 jar 打进来的无用资源：Rhino 调试/工具(test.js 等)、protobuf 源描述文本

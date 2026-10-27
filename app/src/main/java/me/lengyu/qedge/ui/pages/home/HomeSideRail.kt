@@ -10,7 +10,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -165,6 +165,7 @@ internal fun HomeScaffold(
                 currentTime = currentTime,
                 contentColor = railContentColor,
                 actions = actions,
+                drawerOpen = drawerOpen,
                 onActionClick = { drawerOpen = false },
                 modifier = Modifier.fillMaxSize()
             )
@@ -193,6 +194,7 @@ private fun HomeSideRail(
     currentTime: LocalTime,
     contentColor: Color,
     actions: List<HomeRailAction>,
+    drawerOpen: Boolean,
     onActionClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -244,8 +246,24 @@ private fun HomeSideRail(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.Bottom)
         ) {
-            items(actions, key = { it.label }) { action ->
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            itemsIndexed(actions, key = { _, it -> it.label }) { index, action ->
+                // 抽屉拉开时按钮自左向右依次浮入，形成空间的流向感
+                val enter by animateFloatAsState(
+                    targetValue = if (drawerOpen) 1f else 0f,
+                    animationSpec = tween(
+                        durationMillis = 260,
+                        delayMillis = (index * 45).coerceAtMost(280),
+                        easing = FastOutSlowInEasing
+                    ),
+                    label = "railItemEnter"
+                )
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.graphicsLayer {
+                        alpha = enter
+                        translationX = -22f * (1f - enter)
+                    }
+                ) {
                     if (action.showDividerBefore) {
                         Box(
                             modifier = Modifier

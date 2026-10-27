@@ -105,6 +105,7 @@ public class ColdRainCore {
         
         initConfigFile();
         loadConfig();
+        migrateMasterToGlobalAdmins();
         initialized = true;
 
         registerFeatures();
@@ -147,6 +148,18 @@ public class ColdRainCore {
         if (!dataDir.exists()) {
             dataDir.mkdirs();
         }
+    }
+
+    /** 主人与全局代管已合并：把旧配置里的 master_uin 并入 global_admins 后删除该键 */
+    private void migrateMasterToGlobalAdmins() {
+        String masterUin = getString("master_uin", "");
+        if (masterUin == null || masterUin.isEmpty()) return;
+        String globalAdmins = getGlobalAdmins();
+        if (!matchesAdminList(globalAdmins, masterUin)) {
+            globalAdmins = globalAdmins.isEmpty() ? masterUin : globalAdmins + "," + masterUin;
+            setString("global_admins", globalAdmins);
+        }
+        removeConfig("master_uin");
     }
 
     private void loadConfig() {
@@ -214,6 +227,11 @@ public class ColdRainCore {
     private void setBoolean(String key, boolean value) {
         try {
             synchronized (configLock) {
+                // 写之前先同步磁盘上的最新配置，避免把外部（手动编辑等）改动整份覆盖掉
+                checkAndReloadIfModified();
+                if (configData == null) {
+                    configData = new JSONObject();
+                }
                 configData.put(key, value);
                 saveConfig();
             }
@@ -238,6 +256,11 @@ public class ColdRainCore {
     private void setString(String key, String value) {
         try {
             synchronized (configLock) {
+                // 写之前先同步磁盘上的最新配置，避免把外部（手动编辑等）改动整份覆盖掉
+                checkAndReloadIfModified();
+                if (configData == null) {
+                    configData = new JSONObject();
+                }
                 configData.put(key, value);
                 saveConfig();
             }
@@ -265,6 +288,11 @@ public class ColdRainCore {
     public void setConfigInt(String key, int value) {
         try {
             synchronized (configLock) {
+                // 写之前先同步磁盘上的最新配置，避免把外部（手动编辑等）改动整份覆盖掉
+                checkAndReloadIfModified();
+                if (configData == null) {
+                    configData = new JSONObject();
+                }
                 configData.put(key, value);
                 saveConfig();
             }
@@ -275,6 +303,10 @@ public class ColdRainCore {
 
     public int getConfigInt(String key, int defaultValue) {
         synchronized (configLock) {
+            if (configData == null) {
+                return defaultValue;
+            }
+            checkAndReloadIfModified();
             if (configData.has(key)) {
                 return configData.optInt(key, defaultValue);
             }
@@ -374,6 +406,10 @@ public class ColdRainCore {
     public java.util.Set<String> getAllConfigKeys() {
         java.util.Set<String> keys = new java.util.HashSet<>();
         synchronized (configLock) {
+            checkAndReloadIfModified();
+            if (configData == null) {
+                return keys;
+            }
             java.util.Iterator<String> it = configData.keys();
             while (it.hasNext()) {
                 keys.add(it.next());
@@ -384,6 +420,10 @@ public class ColdRainCore {
 
     public void removeConfig(String key) {
         synchronized (configLock) {
+            checkAndReloadIfModified();
+            if (configData == null) {
+                return;
+            }
             configData.remove(key);
             saveConfig();
         }
@@ -562,7 +602,8 @@ public class ColdRainCore {
             return false;
         }
         if (isPersonalFeature(featureKey)) {
-            return true;
+            // 个人功能不受「功能开关」和「群功能开关」限制，但仍需本群/好友会话已开机
+            return getBoolean("group_master_enabled_" + effectiveKey, false);
         }
         if (!getBoolean("group_master_enabled_" + effectiveKey, false)) {
             return false;
@@ -727,10 +768,6 @@ public class ColdRainCore {
         return getBoolean("menu_restricted", false);
     }
 
-    public String getMasterUin() {
-        return getString("master_uin", "");
-    }
-
     public String getGlobalAdmins() {
         return getString("global_admins", "");
     }
@@ -751,25 +788,17 @@ public class ColdRainCore {
         String myUin = getMyUin();
         if (!myUin.isEmpty() && uin.equals(myUin)) return true;
 
-        String masterUin = getMasterUin();
-        if (!masterUin.isEmpty() && uin.equals(masterUin)) return true;
-
         String globalAdmins = getGlobalAdmins();
-        if (!globalAdmins.isEmpty()) {
-            for (String admin : globalAdmins.split(",")) {
-                if (admin.trim().equals(uin)) return true;
-            }
-        }
+        if (matchesAdminList(globalAdmins, uin)) return true;
 
         if (msgData.type == 2 && msgData.peerUin != null && !msgData.peerUin.isEmpty()) {
             String groupAdmins = getGroupAdmins(msgData.peerUin);
-            if (!groupAdmins.isEmpty()) {
-                for (String admin : groupAdmins.split(",")) {
-                    if (admin.trim().equals(uin)) return true;
-                }
-            }
+            if (matchesAdminList(groupAdmins, uin)) return true;
         }
 
+        // 鉴权失败时输出一条日志，便于确认 senderUin 是否取到真实 QQ 号
+        LogUtils.d(TAG, "isAdminOrSelf denied: uin=" + uin + ", sendType=" + msgData.sendType
+                + ", type=" + msgData.type + ", peerUin=" + msgData.peerUin);
         return false;
     }
 
@@ -779,25 +808,23 @@ public class ColdRainCore {
         String myUin = getMyUin();
         if (!myUin.isEmpty() && uin.equals(myUin)) return true;
 
-        String masterUin = getMasterUin();
-        if (!masterUin.isEmpty() && uin.equals(masterUin)) return true;
-
         String globalAdmins = getGlobalAdmins();
-        if (!globalAdmins.isEmpty()) {
-            for (String admin : globalAdmins.split(",")) {
-                if (admin.trim().equals(uin)) return true;
-            }
-        }
+        if (matchesAdminList(globalAdmins, uin)) return true;
 
         if (groupUin != null && !groupUin.isEmpty()) {
             String groupAdmins = getGroupAdmins(groupUin);
-            if (!groupAdmins.isEmpty()) {
-                for (String admin : groupAdmins.split(",")) {
-                    if (admin.trim().equals(uin)) return true;
-                }
-            }
+            if (matchesAdminList(groupAdmins, uin)) return true;
         }
 
+        return false;
+    }
+
+    /** 代管QQ列表支持中英文逗号、顿号、分号与空白分隔 */
+    private static boolean matchesAdminList(String list, String uin) {
+        if (list == null || list.isEmpty()) return false;
+        for (String admin : list.split("[,，、;；\\s]+")) {
+            if (admin.equals(uin)) return true;
+        }
         return false;
     }
 

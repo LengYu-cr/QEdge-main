@@ -57,6 +57,12 @@ object LevelBoost : BaseApiHookItem<LevelBoost.Listener>() {
     const val SP_LEVEL_BOOST_ENABLED = "level_boost_enabled"
     /** 等级加速·空间浏览开关 */
     const val SP_SPACE_BROWSE_ENABLED = "space_browse_enabled"
+    /** 空间签到发布成功后删除说说开关（默认关闭） */
+    const val SP_CHECKIN_DELETE_AFTER = "qzone_checkin_delete_after"
+    /** 定时说说发布成功后删除开关（默认关闭） */
+    const val SP_MOOD_DELETE_AFTER = "qzone_mood_delete_after"
+    /** 发布后删除说说的延迟（毫秒） */
+    private const val DELETE_DELAY_MS = 5000L
     /** 所有等级加速类签到默认触发时间：凌晨 00:00 */
     const val CHECKIN_TRIGGER_TIME = "00:00"
 
@@ -110,6 +116,8 @@ object LevelBoost : BaseApiHookItem<LevelBoost.Listener>() {
     fun isLevelBoostEnabled(): Boolean = ModuleConfig.getBoolean(SP_LEVEL_BOOST_ENABLED, false)
     fun isSpaceBrowseEnabled(): Boolean = ModuleConfig.getBoolean(SP_SPACE_BROWSE_ENABLED, false)
     fun isMoodEnabled(): Boolean = ModuleConfig.getBoolean(SP_MOOD_ENABLED, false)
+    fun isCheckinDeleteAfter(): Boolean = ModuleConfig.getBoolean(SP_CHECKIN_DELETE_AFTER, false)
+    fun isMoodDeleteAfter(): Boolean = ModuleConfig.getBoolean(SP_MOOD_DELETE_AFTER, false)
     fun getMoodTime(): String = ModuleConfig.getString(SP_MOOD_TIME, "08:30").trim()
         .takeIf { HH_MM_REGEX.matches(it) } ?: "08:30"
     fun getMoodText(): String = ModuleConfig.getString(SP_MOOD_TEXT, "").trim()
@@ -311,8 +319,11 @@ object LevelBoost : BaseApiHookItem<LevelBoost.Listener>() {
             if (needMood) {
                 Thread {
                     runCatching {
-                        val ok = QZoneLikeTool.publishMood(text)
-                        if (ok) markDoneToday(SP_PREFIX_MOOD_DONE, today)
+                        val (ok, tid) = QZoneLikeTool.publishMood(text)
+                        if (ok) {
+                            markDoneToday(SP_PREFIX_MOOD_DONE, today)
+                            deleteAfterPublish(isMoodDeleteAfter(), tid)
+                        }
                         forEachChecked { it.onScheduleMoodResult(ok, text, tgt) }
                     }.onFailure { LogUtils.e(TAG, "tick mood error: ${it.message}") }
                 }.start()
@@ -331,11 +342,26 @@ object LevelBoost : BaseApiHookItem<LevelBoost.Listener>() {
         if (!checkinRunning.compareAndSet(false, true)) return
         Thread {
             runCatching {
-                val ok = QZoneLikeTool.qzoneClockIn()
-                if (ok) markDoneToday(SP_PREFIX_CHECKIN_DONE, today)
+                val (ok, tid) = QZoneLikeTool.qzoneClockIn()
+                if (ok) {
+                    markDoneToday(SP_PREFIX_CHECKIN_DONE, today)
+                    deleteAfterPublish(isCheckinDeleteAfter(), tid)
+                }
                 forEachChecked { it.onScheduleCheckinResult(ok) }
             }.onFailure { LogUtils.e(TAG, "runCheckin error: ${it.message}") }
             checkinRunning.set(false)
+        }.start()
+    }
+
+    /** 发布成功后按配置延迟删除该条说说（默认不删） */
+    private fun deleteAfterPublish(enabled: Boolean, tid: String) {
+        if (!enabled || tid.isEmpty()) return
+        Thread {
+            runCatching {
+                Thread.sleep(DELETE_DELAY_MS)
+                val ok = QZoneLikeTool.deleteMood(tid)
+                LogUtils.d(TAG, "deleteAfterPublish tid=$tid ok=$ok")
+            }.onFailure { LogUtils.e(TAG, "deleteAfterPublish error: ${it.message}") }
         }.start()
     }
 

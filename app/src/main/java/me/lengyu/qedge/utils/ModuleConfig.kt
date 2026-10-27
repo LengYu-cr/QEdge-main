@@ -12,8 +12,8 @@ object ModuleConfig {
     private const val SWITCH_CONFIG = "config"
     private const val DATA_CONFIG = "userdata"
 
-    private val configDir: String
-        get() = "${HostInfo.getModuleDataPath()}data/"
+    /** 延迟初始化后固定复用，避免每次读配置都拼一次路径字符串 */
+    private val configDir: String by lazy { "${HostInfo.getModuleDataPath()}data/" }
 
     // ---- 开关配置 ----
 

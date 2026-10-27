@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.SystemClock
 import android.view.View
 import android.widget.ImageView
 import de.robv.android.xposed.XC_MethodHook
@@ -43,24 +44,40 @@ class RepeatMsg : BaseSwitchHookItem() {
         private const val TAG = "RepeatMsg"
         private const val SP_KEY = "repeat_msg"
         private const val ICON_SP_KEY = "repeat_msg_icon"
+        private const val ICON_TAG_KEY = 0x293285
+
+        /** 自定义图标路径/修改时间的校验间隔：高频回调里不每次都碰文件系统 */
+        private const val ICON_CHECK_INTERVAL_MS = 1000L
 
         @Volatile
         private var cachedTargetMethod: Method? = null
         @Volatile
         private var hasSearched = false
 
+        /** 按 Class 缓存 kotlin.Lazy 字段，避免每次气泡更新都扫全部字段 */
+        private val lazyFieldCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Any>()
+        private val FIELD_NOT_FOUND = Any()
+
         // 自定义图标按 路径+修改时间 缓存：换图时文件被原地覆盖（路径不变），靠 lastModified 失效
         @Volatile
         private var cachedIconKey: String? = null
         @Volatile
         private var cachedIconBitmap: Bitmap? = null
+        @Volatile
+        private var lastIconCheckMs = 0L
 
         /**
          * 读取用户在首页选择的自定义图标（路径存 ModuleConfig）。
          * 未设置、文件不存在或解码失败均返回 null，回退到默认图标。
          * 大图按 256px 采样解码，避免整张照片解进内存（按钮只有几十 dp）。
+         *
+         * 路径与 lastModified 的校验按 [ICON_CHECK_INTERVAL_MS] 节流，避免每个气泡都做文件 IO。
          */
         fun loadCustomIcon(): Bitmap? {
+            val now = SystemClock.elapsedRealtime()
+            if (now - lastIconCheckMs < ICON_CHECK_INTERVAL_MS) return cachedIconBitmap
+            lastIconCheckMs = now
+
             val path = ModuleConfig.getString(ICON_SP_KEY, "")
             if (path.isEmpty()) {
                 cachedIconKey = null
@@ -87,6 +104,17 @@ class RepeatMsg : BaseSwitchHookItem() {
             cachedIconKey = key
             cachedIconBitmap = bitmap
             return bitmap
+        }
+
+        /** 按 Class 取得缓存中的 kotlin.Lazy 字段，找不到返回 null（负结果同样缓存） */
+        internal fun getLazyField(clazz: Class<*>): java.lang.reflect.Field? {
+            val cached = lazyFieldCache[clazz]
+            if (cached != null) return if (cached === FIELD_NOT_FOUND) null else cached as java.lang.reflect.Field
+
+            val found = clazz.declaredFields.firstOrNull { it.type.name == "kotlin.Lazy" }
+                ?.apply { isAccessible = true }
+            lazyFieldCache[clazz] = found ?: FIELD_NOT_FOUND
+            return found
         }
 
         fun isEnabled(): Boolean {
@@ -149,10 +177,7 @@ class RepeatMsg : BaseSwitchHookItem() {
         try {
             if (!isEnabled()) return
 
-            val lazyField = param.thisObject.javaClass.declaredFields.find {
-                it.type.name == "kotlin.Lazy"
-            } ?: return
-            lazyField.isAccessible = true
+            val lazyField = getLazyField(param.thisObject.javaClass) ?: return
             val lazy = lazyField.get(param.thisObject) ?: return
 
             val repeatView = ReflectUtils.callMethod(lazy, "getValue") as? ImageView ?: return
@@ -164,12 +189,17 @@ class RepeatMsg : BaseSwitchHookItem() {
 
             repeatView.apply {
                 visibility = View.VISIBLE
-                // 用户在首页选过图则用自定义图标，否则用默认图标
+                // 用户在首页选过图则用自定义图标，否则用默认图标；
+                // 图标没变就跳过重设，避免每次 UI 更新都触发资源解析/重绘
                 val customIcon = loadCustomIcon()
-                if (customIcon != null) {
-                    setImageBitmap(customIcon)
-                } else {
-                    setImageResource(R.drawable.repeat)
+                val applied = getTag(ICON_TAG_KEY)
+                if (applied == null || applied !== drawable) {
+                    if (customIcon != null) {
+                        setImageBitmap(customIcon)
+                    } else {
+                        setImageResource(R.drawable.repeat)
+                    }
+                    setTag(ICON_TAG_KEY, drawable)
                 }
                 setOnClickListener {
                     // LogUtils.d(TAG, "repeatView clicked")

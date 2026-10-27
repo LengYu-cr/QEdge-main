@@ -64,9 +64,6 @@ object ColdRainConfig {
     val menuRestricted: Boolean
         get() = getBoolean("menu_restricted", false)
 
-    val masterUin: String
-        get() = getString("master_uin", "")
-
     val globalAdmins: String
         get() = getString("global_admins", "")
 
@@ -133,7 +130,25 @@ object ColdRainConfig {
     }
 
     fun getConfigDir(): File? {
-        return File(getLocalPath(), "Android/media/me.lengyu.qedge/冷雨Java")
+        return File(QQCurrentEnv.getMediaPath(), "冷雨Java")
+    }
+
+    /** 已配置的本群代管：群号 to 代管QQ列表 */
+    fun getGroupAdminEntries(): List<Pair<String, String>> {
+        val core = me.lengyu.qedge.coldrain.ColdRainCore.getInstance()
+        return core.allConfigKeys
+            .filter { it.startsWith("group_admins_") }
+            .sorted()
+            .map { key -> key.removePrefix("group_admins_") to core.getConfigString(key, "") }
+            .filter { it.second.isNotEmpty() }
+    }
+
+    fun setGroupAdmins(groupUin: String, admins: String) {
+        setString("group_admins_$groupUin", admins)
+    }
+
+    fun removeGroupAdmins(groupUin: String) {
+        me.lengyu.qedge.coldrain.ColdRainCore.getInstance().removeConfig("group_admins_$groupUin")
     }
 
     fun isInitialized(): Boolean {

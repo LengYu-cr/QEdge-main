@@ -76,6 +76,7 @@ import me.lengyu.qedge.hook.item.NativeEmotionDownload;
 import me.lengyu.qedge.hook.item.HideDressBeancurd;
 import me.lengyu.qedge.hook.item.HideAioPet;
 import me.lengyu.qedge.hook.item.Apk1AsApk;
+import me.lengyu.qedge.hook.item.GlassBottomTabBar;
 
 import java.util.List;
 /**
@@ -143,6 +144,7 @@ public class MainHook {
         HookRegistry.register(HideDressBeancurd.INSTANCE);
         HookRegistry.register(HideAioPet.INSTANCE);
         HookRegistry.register(Apk1AsApk.INSTANCE);
+        HookRegistry.register(GlassBottomTabBar.INSTANCE);
     }
 
     private static long lastPluginLoadTime = 0;

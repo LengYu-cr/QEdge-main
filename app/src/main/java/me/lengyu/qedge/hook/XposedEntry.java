@@ -1,7 +1,6 @@
 package me.lengyu.qedge.hook;
 
 import android.content.Context;
-import android.os.Build;
 import dalvik.system.BaseDexClassLoader;
 import de.robv.android.xposed.IXposedHookLoadPackage;
 import de.robv.android.xposed.IXposedHookZygoteInit;
@@ -95,9 +94,9 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
             return;
         }
 
-        // 仅打包 arm64(v8a)：若为 32 位设备，不加载模块并提示系统版本不支持
-        if (is32BitDevice()) {
-            reject32BitDevice(lpparam);
+        // 仅打包 arm64(v8a)：若当前宿主进程为 32 位，不加载模块并提示系统版本不支持
+        if (is32BitProcess()) {
+            reject32BitProcess(lpparam);
             return;
         }
 
@@ -165,16 +164,17 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
     }
 
     /**
-     * 仅打包 arm64 后，若设备为纯 32 位则判定为不支持
+     * 仅打包 arm64 后，当前宿主进程为 32 位则判定为不支持。
+     * 64 位设备上也可能运行 32 位宿主，因此必须看进程位数而非设备位数。
      */
-    private boolean is32BitDevice() {
-        return Build.SUPPORTED_64_BIT_ABIS == null || Build.SUPPORTED_64_BIT_ABIS.length == 0;
+    private boolean is32BitProcess() {
+        return !android.os.Process.is64Bit();
     }
 
     /**
-     * 32 位设备：不加载任何模块，仅 hook 宿主 Application.onCreate 提示系统版本不支持
+     * 32 位进程：不加载任何模块，仅 hook 宿主 Application.onCreate 提示系统版本不支持
      */
-    private void reject32BitDevice(XC_LoadPackage.LoadPackageParam lpparam) {
+    private void reject32BitProcess(XC_LoadPackage.LoadPackageParam lpparam) {
         final String appClass;
         String pkg = lpparam.packageName;
         if (pkg.equals("com.tencent.mobileqq") || pkg.equals("com.tencent.tim")) {
@@ -204,14 +204,14 @@ public class XposedEntry implements IXposedHookLoadPackage, IXposedHookZygoteIni
                 protected void afterHookedMethod(MethodHookParam param) {
                     try {
                         if (param.thisObject instanceof Context) {
-                            Toasts.toast("QEdge 不支持 32 位系统版本");
+                            Toasts.toast("QEdge 不支持 32 位运行环境");
                         }
                     } catch (Throwable ignored) {
                     }
                 }
             });
         } catch (Throwable e) {
-            XposedBridge.log("[QEdge] 32 位设备拦截提示失败: " + e.getMessage());
+            XposedBridge.log("[QEdge] 32 位进程拦截提示失败: " + e.getMessage());
         }
     }
 

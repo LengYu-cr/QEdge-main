@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Intent
 import android.view.View
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
@@ -12,30 +13,47 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Switch
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import com.tencent.qqnt.aio.activity.AIODelegate
 import de.robv.android.xposed.XC_MethodHook
 import de.robv.android.xposed.XposedBridge
 import me.lengyu.qedge.activity.SettingActivity
 import me.lengyu.qedge.coldrain.ColdRainCore
+import me.lengyu.qedge.coldrain.features.MusicMenuFeature
+import me.lengyu.qedge.common.ModuleScope
 import me.lengyu.qedge.lifecycle.Parasitics
 import me.lengyu.qedge.plugin.PluginManager
 import me.lengyu.qedge.plugin.bean.PluginInfo
@@ -278,6 +296,21 @@ object ChatSettingLoader {
                         showGroupSwitchDialog(hostActivity, effectiveKey, isGroup)
                     }
                 )
+                if (ColdRainConfig.getBoolean("quick_music_enabled", false)) {
+                    menuItems.add(
+                        PluginMenuItem.Action(
+                            "快捷QQ点歌",
+                            "cold_rain"
+                        ) {
+                            if (contact.peerUin.isEmpty()) {
+                                Toasts.toast("获取聊天信息失败")
+                                return@Action
+                            }
+                            ColdRainConfig.init(hostActivity)
+                            showQuickMusicDialog(hostActivity, contact.peerUin, contact.chatType)
+                        }
+                    )
+                }
             }
         }.onFailure { e ->
             LogUtils.e("ChatSettingLoader", "build coldrain menu failed: ${e.message}")
@@ -398,6 +431,36 @@ object ChatSettingLoader {
             }
         } catch (e: Throwable) {
             LogUtils.e("ChatSettingLoader", "showGroupSwitchDialog failed: ${e.message}")
+            Toasts.toast("打开失败: ${e.message}")
+        }
+    }
+
+    private fun showQuickMusicDialog(
+        context: android.content.Context,
+        peerUin: String,
+        chatType: Int
+    ) {
+        try {
+            val activity = QQCurrentEnv.getActivity()
+                ?: (context as? Activity)
+            if (activity == null || activity.isFinishing || activity.isDestroyed) {
+                LogUtils.e("ChatSettingLoader", "skip showQuickMusicDialog: host activity invalid")
+                Toasts.toast("当前页面状态异常")
+                return
+            }
+            Parasitics.ensureInitialized(activity)
+            runCatching { Parasitics.injectModuleResources(activity.resources) }
+
+            runCatching {
+                QEdgeBottomDialog(activity) { dismiss ->
+                    QuickMusicContent(peerUin, chatType, dismiss)
+                }.show()
+            }.onFailure { e ->
+                LogUtils.e("ChatSettingLoader", "showQuickMusicDialog show failed: ${e.message}")
+                Toasts.toast("打开失败: ${e.message}")
+            }
+        } catch (e: Throwable) {
+            LogUtils.e("ChatSettingLoader", "showQuickMusicDialog failed: ${e.message}")
             Toasts.toast("打开失败: ${e.message}")
         }
     }
@@ -630,6 +693,276 @@ private fun GroupSwitchContent(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun QuickMusicContent(
+    peerUin: String,
+    chatType: Int,
+    onDismiss: () -> Unit
+) {
+    val colors = QEdgeTheme.colors
+    var keyword by remember { mutableStateOf("") }
+    var searching by remember { mutableStateOf(false) }
+    var sending by remember { mutableStateOf(false) }
+    var songs by remember { mutableStateOf<List<MusicMenuFeature.QuickSong>>(emptyList()) }
+    var selected by remember { mutableStateOf<MusicMenuFeature.QuickSong?>(null) }
+    val qualities = remember {
+        listOf("" to "接口默认音质") + MusicMenuFeature.quickQQQualityTable().map { it.key to it.value }
+    }
+
+    fun doSearch() {
+        val kw = keyword.trim()
+        if (kw.isEmpty()) {
+            Toasts.toast("请输入歌名")
+            return
+        }
+        if (searching) return
+        searching = true
+        ModuleScope.launchIO("QuickMusic") {
+            try {
+                val result = MusicMenuFeature.quickSearchQQ(kw)
+                ModuleScope.postToMain {
+                    songs = result
+                    searching = false
+                    if (result.isEmpty()) Toasts.toast("未搜索到歌曲")
+                }
+            } catch (e: Throwable) {
+                ModuleScope.postToMain {
+                    searching = false
+                    Toasts.toast("搜索失败: ${e.message}")
+                }
+            }
+        }
+    }
+
+    fun doSend(song: MusicMenuFeature.QuickSong, quality: String) {
+        if (sending) return
+        sending = true
+        ModuleScope.launchIO("QuickMusic") {
+            try {
+                MusicMenuFeature.quickSendQQ(peerUin, chatType, song, quality)
+                ModuleScope.postToMain {
+                    sending = false
+                    Toasts.toast("已发送: ${song.title}")
+                    onDismiss()
+                }
+            } catch (e: Throwable) {
+                ModuleScope.postToMain {
+                    sending = false
+                    Toasts.toast("发送失败: ${e.message}")
+                }
+            }
+        }
+    }
+
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .fillMaxHeight()
+            .padding(Dimens.PaddingLarge)
+    ) {
+        Text(
+            "快捷点歌",
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
+            colors.textPrimary,
+            fontSize = 22.sp,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(Dimens.PaddingSmall))
+        Text(
+            if (chatType == 2) "发送到当前群聊" else "发送到当前好友",
+            Modifier.fillMaxWidth(),
+            colors.textSecondary,
+            fontSize = 12.sp,
+            textAlign = TextAlign.Center
+        )
+        Spacer(Modifier.height(20.dp))
+        HorizontalDivider(color = colors.textSecondary.copy(0.1f))
+        Spacer(Modifier.height(20.dp))
+
+        val song = selected
+        if (song == null) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                OutlinedTextField(
+                    value = keyword,
+                    onValueChange = { keyword = it },
+                    modifier = Modifier.weight(1f),
+                    singleLine = true,
+                    enabled = !searching,
+                    label = { Text("歌名或歌手") }
+                )
+                TextButton(
+                    onClick = { doSearch() },
+                    enabled = !searching,
+                    modifier = Modifier.padding(start = 8.dp)
+                ) {
+                    Text(if (searching) "搜索中" else "搜索", color = AccentGreen)
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            if (songs.isEmpty()) {
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 30.dp), Alignment.Center
+                ) {
+                    Text(
+                        if (searching) "搜索中..." else "输入歌名后点击搜索",
+                        fontSize = 14.sp,
+                        color = colors.textSecondary
+                    )
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(songs) { item ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colors.cardBackground)
+                                .clickable { selected = item }
+                                .padding(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            SongCover(item.cover, 48.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    item.title,
+                                    fontSize = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = colors.textPrimary,
+                                    maxLines = 1
+                                )
+                                Text(
+                                    item.singer,
+                                    fontSize = 12.sp,
+                                    color = colors.textSecondary,
+                                    maxLines = 1
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            Row(
+                Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                SongCover(song.cover, 72.dp)
+                Spacer(Modifier.width(12.dp))
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        song.title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = colors.textPrimary,
+                        maxLines = 2
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Text(
+                        song.singer,
+                        fontSize = 13.sp,
+                        color = colors.textSecondary,
+                        maxLines = 1
+                    )
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            Text(
+                "选择音质",
+                Modifier.fillMaxWidth(),
+                colors.textSecondary,
+                fontSize = 12.sp
+            )
+            Spacer(Modifier.height(8.dp))
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(qualities) { (value, label) ->
+                    Text(
+                        if (value.isEmpty()) label else "$value——$label",
+                        Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.cardBackground)
+                            .clickable(enabled = !sending) { doSend(song, value) }
+                            .padding(12.dp),
+                        fontSize = 15.sp,
+                        color = colors.textPrimary
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                TextButton(onClick = { selected = null }, enabled = !sending) {
+                    Text("返回")
+                }
+            }
+        }
+    }
+}
+
+/** 封面内存缓存：同一首歌在列表与选中态复用，避免重复下载 */
+private val songCoverCache = android.util.LruCache<String, android.graphics.Bitmap>(48)
+
+private suspend fun loadSongCover(url: String): android.graphics.Bitmap? {
+    if (url.isEmpty()) return null
+    songCoverCache.get(url)?.let { return it }
+    return withContext(Dispatchers.IO) {
+        runCatching {
+            val conn = java.net.URL(url).openConnection() as java.net.HttpURLConnection
+            conn.connectTimeout = 8000
+            conn.readTimeout = 8000
+            conn.inputStream.use { android.graphics.BitmapFactory.decodeStream(it) }
+        }.getOrNull()?.also { songCoverCache.put(url, it) }
+    }
+}
+
+@Composable
+private fun SongCover(url: String, size: Dp) {
+    val colors = QEdgeTheme.colors
+    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = url) {
+        value = loadSongCover(url)
+    }
+    Box(
+        Modifier
+            .size(size)
+            .clip(RoundedCornerShape(10.dp))
+            .background(colors.cardBackground),
+        contentAlignment = Alignment.Center
+    ) {
+        val bmp = bitmap
+        if (bmp != null) {
+            Image(
+                bmp.asImageBitmap(),
+                null,
+                Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop
+            )
+        } else {
+            Text("♪", fontSize = 18.sp, color = colors.textSecondary)
         }
     }
 }

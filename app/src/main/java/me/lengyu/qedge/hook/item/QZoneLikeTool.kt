@@ -6,6 +6,7 @@ import me.lengyu.qedge.utils.dexkit.DexKitTask
 import me.lengyu.qedge.utils.qq.CookieTool
 import me.lengyu.qedge.hook.annotation.HookItemAnnotation
 import me.lengyu.qedge.hook.annotation.HookCategory
+import org.json.JSONObject
 import org.luckypray.dexkit.query.base.BaseFinder
 import java.io.BufferedReader
 import java.io.DataOutputStream
@@ -152,19 +153,23 @@ object QZoneLikeTool : DexKitTask {
         }
     }
 
+    /** 解析接口返回的 JSON，返回体不是合法 JSON 时返回 null */
+    private fun parseJson(raw: String): JSONObject? =
+        runCatching { JSONObject(raw.trim()) }.getOrNull()
+
     /**
      * 定时发说说
      * 接口来源：taotao.qzone.qq.com emotion_cgi_publish_v6（QQ空间 PC/H5 发表纯文字说说）
      * @param msg 说说内容，中文会自动 UTF-8 编码
-     * @return 是否成功
+     * @return (是否成功, 说说 tid)
      */
-    fun publishMood(msg: String): Boolean {
+    fun publishMood(msg: String): Pair<Boolean, String> {
         return runCatching {
-            val uin = QQCurrentEnv.getCurrentUin() ?: return@runCatching false
-            val skey = CookieTool.getSkey() ?: return@runCatching false
-            val pSkey = CookieTool.getPskey("qzone.qq.com") ?: return@runCatching false
+            val uin = QQCurrentEnv.getCurrentUin() ?: return@runCatching (false to "")
+            val skey = CookieTool.getSkey() ?: return@runCatching (false to "")
+            val pSkey = CookieTool.getPskey("qzone.qq.com") ?: return@runCatching (false to "")
             val bkn = CookieTool.getBkn(skey)
-            val cookieUin = QQCurrentEnv.getCookieUin() ?: return@runCatching false
+            val cookieUin = QQCurrentEnv.getCookieUin() ?: return@runCatching (false to "")
 
             val urlStr = "https://user.qzone.qq.com/proxy/domain/taotao.qzone.qq.com/cgi-bin/emotion_cgi_publish_v6?g_tk=$bkn"
             val encodedMsg = URLEncoder.encode(msg, "UTF-8")
@@ -176,30 +181,33 @@ object QZoneLikeTool : DexKitTask {
                 "&con=qm$encodedMsg" +
                 "&feedversion=1&ver=1&ugc_right=1&to_sign=1" +
                 "&hostuin=$uin" +
-                "&code_version=1&format=fs" +
+                "&code_version=1&format=json" +
                 "&qzreferrer=$referer"
 
             val cookie = "uin=$cookieUin; skey=$skey; p_uin=$cookieUin; p_skey=$pSkey"
             val result = httpPostForm(urlStr, postData, cookie)
             // LogUtils.d(TAG, "publishMood result=${if (result.length > 300) result.substring(0, 300) else result}")
-            result.contains("\"code\":0,") || result.contains("\"ret\":0")
+            val json = parseJson(result) ?: return@runCatching (false to "")
+            val ok = json.optInt("code", -1) == 0
+            val tid = json.optString("t1_tid").ifEmpty { json.optString("tid") }
+            ok to tid
         }.onFailure {
             LogUtils.e(TAG, "publishMood error: ${it.message}")
-        }.getOrDefault(false)
+        }.getOrDefault(false to "")
     }
 
     /**
      * 空间等级签到（等级加速类）
      * 接口来源：h5.qzone.qq.com publishDiyMood/publishmood（小程序入口的每日签到模板）
      * @param content 签到自定义文字，默认 "123" 可改
-     * @return 是否成功
+     * @return (是否成功, 签到说说 tid)
      */
-    fun qzoneClockIn(content: String = "QEdge每日空间签到"): Boolean {
+    fun qzoneClockIn(content: String = "QEdge每日空间签到"): Pair<Boolean, String> {
         return runCatching {
-            val cookieUin = QQCurrentEnv.getCookieUin() ?: return@runCatching false
-            val uin = QQCurrentEnv.getCurrentUin() ?: return@runCatching false
-            val skey = CookieTool.getSkey() ?: return@runCatching false
-            val pSkey = CookieTool.getPskey("qzone.qq.com") ?: return@runCatching false
+            val cookieUin = QQCurrentEnv.getCookieUin() ?: return@runCatching (false to "")
+            val uin = QQCurrentEnv.getCurrentUin() ?: return@runCatching (false to "")
+            val skey = CookieTool.getSkey() ?: return@runCatching (false to "")
+            val pSkey = CookieTool.getPskey("qzone.qq.com") ?: return@runCatching (false to "")
             val gtk = CookieTool.getBkn(pSkey)
             
             val t = System.currentTimeMillis()
@@ -224,9 +232,41 @@ object QZoneLikeTool : DexKitTask {
 
             val result = httpPostJson(urlStr, data1, cookie)
             // LogUtils.d(TAG, "qzoneClockIn result=${if (result.length > 300) result.substring(0, 300) else result}")
-            result.contains("data is ok!") || result.contains("\"ret\":0") || result.contains("\"code\":0")
+            val json = parseJson(result) ?: return@runCatching (false to "")
+            val data = json.optJSONObject("data")
+            val innerRet = data?.optInt("ret", 0) ?: 0
+            val ok = json.optInt("ret", -1) == 0 && innerRet == 0
+            ok to data?.optString("tid").orEmpty()
         }.onFailure {
             LogUtils.e(TAG, "qzoneClockIn error: ${it.message}")
+        }.getOrDefault(false to "")
+    }
+
+    /**
+     * 删除空间说说（发布后自动删除用）
+     * 接口来源：mobile.qzone.qq.com operation/operation_add，res_type=311 表示说说
+     * @param tid 说说 id（publishmood 返回的 data.tid，或 publish_v6 返回的 t1_tid）
+     * @return 是否删除成功
+     */
+    fun deleteMood(tid: String): Boolean {
+        return runCatching {
+            if (tid.isEmpty()) return@runCatching false
+            val cookieUin = QQCurrentEnv.getCookieUin() ?: return@runCatching false
+            val uin = QQCurrentEnv.getCurrentUin() ?: return@runCatching false
+            val skey = CookieTool.getSkey() ?: return@runCatching false
+            val pSkey = CookieTool.getPskey("qzone.qq.com") ?: return@runCatching false
+            val gtk = CookieTool.getBkn(pSkey)
+
+            val urlStr = "https://mobile.qzone.qq.com/operation/operation_add?g_tk=$gtk"
+            val postData = "opr_type=delugc&res_type=311&res_id=$tid&real_del=0&res_uin=$uin&format=json"
+            val cookie = "uin=$cookieUin; skey=$skey; p_uin=$cookieUin; p_skey=$pSkey"
+
+            val result = httpPostForm(urlStr, postData, cookie)
+            // LogUtils.d(TAG, "deleteMood result=${if (result.length > 300) result.substring(0, 300) else result}")
+            val json = parseJson(result) ?: return@runCatching false
+            json.optInt("code", -1) == 0 && (json.optJSONObject("data")?.optInt("ret", 0) ?: 0) == 0
+        }.onFailure {
+            LogUtils.e(TAG, "deleteMood error: ${it.message}")
         }.getOrDefault(false)
     }
 

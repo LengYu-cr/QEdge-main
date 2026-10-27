@@ -4,6 +4,8 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -58,6 +60,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -316,6 +319,29 @@ internal fun CollapsibleContent(
 }
 
 /**
+ * 手风琴卡片：展开时圆角微微放大、收起时收拢回默认值，
+ * 让卡片在「呼气/吸气」之间有一次连续的形状变化，而不是硬切。
+ */
+@Composable
+internal fun HomeAccordionCard(
+    expanded: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.BoxScope.() -> Unit
+) {
+    val cornerRadius by animateDpAsState(
+        targetValue = if (expanded) Dimens.CardCornerRadius + 8.dp else Dimens.CardCornerRadius,
+        animationSpec = spring(dampingRatio = 0.72f, stiffness = 380f),
+        label = "accordionCorner"
+    )
+    QEdgeCard(
+        modifier = modifier,
+        glass = true,
+        cornerRadius = cornerRadius,
+        content = content
+    )
+}
+
+/**
  * 手风琴卡片的可点击标题行：标题 + 副标题 + 右侧展开箭头。
  * 文案取自 HomeRowText 注解，title 为其中的常量 key，subtitle 传入时覆盖注解里的静态文案。
  * 点击切换卡片的展开/收起状态。
@@ -361,12 +387,18 @@ internal fun CardHeader(
             )
         }
         if (!searching) {
-            // 展开箭头：展开时朝上，收起时朝下
+            // 展开箭头：一个常驻字符做连续旋转，避免字符硬切造成的跳动
+            val arrowRotation by animateFloatAsState(
+                targetValue = if (expanded) 180f else 0f,
+                animationSpec = spring(dampingRatio = 0.55f, stiffness = 500f),
+                label = "cardArrowRotation"
+            )
             Text(
-                text = if (expanded) "˄" else "˅",
+                text = "˅",
                 fontSize = 16.sp,
                 color = colors.textSecondary.copy(alpha = 0.5f),
-                fontWeight = FontWeight.Bold
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.graphicsLayer { rotationZ = arrowRotation }
             )
         }
     }

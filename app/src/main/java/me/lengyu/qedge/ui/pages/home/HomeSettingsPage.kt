@@ -66,7 +66,6 @@ import me.lengyu.qedge.common.ModuleScope
 import me.lengyu.qedge.hook.item.HideQmateTitleIcon
 import me.lengyu.qedge.hook.item.HideAioPet
 import me.lengyu.qedge.ui.components.atoms.ActionButton
-import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.molecules.AnimatedListItem
 import me.lengyu.qedge.ui.components.molecules.EmptyStateView
 import me.lengyu.qedge.ui.components.molecules.QEdgeTopBar
@@ -153,7 +152,7 @@ internal fun HomePage(
         if (!isCardVisibleForSearch(searchQuery, "card_qzone")) return@item
         val expanded = searching || expandedCard == "card_qzone"
         CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_qzone")) {
-        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = HomeRowText.CARD_QZONE,
@@ -194,6 +193,14 @@ internal fun HomePage(
                         onCheckedChange = callbacks.onMoodToggle,
                         onClick = callbacks.onMoodConfigClick
                     )
+
+                    SettingGap(12)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.MOOD_DELETE_AFTER,
+                        checked = state.moodDeleteAfter,
+                        onCheckedChange = callbacks.onMoodDeleteAfterToggle
+                    )
                 }
             }
         }
@@ -204,7 +211,7 @@ internal fun HomePage(
         if (!isCardVisibleForSearch(searchQuery, "card_chat")) return@item
         val expanded = searching || expandedCard == "card_chat"
         CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_chat")) {
-        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = HomeRowText.CARD_CHAT,
@@ -445,7 +452,7 @@ internal fun HomePage(
         if (!isCardVisibleForSearch(searchQuery, "card_profile")) return@item
         val expanded = searching || expandedCard == "card_profile"
         CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_profile")) {
-        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = HomeRowText.CARD_PROFILE,
@@ -481,7 +488,7 @@ internal fun HomePage(
         if (!isCardVisibleForSearch(searchQuery, "card_level")) return@item
         val expanded = searching || expandedCard == "card_level"
         CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_level")) {
-        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = HomeRowText.CARD_LEVEL,
@@ -498,6 +505,14 @@ internal fun HomePage(
                         title = HomeRowText.QZONE_CHECKIN,
                         checked = state.qzoneCheckinEnabled,
                         onCheckedChange = callbacks.onCheckinToggle
+                    )
+
+                    SettingGap(12)
+
+                    SettingSwitchItem(
+                        title = HomeRowText.CHECKIN_DELETE_AFTER,
+                        checked = state.qzoneCheckinDeleteAfter,
+                        onCheckedChange = callbacks.onCheckinDeleteAfterToggle
                     )
 
                     SettingGap(12)
@@ -541,7 +556,7 @@ internal fun HomePage(
         if (!isCardVisibleForSearch(searchQuery, "card_keepalive")) return@item
         val expanded = searching || expandedCard == "card_keepalive"
         CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_keepalive")) {
-        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = HomeRowText.CARD_KEEPALIVE,
@@ -587,7 +602,7 @@ internal fun HomePage(
         val qmateTitleIconSupported = remember { HideQmateTitleIcon.isSupported() }
         val aioPetSupported = remember { HideAioPet.isSupported() }
         CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_purify")) {
-        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = HomeRowText.CARD_PURIFY,
@@ -699,6 +714,16 @@ internal fun HomePage(
                             checked = state.disableHomePullDown,
                             onCheckedChange = callbacks.onDisableHomePullDownToggle
                         )
+
+                        SettingGap(4)
+
+                        SettingSwitchItem(
+                            title = HomeRowText.GLASS_BOTTOM_TAB_BAR,
+                            subtitle = "高 ${state.glassBarHeight}dp · 左右留白 ${state.glassBarSideMargin}dp，点击调节尺寸",
+                            checked = state.glassBottomTabBar,
+                            onCheckedChange = callbacks.onGlassBottomTabBarToggle,
+                            onClick = callbacks.onGlassBottomTabBarConfigClick
+                        )
                     }
                 }
             }
@@ -710,7 +735,7 @@ internal fun HomePage(
         if (!isCardVisibleForSearch(searchQuery, "card_system")) return@item
         val expanded = searching || expandedCard == "card_system"
         CompositionLocalProvider(LocalHomeCardSearchText provides homeCardSearchText("card_system")) {
-        QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+        HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
             Column(modifier = Modifier.padding(20.dp)) {
                 CardHeader(
                     title = HomeRowText.CARD_SYSTEM,
@@ -905,7 +930,7 @@ private fun ModuleConfigCard(expanded: Boolean, onToggle: () -> Unit) {
         else -> colors.accentRed
     }
 
-    QEdgeCard(modifier = Modifier.fillMaxWidth(), glass = true) {
+    HomeAccordionCard(expanded = expanded, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(20.dp)) {
             CardHeader(
                 title = HomeRowText.CARD_MODULE_CONFIG,

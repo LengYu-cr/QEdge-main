@@ -23,8 +23,11 @@ public class GroupManagerFeature implements ColdRainFeature {
         if (text.startsWith("/")) {
             return text.equals("/ban") ||
                    text.equals("/禁言") ||
+                   text.equals("/禁") ||
+                   text.equals("/神权") ||
                    text.equals("/unban") ||
                    text.equals("/解禁") ||
+                   text.equals("/解") ||
                    text.equals("/kick") ||
                    text.equals("/踢") ||
                    text.equals("/kickban") ||
@@ -282,7 +285,7 @@ public class GroupManagerFeature implements ColdRainFeature {
         if (text.equals("/ban") || text.equals("/踢黑")) {
             TroopTool.INSTANCE.kickGroup(troopUin, targetUin, true);
             core.reply(msgData, "ok,已踢黑");
-        } else if (text.equals("/解") || text.equals("/解禁")) {
+        } else if (text.equals("/解") || text.equals("/解禁") || text.equals("/unban")) {
             TroopTool.INSTANCE.shutUp(troopUin, targetUin, 0L);
             core.reply(msgData, "ok,已解禁");
         } else if (text.equals("/kick") || text.equals("/踢")) {

@@ -16,7 +16,6 @@ import me.lengyu.qedge.utils.HttpUtils;
 import me.lengyu.qedge.utils.LogUtils;
 import me.lengyu.qedge.utils.Toasts;
 import me.lengyu.qedge.utils.qq.QQCurrentEnv;
-import me.lengyu.qedge.utils.qq.CookieTool;
 import me.lengyu.qedge.utils.qq.ExtraTool;
 import me.lengyu.qedge.utils.qq.MsgTool;
 /**
@@ -146,7 +145,6 @@ public class MusicMenuFeature implements ColdRainFeature {
         if (text.equals("切换下载点歌")) return true;
         if (text.equals("切换空间点歌")) return true;
         if (text.equals("切换播放点歌")) return true;
-        if (text.startsWith("点歌")) return true;
         if (text.startsWith("QQ点歌")) return true;
         if (text.startsWith("网易点歌")) return true;
         if (text.startsWith("酷狗点歌")) return true;
@@ -183,7 +181,7 @@ public class MusicMenuFeature implements ColdRainFeature {
                             enabled = finalCore.isFeatureEnabled("feature_music");
                         }
                         if (enabled) {
-                            String menu = "音乐菜单:\n随机音乐 随机网易\n逆天语音 坤坤音乐\n取消点歌\n点歌+歌曲\nQQ点歌+歌曲(vip)\n网易点歌+歌曲(vip)\n酷狗点歌+歌曲(vip)\n酷我点歌+歌曲(vip)\n咪咕点歌+歌曲(vip)\n汽水点歌+歌曲\n抖音点歌+歌曲\n设置(QQ/网易/酷狗/酷我/咪咕)音质10\n查看(QQ/网易/酷狗/酷我/咪咕)音质列表\n切换卡片/语音/链接/文件/下载/空间/播放点歌\n配置赞助密钥xxxx(赞助20后在后台获取)";
+                            String menu = "音乐菜单:\n随机音乐 随机网易\n逆天语音 坤坤音乐\n取消点歌\nQQ点歌+歌曲(vip)\n网易点歌+歌曲(vip)\n酷狗点歌+歌曲(vip)\n酷我点歌+歌曲(vip)\n咪咕点歌+歌曲(vip)\n汽水点歌+歌曲\n抖音点歌+歌曲\n设置(QQ/网易/酷狗/酷我/咪咕)音质10\n查看(QQ/网易/酷狗/酷我/咪咕)音质列表\n切换卡片/语音/链接/文件/下载/空间/播放点歌\n配置赞助密钥xxxx(赞助20后在后台获取)";
                             finalCore.reply(finalMsgData, menu);
                         } else {
                             finalCore.reply(finalMsgData, "本聊天未开启音乐菜单");
@@ -244,11 +242,6 @@ public class MusicMenuFeature implements ColdRainFeature {
 
                     if (text.startsWith("查看") && text.contains("音质")) {
                         showMusicQuality(qun, text, finalCore, finalMsgData);
-                        return;
-                    }
-
-                    if (text.startsWith("点歌")) {
-                        searchQQMusicDirect(qun, uin, text.substring(2), mtype, yyms, finalCore, finalMsgData);
                         return;
                     }
 
@@ -351,74 +344,81 @@ public class MusicMenuFeature implements ColdRainFeature {
         }
     }
 
-    private void searchQQMusicDirect(String qun, String uin, String keyword, int mtype, String yyms, ColdRainCore core, MsgData msgData) {
-        try {
-            if (keyword.isEmpty()) {
-                core.reply(msgData, "[atUin=" + uin + "]\n不是，你怎么连歌名都不输入！");
-                return;
-            }
-            String myUin = QQCurrentEnv.getCurrentUin();
-            String pskey = CookieTool.getPskey("y.qq.com");
-            String skey = CookieTool.getSkey();
-            if (pskey == null || skey == null) {
-                core.reply(msgData, "无法获取QQ音乐cookie");
-                return;
-            }
-            String cookie = "uin=" + QQCurrentEnv.getCookieUin() + "; skey=" + skey + "; p_uin=" + QQCurrentEnv.getCookieUin() + "; p_skey=" + pskey;
-            String dataJson = "{\"comm\":{\"format\":\"json\",\"inCharset\":\"utf-8\",\"outCharset\":\"utf-8\",\"notice\":0,\"platform\":\"h5\",\"needNewCode\":1,\"ct\":23,\"cv\":0},\"req_0\":{\"method\":\"DoSearchForQQMusicDesktop\",\"module\":\"music.search.SearchCgiService\",\"param\":{\"remoteplace\":\"txt.mqq.all\",\"search_type\":0,\"query\":\"" + keyword + "\",\"page_num\":1,\"num_per_page\":20}}}";
-            String url = HttpUtils.postWithCookie("https://u.y.qq.com/cgi-bin/musicu.fcg?_webcgikey=DoSearchForQQMusicDesktop", dataJson, cookie);
-            if (url == null || url.isEmpty()) {
-                core.reply(msgData, "搜索失败");
-                return;
-            }
-            JSONObject json = new JSONObject(url);
-            String code = json.optString("code");
-            if (!code.equals("0")) {
-                core.reply(msgData, "搜索失败");
-                return;
-            }
-            String req_0 = json.getString("req_0");
-            JSONObject json1 = new JSONObject(req_0);
-            String data1 = json1.getString("data");
-            JSONObject json2 = new JSONObject(data1);
-            String body = json2.getString("body");
-            JSONObject json3 = new JSONObject(body);
-            String song = json3.getString("song");
-            JSONObject json4 = new JSONObject(song);
-            String list = json4.getString("list");
-            if (list.length() < 5) {
-                core.reply(msgData, "[atUin=" + uin + "]\n歌曲未搜索到");
-                return;
-            }
-            JSONArray infos = json4.getJSONArray("list");
-            JSONObject item = infos.getJSONObject(0);
-            String mid = item.getString("mid");
-            String album = item.getString("album");
-            JSONObject albumObj = new JSONObject(album);
-            String albumId = albumObj.getString("pmid");
-            String coverUrl = "http://y.gtimg.cn/music/photo_new/T002R500x500M000" + albumId + ".jpg";
-            String name = item.getString("name");
-            JSONArray singers = item.getJSONArray("singer");
-            StringBuilder singerBuilder = new StringBuilder();
-            for (int i = 0; i < singers.length(); i++) {
-                singerBuilder.append(singers.getJSONObject(i).getString("name")).append(" ");
-            }
-            String singer = singerBuilder.toString().trim();
-            String link = "https://i.y.qq.com/v8/playsong.html?songmid=" + mid + "&senderName=ColdRain";
+    /** 快捷点歌搜索结果（供聊天页弹窗使用） */
+    public static class QuickSong {
+        public final String mid;
+        public final String title;
+        public final String singer;
+        public final String cover;
 
-            String url2 = HttpUtils.get(API_V1 + "qqmusic.php?select=play&mid=" + mid + "&adaptive=1" + qualityParam(qun, "qq") + sponsorParam());
-            if (url2 != null && !url2.isEmpty() && !url2.equals("访问网页失败")) {
-                JSONObject musicJson = new JSONObject(url2);
-                if (musicJson.getInt("code") == 0) {
-                    JSONObject musicData = musicJson.getJSONObject("data");
-                    String music = musicData.getString("music");
-                    sendMusic(qun, name, singer, link, music, coverUrl, "QQ", yyms, mtype, core, msgData);
-                    return;
+        public QuickSong(String mid, String title, String singer, String cover) {
+            this.mid = mid;
+            this.title = title;
+            this.singer = singer;
+            this.cover = cover == null ? "" : cover;
+        }
+    }
+
+    /** 快捷点歌：搜索QQ音乐，失败时抛异常由调用方提示 */
+    public static java.util.List<QuickSong> quickSearchQQ(String keyword) throws Exception {
+        String url = HttpUtils.get(API_V1 + "qqmusic.php?select=search&msg="
+                + URLEncoder.encode(keyword, "UTF-8") + "&num=15" + sponsorParam());
+        if (url == null || url.isEmpty() || url.equals("访问网页失败")) {
+            throw new Exception(url == null || url.isEmpty() ? "搜索失败" : url);
+        }
+        JSONObject json = new JSONObject(url);
+        if (json.getInt("code") != 0) {
+            throw new Exception(json.optString("msg", "搜索失败"));
+        }
+        JSONArray data = json.getJSONArray("data");
+        java.util.List<QuickSong> songs = new java.util.ArrayList<>();
+        for (int i = 0; i < data.length(); i++) {
+            JSONObject item = data.getJSONObject(i);
+            String cover = item.optString("cover", "");
+            if (cover.isEmpty()) {
+                // 搜索接口只有专辑 mid 时按 QQ 音乐封面规则拼接
+                String albumMid = item.optString("albummid", item.optString("albumMid", ""));
+                if (!albumMid.isEmpty()) {
+                    cover = "https://y.gtimg.cn/music/photo_new/T002R300x300M000" + albumMid + ".jpg";
                 }
             }
-            core.reply(msgData, "获取音乐直链失败\n『" + name + "——" + singer + "』\n" + link);
-        } catch (Throwable e) {
-            LogUtils.e("MusicMenuFeature", "searchQQMusicDirect error: " + e.getMessage());
+            songs.add(new QuickSong(item.optString("mid"), item.optString("title"),
+                    item.optString("singer"), cover));
+        }
+        return songs;
+    }
+
+    /** 快捷点歌：QQ音乐可选音质（音质值 -> 说明） */
+    public static LinkedHashMap<String, String> quickQQQualityTable() {
+        LinkedHashMap<String, String> table = QUALITY_TABLE.get("qq");
+        return table == null ? new LinkedHashMap<>() : new LinkedHashMap<>(table);
+    }
+
+    /** 快捷点歌：按指定音质取直链并以音乐卡片发送到当前聊天 */
+    public static void quickSendQQ(String peerUin, int chatType, QuickSong song, String quality) throws Exception {
+        String qualityPart = (quality == null || quality.isEmpty()) ? "" : "&type=" + quality;
+        String url = HttpUtils.get(API_V1 + "qqmusic.php?select=play&mid=" + song.mid + "&adaptive=1" + qualityPart + sponsorParam());
+        if (url == null || url.isEmpty() || url.equals("访问网页失败")) {
+            throw new Exception(url == null || url.isEmpty() ? "获取音乐直链失败" : url);
+        }
+        JSONObject json = new JSONObject(url);
+        if (json.getInt("code") != 0) {
+            throw new Exception(json.optString("msg", "获取音乐直链失败"));
+        }
+        JSONObject data = json.getJSONObject("data");
+        String music = data.optString("music", "").replace("&API=ly.aa.cab", "");
+        if (music.isEmpty()) {
+            throw new Exception("获取音乐直链失败");
+        }
+        String title = data.optString("title", song.title);
+        String singer = data.optString("singer", song.singer);
+        String cover = data.optString("cover", "");
+        String mid = data.optString("mid", song.mid);
+        String link = "https://i.y.qq.com/v8/playsong.html?songmid=" + mid;
+        if (chatType == 2) {
+            ExtraTool.qqsendTroopMusic(peerUin, title, singer, link, music, cover);
+        } else {
+            ExtraTool.qqsendFriendMusic(peerUin, title, singer, link, music, cover);
         }
     }
 

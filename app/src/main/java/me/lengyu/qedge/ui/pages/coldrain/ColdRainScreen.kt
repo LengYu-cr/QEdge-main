@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
@@ -27,12 +28,11 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.LaunchedEffect
-import android.content.Context
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -47,6 +47,7 @@ import me.lengyu.qedge.R
 import me.lengyu.qedge.ui.components.atoms.QEdgeCard
 import me.lengyu.qedge.ui.components.atoms.QEdgeSwitch
 import me.lengyu.qedge.ui.core.theme.AccentBlue
+import me.lengyu.qedge.ui.core.theme.AccentRed
 import me.lengyu.qedge.ui.core.theme.QEdgeTheme
 import me.lengyu.qedge.ui.core.theme.isBgImageActive
 import me.lengyu.qedge.ui.widget.glass.GlassBackdropHost
@@ -66,17 +67,18 @@ fun ColdRainScreen(
     var menuRestricted by remember { mutableStateOf(ColdRainConfig.menuRestricted) }
     var menuName by remember { mutableStateOf(ColdRainConfig.menuName) }
     var replyMode by remember { mutableStateOf(ColdRainConfig.replyMode) }
-    var masterUin by remember { mutableStateOf(ColdRainConfig.masterUin) }
     var globalAdmins by remember { mutableStateOf(ColdRainConfig.globalAdmins) }
     var welcomeJoinMsg by remember { mutableStateOf(ColdRainConfig.welcomeJoinMsg) }
     var welcomeQuitMsg by remember { mutableStateOf(ColdRainConfig.welcomeQuitMsg) }
     var hourlyCustom by remember { mutableStateOf(ColdRainConfig.hourlyCustom) }
+    var quickMusicEnabled by remember { mutableStateOf(ColdRainConfig.getBoolean("quick_music_enabled", false)) }
+    var groupAdminEntries by remember { mutableStateOf(ColdRainConfig.getGroupAdminEntries()) }
     val scrollState = rememberScrollState()
 
     var showMenuNameDialog by remember { mutableStateOf(false) }
     var showReplyModeDialog by remember { mutableStateOf(false) }
-    var showMasterUinDialog by remember { mutableStateOf(false) }
     var showGlobalAdminsDialog by remember { mutableStateOf(false) }
+    var showGroupAdminsDialog by remember { mutableStateOf(false) }
     var showWelcomeJoinDialog by remember { mutableStateOf(false) }
     var showWelcomeQuitDialog by remember { mutableStateOf(false) }
     var showHourlyCustomDialog by remember { mutableStateOf(false) }
@@ -177,15 +179,16 @@ fun ColdRainScreen(
                     )
 
                     ConfigItemColdRain(
-                        title = "主人QQ",
-                        value = masterUin.ifEmpty { "未设置" },
-                        onClick = { showMasterUinDialog = true }
-                    )
-
-                    ConfigItemColdRain(
                         title = "全局代管",
                         value = if (globalAdmins.isEmpty()) "未设置" else globalAdmins,
                         onClick = { showGlobalAdminsDialog = true }
+                    )
+
+                    ConfigItemColdRain(
+                        title = "本群代管",
+                        value = if (groupAdminEntries.isEmpty()) "未设置"
+                        else "${groupAdminEntries.size} 个群已配置",
+                        onClick = { showGroupAdminsDialog = true }
                     )
                 }
             }
@@ -216,6 +219,16 @@ fun ColdRainScreen(
                         title = "自定义报时内容",
                         value = if (hourlyCustom.isEmpty()) "未设置" else hourlyCustom.take(20) + if (hourlyCustom.length > 20) "..." else "",
                         onClick = { showHourlyCustomDialog = true }
+                    )
+
+                    SwitchItemColdRain(
+                        title = "快捷点歌",
+                        description = "开启后聊天页脚本菜单显示快捷QQ点歌按钮",
+                        checked = quickMusicEnabled,
+                        onCheckedChange = {
+                            quickMusicEnabled = it
+                            ColdRainConfig.setBoolean("quick_music_enabled", it)
+                        }
                     )
                 }
             }
@@ -355,36 +368,6 @@ fun ColdRainScreen(
         )
     }
 
-    if (showMasterUinDialog) {
-        var inputText by remember { mutableStateOf(masterUin) }
-        AlertDialog(
-            onDismissRequest = { showMasterUinDialog = false },
-            title = { Text("主人QQ") },
-            text = {
-                OutlinedTextField(
-                    value = inputText,
-                    onValueChange = { inputText = it },
-                    singleLine = true,
-                    label = { Text("请输入主人QQ号") }
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    masterUin = inputText.trim()
-                    ColdRainConfig.setString("master_uin", masterUin)
-                    showMasterUinDialog = false
-                }) {
-                    Text("确定", color = AccentBlue)
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showMasterUinDialog = false }) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-
     if (showGlobalAdminsDialog) {
         var inputText by remember { mutableStateOf(globalAdmins) }
         AlertDialog(
@@ -418,6 +401,99 @@ fun ColdRainScreen(
             dismissButton = {
                 TextButton(onClick = { showGlobalAdminsDialog = false }) {
                     Text("取消")
+                }
+            }
+        )
+    }
+
+    if (showGroupAdminsDialog) {
+        var inputGroupUin by remember { mutableStateOf("") }
+        var inputAdmins by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { showGroupAdminsDialog = false },
+            title = { Text("本群代管") },
+            text = {
+                Column {
+                    if (groupAdminEntries.isEmpty()) {
+                        Text(
+                            "尚未配置任何群",
+                            fontSize = 12.sp,
+                            color = colors.textSecondary
+                        )
+                    } else {
+                        Column(
+                            modifier = Modifier
+                                .heightIn(max = 160.dp)
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            groupAdminEntries.forEach { (groupUin, admins) ->
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(vertical = 4.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            "群 $groupUin",
+                                            fontSize = 13.sp,
+                                            color = colors.textPrimary
+                                        )
+                                        Text(
+                                            admins,
+                                            fontSize = 12.sp,
+                                            color = colors.textSecondary
+                                        )
+                                    }
+                                    TextButton(onClick = {
+                                        ColdRainConfig.removeGroupAdmins(groupUin)
+                                        groupAdminEntries = ColdRainConfig.getGroupAdminEntries()
+                                    }) {
+                                        Text("删除", color = AccentRed)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = inputGroupUin,
+                        onValueChange = { inputGroupUin = it },
+                        singleLine = true,
+                        label = { Text("群号") }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = inputAdmins,
+                        onValueChange = { inputAdmins = it },
+                        singleLine = true,
+                        label = { Text("代管QQ，多个用逗号分隔") }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "只对填写的群生效，不影响其他群",
+                        fontSize = 12.sp,
+                        color = colors.textSecondary
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val groupUin = inputGroupUin.trim()
+                    val admins = inputAdmins.trim()
+                    if (groupUin.isNotEmpty() && admins.isNotEmpty()) {
+                        ColdRainConfig.setGroupAdmins(groupUin, admins)
+                        groupAdminEntries = ColdRainConfig.getGroupAdminEntries()
+                        inputGroupUin = ""
+                        inputAdmins = ""
+                    }
+                }) {
+                    Text("保存", color = AccentBlue)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showGroupAdminsDialog = false }) {
+                    Text("关闭")
                 }
             }
         )

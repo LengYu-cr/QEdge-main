@@ -16,6 +16,7 @@ import me.lengyu.qedge.utils.ModuleConfig
 import me.lengyu.qedge.utils.ReflectUtils
 import me.lengyu.qedge.utils.qq.QQCurrentEnv
 import me.lengyu.qedge.utils.qq.FriendTool
+import me.lengyu.qedge.utils.reflect.ClassUtils
 import java.io.ByteArrayOutputStream
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
@@ -37,6 +38,11 @@ class PreventRecall : BaseSwitchHookItem() {
         private const val TAG = "PreventRecall"
         private const val SP_KEY = "prevent_recall"
         private const val RECALL_PROMPT_VIEW_ID = 0x298382
+        private const val AIO_MSG_ITEM_CLASS = "com.tencent.mobileqq.aio.msg.AIOMsgItem"
+
+        /** 按 VB 的 Class 缓存 AIOMsgItem 字段（视图复用同一 Class，命中后 O(1)） */
+        private val aioMsgItemFieldCache = java.util.concurrent.ConcurrentHashMap<Class<*>, Any>()
+        private val FIELD_NOT_FOUND = Any()
 
         private fun isEnabled(): Boolean {
             return ModuleConfig.getBoolean(SP_KEY, false)
@@ -1003,8 +1009,9 @@ class PreventRecall : BaseSwitchHookItem() {
      */
     private fun onAIOMsgUpdate(param: XC_MethodHook.MethodHookParam) {
         try {
-            if (!isEnabled()) return
+            // 没有撤回记录时直接返回，避免无谓的反射与视图查找
             if (recallMetaMap.isEmpty()) return
+            if (!isEnabled()) return
 
             val thisObject = param.thisObject
 
@@ -1017,14 +1024,8 @@ class PreventRecall : BaseSwitchHookItem() {
                 captureAIOAdapter(rootView)
             }
 
-            // 获取 AIOMsgItem 字段
-            val aioMsgItem = findFirstFieldOfType(
-                thisObject,
-                "com.tencent.mobileqq.aio.msg.AIOMsgItem"
-            )
-            if (aioMsgItem == null) {
-                return
-            }
+            // 获取 AIOMsgItem 字段（按 Class 缓存，命中后不再扫描字段）
+            val aioMsgItem = findAioMsgItem(thisObject) ?: return
 
             // 获取 msgRecord
             val msgRecord = ReflectUtils.callMethod(aioMsgItem, "getMsgRecord") ?: return
@@ -1039,8 +1040,9 @@ class PreventRecall : BaseSwitchHookItem() {
             val lookupKey = "${peerUin}_$msgSeq"
             val meta = recallMetaMap[lookupKey] ?: return
 
-            // 防止重复添加
-            if (rootView.findViewById<View?>(RECALL_PROMPT_VIEW_ID) != null) return
+            // 防止重复添加（tag 查找 O(1)，不再遍历子树）
+            val existing = rootView.getTag(RECALL_PROMPT_VIEW_ID) as? View
+            if (existing != null && existing.parent === rootView) return
 
             // 添加「已撤回」提示标签
             addRecallPromptView(rootView)
@@ -1053,12 +1055,13 @@ class PreventRecall : BaseSwitchHookItem() {
      * 从 AIOBubbleMsgItemVB 获取视图，优先使用 e 字段
      */
     private fun getVBView(thisObject: Any): View? {
-        // 策略1：反射获取 e 字段（private final android.view.View）
+        // 策略1：反射获取 e 字段（private final android.view.View），字段查找走 ClassUtils 缓存
         try {
-            val field = thisObject.javaClass.getDeclaredField("e")
-            field.isAccessible = true
-            val view = field.get(thisObject) as? View
-            if (view != null) return view
+            val field = ClassUtils.findFieldOrNull(thisObject.javaClass, "e")
+            if (field != null) {
+                val view = field.get(thisObject) as? View
+                if (view != null) return view
+            }
         } catch (_: Exception) {}
 
         // 策略2：调用 getHostView()
@@ -1194,24 +1197,47 @@ class PreventRecall : BaseSwitchHookItem() {
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.WRAP_CONTENT
         ))
+        rootView.setTag(RECALL_PROMPT_VIEW_ID, textView)
     }
 
     /**
-     * 在对象中查找第一个指定类型的字段值（含父类）
+     * 在对象中查找 AIOMsgItem 字段的值；字段本身按 Class 缓存，命中后不再扫描字段
      */
-    private fun findFirstFieldOfType(obj: Any, typeName: String): Any? {
+    private fun findAioMsgItem(obj: Any): Any? {
+        val clazz = obj.javaClass
+        val cached = aioMsgItemFieldCache[clazz]
+        val field: java.lang.reflect.Field = when {
+            cached === FIELD_NOT_FOUND -> return null
+            cached != null -> cached as java.lang.reflect.Field
+            else -> {
+                val found = findFirstFieldOfType(clazz, AIO_MSG_ITEM_CLASS)
+                aioMsgItemFieldCache.putIfAbsent(clazz, found ?: FIELD_NOT_FOUND)
+                found
+            }
+        } ?: return null
+        return try {
+            field.get(obj)
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    /**
+     * 在类及其父类中查找第一个指定类型的字段
+     */
+    private fun findFirstFieldOfType(clazz: Class<*>, typeName: String): java.lang.reflect.Field? {
         try {
             val hostCL = ReflectUtils.hostClassLoader ?: return null
             val targetType = XposedHelpers.findClass(typeName, hostCL)
-            var clazz: Class<*>? = obj.javaClass
-            while (clazz != null) {
-                for (field in clazz.declaredFields) {
+            var current: Class<*>? = clazz
+            while (current != null) {
+                for (field in current.declaredFields) {
                     if (targetType.isAssignableFrom(field.type)) {
                         field.isAccessible = true
-                        return field.get(obj)
+                        return field
                     }
                 }
-                clazz = clazz.superclass
+                current = current.superclass
             }
         } catch (e: Exception) {
             // ignore

@@ -4,13 +4,17 @@ import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.ExperimentalAnimationApi
 import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.expandVertically
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
@@ -57,12 +61,14 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import me.lengyu.qedge.common.ModuleScope
@@ -86,6 +92,7 @@ import me.lengyu.qedge.ui.pages.home.HomeCreatePluginDialog
 import me.lengyu.qedge.ui.pages.home.HomeEntrySelectDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageSummaryDialog
 import me.lengyu.qedge.ui.pages.home.HomeImageRatioDialog
+import me.lengyu.qedge.ui.pages.home.HomeGlassBarSizeDialog
 import me.lengyu.qedge.ui.pages.home.HomeVoiceSpeedDialog
 import me.lengyu.qedge.ui.pages.home.HomeWebJsAllowlistDialog
 import me.lengyu.qedge.ui.pages.home.HomeQLogRedirectDialog
@@ -99,6 +106,7 @@ import me.lengyu.qedge.plugin.view.MediaPanelLoader
 import me.lengyu.qedge.hook.item.LevelBoost
 import me.lengyu.qedge.hook.item.HideQmateTitleIcon
 import me.lengyu.qedge.hook.item.HideAioPet
+import me.lengyu.qedge.hook.item.GlassBottomTabBar
 import me.lengyu.qedge.hook.item.KeepAliveHook
 import me.lengyu.qedge.hook.item.QLogRedirect
 import me.lengyu.qedge.hook.UserData
@@ -114,6 +122,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.compose.ui.layout.ContentScale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import java.net.URL
 
@@ -250,6 +259,24 @@ fun HomeScreen(
     var hideDressBeancurd by remember { mutableStateOf(ModuleConfig.getBoolean("hide_dress_beancurd", false)) }
     var hideAioPet by remember { mutableStateOf(ModuleConfig.getBoolean("hide_aio_pet", false)) }
     var apk1AsApk by remember { mutableStateOf(ModuleConfig.getBoolean("apk1_as_apk", false)) }
+    var glassBottomTabBar by remember { mutableStateOf(ModuleConfig.getBoolean("glass_bottom_tab_bar", false)) }
+    var glassBarHeight by remember {
+        mutableStateOf(
+            ModuleConfig.getInt(
+                GlassBottomTabBar.KEY_HEIGHT_DP,
+                GlassBottomTabBar.DEFAULT_HEIGHT_DP
+            ).toString()
+        )
+    }
+    var glassBarSideMargin by remember {
+        mutableStateOf(
+            ModuleConfig.getInt(
+                GlassBottomTabBar.KEY_SIDE_MARGIN_DP,
+                GlassBottomTabBar.DEFAULT_SIDE_MARGIN_DP
+            ).toString()
+        )
+    }
+    var showGlassBarSizeDialog by remember { mutableStateOf(false) }
     var disableAioLeftSwipe by remember { mutableStateOf(ModuleConfig.getBoolean("disable_aio_left_swipe", false)) }
     var disableHomePullDown by remember { mutableStateOf(ModuleConfig.getBoolean("disable_home_pull_down", false)) }
     var removeRiskWebpage by remember { mutableStateOf(ModuleConfig.getBoolean("remove_risk_webpage", false)) }
@@ -324,11 +351,13 @@ fun HomeScreen(
     var timArkCardBypass by remember { mutableStateOf(ModuleConfig.getBoolean("tim_ark_card_bypass", true)) }
     var profileAutoLikeBack by remember { mutableStateOf(ModuleConfig.getBoolean("profile_auto_like_back", false)) }
     var qzoneCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_CHECKIN_ENABLED, false)) }
+    var qzoneCheckinDeleteAfter by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_CHECKIN_DELETE_AFTER, false)) }
     var dailySignEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_DAILY_SIGN_ENABLED, false)) }
     var bigVipCheckinEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_BIGVIP_CHECKIN_ENABLED, false)) }
     var levelBoostEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_LEVEL_BOOST_ENABLED, false)) }
     var spaceBrowseEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_SPACE_BROWSE_ENABLED, false)) }
     var moodEnabled by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_MOOD_ENABLED, false)) }
+    var moodDeleteAfter by remember { mutableStateOf(ModuleConfig.getBoolean(LevelBoost.SP_MOOD_DELETE_AFTER, false)) }
     var moodTime by remember { mutableStateOf(LevelBoost.getMoodTime()) }
     var moodText by remember { mutableStateOf(LevelBoost.getMoodText()) }
     var showCommentDialog by remember { mutableStateOf(false) }
@@ -471,6 +500,26 @@ fun HomeScreen(
         }
     }
 
+    // 切页瞬间让内容整体「抬起」一下：圆角张开 + 轻微缩小，再落回满幅。
+    // 与 AnimatedContent 的横向位移叠加，形成有纵深的空间流向。
+    var pageLifted by remember { mutableStateOf(false) }
+    var lastTab by remember { mutableIntStateOf(selectedTab) }
+    LaunchedEffect(selectedTab) {
+        if (lastTab != selectedTab) {
+            lastTab = selectedTab
+            pageLifted = true
+            delay(240)
+            pageLifted = false
+        }
+    }
+    val pageLift by animateDpAsState(
+        targetValue = if (pageLifted) 24.dp else 0.dp,
+        // 不能用带回弹的 spring：回落时过冲到负值会让 RoundedCornerShape 抛
+        // "Corner size in Px can't be negative"，宿主会直接把进程杀掉
+        animationSpec = spring(dampingRatio = 1f, stiffness = 500f),
+        label = "pageLift"
+    )
+
     // 有背景图时不分亮暗：整页固定走暗色玻璃风格；无背景图则跟随当前主题
     val bgImageActive = bgImageEnabled && bgImageUri.isNotEmpty()
     val effectiveColors = if (bgImageActive) ForcedDarkColors else colors
@@ -545,21 +594,21 @@ fun HomeScreen(
                 )
             }
 
-            AnimatedVisibility(visible = expandedPanel == 1 && selectedTab == 0) {
+            TopPanel(visible = expandedPanel == 1 && selectedTab == 0) {
                 UserInfoCard(
                     uin = currentUin,
                     avatarBitmap = avatarBitmap
                 )
             }
 
-            AnimatedVisibility(visible = expandedPanel == 2) {
+            TopPanel(visible = expandedPanel == 2) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     UpdateLogCard()
                     HomeAdBanner()
                 }
             }
 
-            AnimatedVisibility(visible = expandedPanel == 3) {
+            TopPanel(visible = expandedPanel == 3) {
                 SponsorCard()
             }
 
@@ -569,24 +618,40 @@ fun HomeScreen(
                 targetState = selectedTab,
                 transitionSpec = {
                     val forward = targetState > initialState
+                    val incomingSlide = spring<IntOffset>(
+                        Spring.DampingRatioMediumBouncy,
+                        Spring.StiffnessMediumLow
+                    )
                     if (forward) {
-                        slideInHorizontally(
-                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
-                            initialOffsetX = { it }
-                        ) + fadeIn(animationSpec = tween(150)) togetherWith
-                        slideOutHorizontally(
-                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
-                            targetOffsetX = { -it / 3 }
-                        ) + fadeOut(animationSpec = tween(120))
+                        slideInHorizontally(animationSpec = incomingSlide, initialOffsetX = { it }) +
+                            fadeIn(animationSpec = tween(150)) +
+                            scaleIn(
+                                animationSpec = spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow),
+                                initialScale = 0.94f
+                            ) togetherWith
+                            slideOutHorizontally(
+                                animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
+                                targetOffsetX = { -it / 3 }
+                            ) + fadeOut(animationSpec = tween(120)) +
+                            scaleOut(
+                                animationSpec = tween(180),
+                                targetScale = 0.92f
+                            )
                     } else {
-                        slideInHorizontally(
-                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
-                            initialOffsetX = { -it }
-                        ) + fadeIn(animationSpec = tween(150)) togetherWith
-                        slideOutHorizontally(
-                            animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
-                            targetOffsetX = { it / 3 }
-                        ) + fadeOut(animationSpec = tween(120))
+                        slideInHorizontally(animationSpec = incomingSlide, initialOffsetX = { -it }) +
+                            fadeIn(animationSpec = tween(150)) +
+                            scaleIn(
+                                animationSpec = spring(Spring.DampingRatioNoBouncy, Spring.StiffnessMediumLow),
+                                initialScale = 0.94f
+                            ) togetherWith
+                            slideOutHorizontally(
+                                animationSpec = spring(Spring.DampingRatioMediumBouncy, Spring.StiffnessMediumLow),
+                                targetOffsetX = { it / 3 }
+                            ) + fadeOut(animationSpec = tween(120)) +
+                            scaleOut(
+                                animationSpec = tween(180),
+                                targetScale = 0.92f
+                            )
                     }
                 },
                 // 底部不再整体留白：内容一直排到系统导航栏上沿，
@@ -594,6 +659,16 @@ fun HomeScreen(
                 modifier = Modifier
                     .weight(1f)
                     .windowInsetsPadding(WindowInsets.navigationBars)
+                    .graphicsLayer {
+                        // 切页瞬间的「整页抬起」：圆角张开 + 轻微缩小，随后落回满幅
+                        val lift = pageLift.value.coerceAtLeast(0f)
+                        clip = true
+                        shape = RoundedCornerShape(lift)
+                        val liftRatio = lift / 24f
+                        val shrink = 1f - liftRatio * 0.02f
+                        scaleX = shrink
+                        scaleY = shrink
+                    }
             ) { tab ->
                 when (tab) {
                     0 -> CompositionLocalProvider(LocalHomeSearchQuery provides homeSearchQuery) {
@@ -639,6 +714,9 @@ fun HomeScreen(
                             hideDressBeancurd = hideDressBeancurd,
                             hideAioPet = hideAioPet,
                             apk1AsApk = apk1AsApk,
+                            glassBottomTabBar = glassBottomTabBar,
+                            glassBarHeight = glassBarHeight,
+                            glassBarSideMargin = glassBarSideMargin,
                             disableAioLeftSwipe = disableAioLeftSwipe,
                             disableHomePullDown = disableHomePullDown,
                             removeRiskWebpage = removeRiskWebpage,
@@ -658,11 +736,13 @@ fun HomeScreen(
                             bgImageEnabled = bgImageEnabled,
                             bgImageUri = bgImageUri,
                             qzoneCheckinEnabled = qzoneCheckinEnabled,
+                            qzoneCheckinDeleteAfter = qzoneCheckinDeleteAfter,
                             dailySignEnabled = dailySignEnabled,
                             bigVipCheckinEnabled = bigVipCheckinEnabled,
                             levelBoostEnabled = levelBoostEnabled,
                             spaceBrowseEnabled = spaceBrowseEnabled,
                             moodEnabled = moodEnabled,
+                            moodDeleteAfter = moodDeleteAfter,
                             moodTime = moodTime,
                             moodText = moodText,
                             keepAlivePixel = keepAlivePixel,
@@ -823,6 +903,13 @@ fun HomeScreen(
                                 apk1AsApk = it
                                 Thread { ModuleConfig.putBoolean("apk1_as_apk", it) }.start()
                             },
+                            onGlassBottomTabBarToggle = {
+                                glassBottomTabBar = it
+                                Thread { ModuleConfig.putBoolean("glass_bottom_tab_bar", it) }.start()
+                                // 钩子只在启动时按配置安装
+                                Toasts.toast("已${if (it) "开启" else "关闭"}，重启QQ后生效")
+                            },
+                            onGlassBottomTabBarConfigClick = { showGlassBarSizeDialog = true },
                             onDisableAioLeftSwipeToggle = {
                                 disableAioLeftSwipe = it
                                 Thread { ModuleConfig.putBoolean("disable_aio_left_swipe", it) }.start()
@@ -929,6 +1016,10 @@ fun HomeScreen(
                                 qzoneCheckinEnabled = it
                                 Thread { ModuleConfig.putBoolean(LevelBoost.SP_CHECKIN_ENABLED, it) }.start()
                             },
+                            onCheckinDeleteAfterToggle = {
+                                qzoneCheckinDeleteAfter = it
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_CHECKIN_DELETE_AFTER, it) }.start()
+                            },
                             onDailySignToggle = {
                                 dailySignEnabled = it
                                 Thread { ModuleConfig.putBoolean(LevelBoost.SP_DAILY_SIGN_ENABLED, it) }.start()
@@ -948,6 +1039,10 @@ fun HomeScreen(
                             onMoodToggle = {
                                 moodEnabled = it
                                 Thread { ModuleConfig.putBoolean(LevelBoost.SP_MOOD_ENABLED, it) }.start()
+                            },
+                            onMoodDeleteAfterToggle = {
+                                moodDeleteAfter = it
+                                Thread { ModuleConfig.putBoolean(LevelBoost.SP_MOOD_DELETE_AFTER, it) }.start()
                             },
                             onMoodConfigClick = { showMoodConfigDialog = true },
                             onKeepAlivePixelToggle = {
@@ -1081,6 +1176,23 @@ fun HomeScreen(
             }
         )
 
+        HomeGlassBarSizeDialog(
+            show = showGlassBarSizeDialog,
+            height = glassBarHeight,
+            sideMargin = glassBarSideMargin,
+            onDismiss = { showGlassBarSizeDialog = false },
+            onConfirm = { h, m ->
+                glassBarHeight = h.toString()
+                glassBarSideMargin = m.toString()
+                showGlassBarSizeDialog = false
+                Thread {
+                    ModuleConfig.putInt(GlassBottomTabBar.KEY_HEIGHT_DP, h)
+                    ModuleConfig.putInt(GlassBottomTabBar.KEY_SIDE_MARGIN_DP, m)
+                }.start()
+                Toasts.toast("已保存，重启QQ后生效")
+            }
+        )
+
         HomeVoiceSpeedDialog(
             show = showVoiceSpeedDialog,
             current = voiceSpeedValue,
@@ -1178,5 +1290,35 @@ fun HomeScreen(
         )
         }
         }
+    }
+}
+
+/**
+ * 顶栏下推面板的统一进出场：从标题栏下方滑出并向下展开，
+ * 收起时反向回收，避免默认 AnimatedVisibility 的生硬淡入淡出。
+ */
+@Composable
+private fun TopPanel(
+    visible: Boolean,
+    content: @Composable () -> Unit
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter = fadeIn(animationSpec = tween(180)) +
+            expandVertically(
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = 900f),
+                expandFrom = Alignment.Top
+            ) +
+            slideInVertically(
+                animationSpec = spring(dampingRatio = 0.72f, stiffness = 900f),
+                initialOffsetY = { -it / 6 }
+            ),
+        exit = fadeOut(animationSpec = tween(120)) +
+            shrinkVertically(
+                animationSpec = spring(dampingRatio = 0.9f, stiffness = 1000f),
+                shrinkTowards = Alignment.Top
+            )
+    ) {
+        Box(modifier = Modifier.fillMaxWidth()) { content() }
     }
 }

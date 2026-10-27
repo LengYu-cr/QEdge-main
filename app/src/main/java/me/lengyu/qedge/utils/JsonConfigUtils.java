@@ -22,17 +22,21 @@ import java.util.concurrent.TimeUnit;
  * @Author 冷雨
  * @Description JSON 配置读写工具类
  *
- * <p>性能优化：每个配置文件在进程内维护一份内存缓存，读操作命中缓存后仅做一次
- * {@code lastModified()} 判断（O(1) stat），不再每次全量读盘 + 解析；写操作立即更新
- * 缓存并把落盘合并到后台单线程去抖执行，去掉了每次写调用里的 {@code fsync} 阻塞。
+ * <p>性能优化：每个配置文件在进程内维护一份内存缓存，读操作命中缓存后完全不做文件系统调用
+ * （跨进程改动检测按 {@link #STAMP_CHECK_INTERVAL_MS} 节流），不再每次全量读盘 + 解析；
+ * 写操作立即更新缓存并把落盘合并到后台单线程去抖执行，去掉了每次写调用里的 {@code fsync} 阻塞。
  *
  * <p>跨进程一致性：模块 UI 进程写、QQ/TIM Hook 进程读。读时通过文件 {@code lastModified()}
  * 变化检测其他进程的写入，变化则重新加载一次，保证 Hook 侧能读到 UI 侧的最新开关值。
  */
 public class JsonConfigUtils {
 
-    /** 每个配置文件对应一个缓存条目，key 为配置文件绝对路径。 */
-    private static final ConcurrentHashMap<String, ConfigEntry> CACHE = new ConcurrentHashMap<>();
+    /** 两级缓存：目录 -> (配置名 -> 缓存条目)，避免每次读配置都拼路径、new File、getAbsolutePath。 */
+    private static final ConcurrentHashMap<String, ConcurrentHashMap<String, ConfigEntry>> CACHE =
+            new ConcurrentHashMap<>();
+
+    /** 跨进程改动检测的最小间隔：这段时间内的读操作完全不碰文件系统。 */
+    private static final long STAMP_CHECK_INTERVAL_MS = 500L;
 
     /** 后台落盘线程：单线程，去抖合并写入。 */
     private static final ScheduledExecutorService FLUSH_EXECUTOR =
@@ -51,6 +55,8 @@ public class JsonConfigUtils {
         JSONObject data;
         /** 上次从磁盘加载/写入后记录的文件修改时间，用于检测其他进程的写入。 */
         long fileStamp;
+        /** 下次允许做 lastModified 检测的时间点（毫秒），节流后高频读不再产生 stat。 */
+        long nextStampCheckMs;
         /** 待落盘标记，配合去抖任务合并写入。 */
         boolean dirty;
         ScheduledFuture<?> pendingFlush;
@@ -172,20 +178,47 @@ public class JsonConfigUtils {
     }
 
     /**
-     * 取得配置缓存条目：首次访问从磁盘加载一次；后续访问仅在文件被其他进程改动
-     * （{@code lastModified()} 变化）时重新加载，命中缓存则直接返回内存对象。
+     * 取得配置缓存条目。
+     *
+     * <p>快路径：条目已缓存且距上次文件时间戳检测不足 {@link #STAMP_CHECK_INTERVAL_MS} 时，
+     * 直接返回内存对象，零文件系统调用（高频 Hook 回调就落在这条路径上）。
+     * 慢路径：首次访问或检测窗口到期时，做一次 {@code exists()+lastModified()}，
+     * 发现其他进程改动才重新加载。跨进程开关同步最多延迟一个检测窗口。
      */
     private static ConfigEntry obtainEntry(String absoluteDir, String configName) {
-        File configFile = getConfigFile(absoluteDir, configName);
-        ConfigEntry entry = CACHE.computeIfAbsent(configFile.getAbsolutePath(),
-                p -> new ConfigEntry(configFile));
+        ConcurrentHashMap<String, ConfigEntry> byName = CACHE.get(absoluteDir);
+        if (byName == null) {
+            ConcurrentHashMap<String, ConfigEntry> created = new ConcurrentHashMap<>();
+            byName = CACHE.putIfAbsent(absoluteDir, created);
+            if (byName == null) byName = created;
+        }
+        ConfigEntry entry = byName.get(configName);
+        if (entry == null) {
+            // 目录创建只发生在首次访问该配置文件时
+            File dir = new File(absoluteDir);
+            if (!dir.exists()) {
+                dir.mkdirs();
+            }
+            ConfigEntry created = new ConfigEntry(new File(dir, configName + ".dat"));
+            entry = byName.putIfAbsent(configName, created);
+            if (entry == null) entry = created;
+        }
+
+        long now = System.currentTimeMillis();
         synchronized (entry) {
-            long currentStamp = configFile.exists() ? configFile.lastModified() : 0L;
-            // data 未初始化，或磁盘被其他进程改动过 -> 重新加载。
-            // dirty 时说明本进程有尚未落盘的更改，以内存为准，不覆盖。
-            if (entry.data == null || (!entry.dirty && currentStamp != entry.fileStamp)) {
+            if (entry.data == null) {
+                long currentStamp = entry.configFile.exists() ? entry.configFile.lastModified() : 0L;
                 entry.data = loadConfig(entry.configFile, configName);
                 entry.fileStamp = currentStamp;
+                entry.nextStampCheckMs = now + STAMP_CHECK_INTERVAL_MS;
+            } else if (!entry.dirty && now >= entry.nextStampCheckMs) {
+                entry.nextStampCheckMs = now + STAMP_CHECK_INTERVAL_MS;
+                long currentStamp = entry.configFile.exists() ? entry.configFile.lastModified() : 0L;
+                // 磁盘被其他进程改动过 -> 重新加载；dirty 时以本进程内存为准，不覆盖。
+                if (currentStamp != entry.fileStamp) {
+                    entry.data = loadConfig(entry.configFile, configName);
+                    entry.fileStamp = currentStamp;
+                }
             }
         }
         return entry;
@@ -240,6 +273,7 @@ public class JsonConfigUtils {
         synchronized (entry) {
             if (!entry.dirty) {
                 entry.fileStamp = entry.configFile.exists() ? entry.configFile.lastModified() : 0L;
+                entry.nextStampCheckMs = System.currentTimeMillis() + STAMP_CHECK_INTERVAL_MS;
             }
         }
     }

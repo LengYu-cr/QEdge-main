@@ -40,6 +40,9 @@ internal object HomeRowText {
     @field:RowText(title = "定时发说说 +0.5天", subtitle = "定时自动发布说说，点击配置", card = "card_qzone")
     val MOOD_SCHEDULE = "定时发说说 +0.5天"
 
+    @field:RowText(title = "发布后删除说说", subtitle = "定时说说发布成功 5 秒后自动删除该条说说，默认关闭", card = "card_qzone")
+    val MOOD_DELETE_AFTER = "发布后删除说说"
+
     // ==================== 聊天功能 ====================
 
     @field:RowText(title = "聊天功能", subtitle = "闪照破解、视频转泡泡等", card = "card_chat", cardHeader = true)
@@ -143,6 +146,9 @@ internal object HomeRowText {
     @field:RowText(title = "禁用首页下拉小程序", subtitle = "保留短距离下拉刷新，长距离下拉不再呼出小程序面板", card = "card_purify")
     val DISABLE_HOME_PULL_DOWN = "禁用首页下拉小程序"
 
+    @field:RowText(title = "液态玻璃底栏", subtitle = "用液态玻璃底栏替换QQ原生底部导航栏，图标取自QQ原生底栏（重启QQ生效）", card = "card_purify")
+    val GLASS_BOTTOM_TAB_BAR = "液态玻璃底栏"
+
     // ==================== 资料卡 ====================
 
     @field:RowText(title = "资料卡", subtitle = "上传透明头像等，名片回赞", card = "card_profile", cardHeader = true)
@@ -161,6 +167,9 @@ internal object HomeRowText {
 
     @field:RowText(title = "空间等级签到", subtitle = "自动执行空间打卡 +0.5天", card = "card_level")
     val QZONE_CHECKIN = "空间等级签到"
+
+    @field:RowText(title = "签到后删除说说", subtitle = "签到成功 5 秒后自动删除该条说说，默认关闭", card = "card_level")
+    val CHECKIN_DELETE_AFTER = "签到后删除说说"
 
     @field:RowText(title = "QQ 日签打卡", subtitle = "自动执行日签打卡 +0.5天", card = "card_level")
     val DAILY_SIGN = "QQ 日签打卡"
